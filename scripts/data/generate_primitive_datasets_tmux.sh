@@ -9,7 +9,7 @@ function run_cmd {
 
     tmux new-session -d -s "${tmux_name}"
     tmux send-keys -t "${tmux_name}" "export PYTHONPATH=${path_mod}:${PYTHONPATH}" Enter
-    tmux send-keys -t "${tmux_name}" "taskset -c ${CPU} pipenv run ${PYTHON_CMD}" Enter
+    tmux send-keys -t "${tmux_name}" "taskset -c ${CPU} ${PYTHON_CMD}" Enter
 }
 
 function generate_data {
@@ -19,7 +19,7 @@ function generate_data {
     args="${args} --config.symbolic-action-type ${SYMBOLIC_ACTION_TYPE}"
     args="${args} --config.seed ${SEED}"
     
-    PYTHON_CMD="python scripts/data/generate_primitive_dataset.py ${args}"
+    PYTHON_CMD="python generate_primitive_dataset.py ${args}"
     run_cmd
 }
 

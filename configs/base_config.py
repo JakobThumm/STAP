@@ -90,6 +90,7 @@ class PolicyDatasetGenerationConfig:
     agent_config: str = "configs/pybullet/agents/single_stage/sac.yaml"
     device: str = "auto"
     seed: int = 0
+    gui: bool = False
     # Dataset generation configs.
     pddl_handler: Optional[PDDLConfig] = None
     template_env_yaml: str = (
@@ -97,7 +98,7 @@ class PolicyDatasetGenerationConfig:
     )
     primitive: Literal["pick", "place", "push", "pull"] = "pick"
     symbolic_action_type: Literal["valid", "invalid"] = "valid"
-    save_env_config: bool = True
+    save_env_config: bool = False
     object_types: Dict[str, str] = dataclasses.field(
         default_factory=lambda: {
             "table": "unmovable",

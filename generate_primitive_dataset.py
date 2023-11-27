@@ -389,6 +389,8 @@ def main(config: PolicyDatasetGenerationConfig):
         env_config=env_config,
         device=config.device,
         seed=config.seed,
+        gui=config.gui,
+        overwrite=True
     )
 
 
