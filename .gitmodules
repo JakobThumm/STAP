@@ -1,3 +1,6 @@
 [submodule "third_party/scod-regression"]
 	path = third_party/scod-regression
 	url = https://github.com/agiachris/scod-regression.git
+[submodule "third_party/human-robot-animations"]
+	path = third_party/human-robot-animations
+	url = https://github.com/JakobThumm/human-robot-animations.git
