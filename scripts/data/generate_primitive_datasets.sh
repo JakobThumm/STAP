@@ -20,8 +20,10 @@ function generate_data {
     args="${args} --config.split ${SPLIT}"
     args="${args} --config.primitive ${PRIMITIVE}"
     args="${args} --config.symbolic-action-type ${SYMBOLIC_ACTION_TYPE}"
-    # args="${args} --config.gui ${GUI}"
     args="${args} --config.seed ${SEED}"
+    if [[ ${GUI} == true ]]; then
+        args="${args} --config.gui"
+    fi
     
     CMD="python generate_primitive_dataset.py ${args}"    
     run_cmd
@@ -47,7 +49,7 @@ TRAINER_CONFIG="configs/pybullet/trainers/datasets/primitive_valid_dataset.yaml"
 SYMBOLIC_ACTION_TYPE="valid"
 TRAIN_SEEDS=($(seq 0 15))
 VALIDATION_SEEDS=($(seq 16 19))
-GUI=true
+GUI=false
 
 PRIMITIVE="pick"
 run_data_generation
