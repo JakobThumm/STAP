@@ -12,8 +12,8 @@ import pybullet as p
 from stap.envs import base as envs
 from stap.envs.pybullet.base import SIM_TIME_STEP
 from stap.envs.pybullet.sim import math
+from stap.envs.pybullet.sim.human import Human
 from stap.envs.pybullet.table import object_state, utils
-from stap.envs.pybullet.table.objects import Human
 from stap.envs.pybullet.table.primitives import Primitive
 from stap.envs.pybullet.table_env import TableEnv
 
@@ -34,11 +34,41 @@ class HumanTableEnv(TableEnv):
             kwargs: Keyword arguments for `TableEnv`.
         """
         super().__init__(**kwargs)
-        self.human = Human(self.physics_id, name="human", color=[1.0, 0.0, 0.0, 0.5])
+        body_names = ["head", "torso"]
+        body_measurement_ids = {
+            "head": (int(0), int(1)),
+            "torso": (int(2), int(3)),
+        }
+        body_radii = {
+            "head": 0.1,
+            "torso": 0.2,
+        }
+        body_lengths = {
+            "head": 0.0,
+            "torso": 0.3,
+        }
+        self.human = Human(
+            self.physics_id,
+            name="human",
+            color=[1.0, 0.0, 0.0, 0.5],
+            body_names=body_names,
+            body_measurement_ids=body_measurement_ids,
+            body_radii=body_radii,
+            body_lengths=body_lengths,
+        )
         self.human.reset(self.task.action_skeleton, self.task.initial_state)
         self._initial_state_id = p.saveState(physicsClientId=self.physics_id)
-        self._animation = 0.2 * np.ones((100, 3), dtype=np.float32)
-        self._animation[:, 0] = np.linspace(0.0, 1.0, 100)
+        # Animation: Time, Point, Pos
+        self._animation = 0.2 * np.ones((100, 4, 3), dtype=np.float32)
+        self._animation[:, 0, 0] = np.linspace(0.0, 1.0, 100)
+        self._animation[:, 1, 0] = np.linspace(0.0, 1.0, 100)
+        # self._animation[:, 2, 0] = np.linspace(0.0, 1.0, 100)
+        # self._animation[:, 3, 0] = np.linspace(0.0, 1.0, 100)
+        self._animation[:, 2, 0] = 0.5 * np.ones((100,), dtype=np.float32)
+        self._animation[:, 3, 0] = 0.5 * np.ones((100,), dtype=np.float32)
+        self._animation[:, 2, 1] = 0.1 + 0.1 * np.linspace(0.0, 1.0, 100)
+        self._animation[:, 3, 1] = 0.1 - 0.1 * np.linspace(0.0, 1.0, 100)
+        self._animation[:, 3, 2] = 0.5 * np.ones((100,), dtype=np.float32)
         self._animation_freq = 100
         self._sim_time = 0.0
 

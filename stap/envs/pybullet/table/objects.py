@@ -279,55 +279,45 @@ class Box(Object):
         return [self._shape]
 
 
-class Human(Object):
+class VisualCapsule(Object):
     def __init__(
         self,
         physics_id: int,
         name: str,
+        height: float,
+        radius: float,
         color: Union[List[float], np.ndarray],
+        mass: float = 0.1,
     ):
-        custom_radius = 0.1
-        physical_head = shapes.Sphere(mass=0, color=np.array(color), radius=custom_radius)
-        self._head = shapes.Visual(shape=physical_head)
-        body_id = shapes.create_body(self._head, physics_id=physics_id)
-        self._bbox = np.array([-custom_radius, custom_radius])
-        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=True)
-        self.disable_collisions()
-        self.freeze()
-        self._animation = np.array([])
-        self._recording_freq = 0.0
-        self._start_time = None
-        self._allow_animation = True
+        vis_cap = shapes.Visual(shape=shapes.Capsule(height=height, radius=radius, mass=mass, color=np.array(color)))
+        body_id = shapes.create_body(vis_cap, physics_id=physics_id)
+        self._shape = vis_cap
 
-    def reset(self, action_skeleton: List, initial_state: Optional[List] = None) -> None:
-        self.set_pose(math.Pose(np.array([0.2, 0.2, 0.2]), np.array([0, 0, 0, 1])))
-        self._start_time = None
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0)
 
-    def set_animation(self, animation: np.ndarray, recording_freq: float) -> None:
-        self._animation = animation
-        self._recording_freq = recording_freq
+        self._state.box_size = np.array([height, 2 * radius, 2 * radius])
+        self._bbox = np.array([-0.5 * self.size, 0.5 * self.size])
 
-    def animate(self, time: float) -> None:
-        if not self._allow_animation:
-            return
-        if self._start_time is None:
-            self._start_time = time
-        if self._animation.size == 0:
-            return
-        run_time = time - self._start_time
-        run_step = int(run_time * self._recording_freq)
-        animation_idx = run_step % self._animation.shape[0]
-        self.set_pose(math.Pose(self._animation[animation_idx, :3], np.array([0, 0, 0, 1])))
+    @property
+    def height(self) -> float:
+        return self._state.box_size[0]
 
-    def disable_animation(self) -> None:
-        self._allow_animation = False
+    @height.setter
+    def height(self, height: float) -> None:
+        self._state.box_size[0] = height
 
-    def enable_animation(self) -> None:
-        self._allow_animation = True
+    @property
+    def radius(self) -> float:
+        return self._state.box_size[1] / 2.0
+
+    @radius.setter
+    def radius(self, radius: float) -> None:
+        self._state.box_size[1] = 2.0 * radius
+        self._state.box_size[2] = 2.0 * radius
 
     @property
     def size(self) -> np.ndarray:
-        return np.array([self._head.radius])
+        return self._state.box_size
 
     @property
     def bbox(self) -> np.ndarray:
@@ -335,7 +325,7 @@ class Human(Object):
 
     @property
     def shapes(self) -> Sequence[shapes.Shape]:
-        return [self._head]
+        return [self._shape]
 
 
 class Hook(Object):

@@ -184,3 +184,23 @@ class Sphere(Shape):
         visual_kwargs["radius"] = self.radius
 
         return collision_kwargs, visual_kwargs
+
+
+@dataclasses.dataclass
+class Capsule(Shape):
+    radius: float = 0.05
+    height: float = 0.1
+
+    def shape_kwargs(self, is_base: bool = False) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        collision_kwargs, visual_kwargs = super().shape_kwargs(is_base)
+
+        collision_kwargs["shapeType"] = p.GEOM_CAPSULE
+        collision_kwargs["radius"] = self.radius
+        collision_kwargs["height"] = self.height
+
+        visual_kwargs["shapeType"] = p.GEOM_CAPSULE
+        visual_kwargs["radius"] = self.radius
+        # Someone really goofed here.
+        visual_kwargs["length"] = self.height
+
+        return collision_kwargs, visual_kwargs
