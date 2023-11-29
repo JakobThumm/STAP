@@ -287,7 +287,8 @@ class Human(Object):
         color: Union[List[float], np.ndarray],
     ):
         custom_radius = 0.1
-        self._head = shapes.Sphere(mass=0, color=np.array(color), radius=custom_radius)
+        physical_head = shapes.Sphere(mass=0, color=np.array(color), radius=custom_radius)
+        self._head = shapes.Visual(shape=physical_head)
         body_id = shapes.create_body(self._head, physics_id=physics_id)
         self._bbox = np.array([-custom_radius, custom_radius])
         super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=True)
@@ -296,6 +297,7 @@ class Human(Object):
         self._animation = np.array([])
         self._recording_freq = 0.0
         self._start_time = None
+        self._allow_animation = True
 
     def reset(self, action_skeleton: List, initial_state: Optional[List] = None) -> None:
         self.set_pose(math.Pose(np.array([0.2, 0.2, 0.2]), np.array([0, 0, 0, 1])))
@@ -306,6 +308,8 @@ class Human(Object):
         self._recording_freq = recording_freq
 
     def animate(self, time: float) -> None:
+        if not self._allow_animation:
+            return
         if self._start_time is None:
             self._start_time = time
         if self._animation.size == 0:
@@ -314,6 +318,12 @@ class Human(Object):
         run_step = int(run_time * self._recording_freq)
         animation_idx = run_step % self._animation.shape[0]
         self.set_pose(math.Pose(self._animation[animation_idx, :3], np.array([0, 0, 0, 1])))
+
+    def disable_animation(self) -> None:
+        self._allow_animation = False
+
+    def enable_animation(self) -> None:
+        self._allow_animation = True
 
     @property
     def size(self) -> np.ndarray:

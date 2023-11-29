@@ -7,11 +7,13 @@ Created: 28.11.2023
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
+import pybullet as p
 
 from stap.envs import base as envs
 from stap.envs.pybullet.base import SIM_TIME_STEP
 from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.table import object_state, utils
+from stap.envs.pybullet.table.objects import Human
 from stap.envs.pybullet.table.primitives import Primitive
 from stap.envs.pybullet.table_env import TableEnv
 
@@ -32,6 +34,9 @@ class HumanTableEnv(TableEnv):
             kwargs: Keyword arguments for `TableEnv`.
         """
         super().__init__(**kwargs)
+        self.human = Human(self.physics_id, name="human", color=[1.0, 0.0, 0.0, 0.5])
+        self.human.reset(self.task.action_skeleton, self.task.initial_state)
+        self._initial_state_id = p.saveState(physicsClientId=self.physics_id)
         self._animation = 0.2 * np.ones((100, 3), dtype=np.float32)
         self._animation[:, 0] = np.linspace(0.0, 1.0, 100)
         self._animation_freq = 100
@@ -44,8 +49,11 @@ class HumanTableEnv(TableEnv):
         options: Optional[dict] = None,
         max_samples_per_trial: int = 100,
     ) -> Tuple[np.ndarray, dict]:
+        self.human.disable_animation()
         obs, info = super().reset(seed=seed, options=options, max_samples_per_trial=max_samples_per_trial)
-        self.objects["human"].set_animation(self._animation, self._animation_freq)
+        self.human.reset(self.task.action_skeleton, self.task.initial_state)
+        self.human.set_animation(self._animation, self._animation_freq)
+        self.human.enable_animation()
         self._sim_time = 0.0
         return obs, info
 
@@ -124,8 +132,13 @@ class HumanTableEnv(TableEnv):
 
     def step_simulation(self) -> None:
         self._sim_time += SIM_TIME_STEP
-        self.objects["human"].animate(self._sim_time)
+        self.human.animate(self._sim_time)
         super().step_simulation()
+        human_contact_points = p.getContactPoints(
+            physicsClientId=self.physics_id, bodyA=self.robot.arm.body_id, bodyB=self.human.body_id
+        )
+        if len(human_contact_points) > 0:
+            stop = True
 
     def wait_until_stable(self, min_iters: int = 0, max_iters: int = 3 * math.PYBULLET_STEPS_PER_SEC) -> int:
         IS_MOVING_KEY = "TableEnv.wait_until_stable"

@@ -1,9 +1,9 @@
 import dataclasses
 
-from ctrlutils import eigen
-import spatialdyn as dyn
 import numpy as np
 import pybullet as p
+import spatialdyn as dyn
+from ctrlutils import eigen
 
 from stap.envs.pybullet.sim import math
 
@@ -25,16 +25,12 @@ class Body:
 
     def pose(self) -> math.Pose:
         """Base pose."""
-        pos, quat = p.getBasePositionAndOrientation(
-            self.body_id, physicsClientId=self.physics_id
-        )
+        pos, quat = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.physics_id)
         return math.Pose(np.array(pos), np.array(quat))
 
     def set_pose(self, pose: math.Pose) -> None:
         """Sets the base pose."""
-        p.resetBasePositionAndOrientation(
-            self.body_id, pose.pos, pose.quat, physicsClientId=self.physics_id
-        )
+        p.resetBasePositionAndOrientation(self.body_id, pose.pos, pose.quat, physicsClientId=self.physics_id)
 
     def twist(self) -> np.ndarray:
         """Base twist."""
@@ -61,9 +57,7 @@ class Body:
             pass
 
         was_frozen = self.unfreeze()
-        dynamics_info = p.getDynamicsInfo(
-            self.body_id, -1, physicsClientId=self.physics_id
-        )
+        dynamics_info = p.getDynamicsInfo(self.body_id, -1, physicsClientId=self.physics_id)
         if was_frozen:
             self.freeze()
 
@@ -72,10 +66,7 @@ class Body:
         com = np.array(dynamics_info[3])
         quat_inertia = eigen.Quaterniond(dynamics_info[4])
         T_inertia = eigen.Translation3d.identity() * quat_inertia
-        self._inertia = (
-            dyn.SpatialInertiad(mass, com, np.concatenate([inertia_xyz, np.zeros(3)]))
-            * T_inertia
-        )
+        self._inertia = dyn.SpatialInertiad(mass, com, np.concatenate([inertia_xyz, np.zeros(3)])) * T_inertia
 
         return self._inertia
 
@@ -86,9 +77,7 @@ class Body:
             Whether the object's frozen status changed.
         """
         if not hasattr(self, "_is_frozen"):
-            self._mass = p.getDynamicsInfo(
-                self.body_id, -1, physicsClientId=self.physics_id
-            )[0]
+            self._mass = p.getDynamicsInfo(self.body_id, -1, physicsClientId=self.physics_id)[0]
         elif self._is_frozen:  # type: ignore
             return False
 
@@ -105,9 +94,7 @@ class Body:
         if not hasattr(self, "_is_frozen") or not self._is_frozen:
             return False
 
-        p.changeDynamics(
-            self.body_id, -1, mass=self._mass, physicsClientId=self.physics_id
-        )
+        p.changeDynamics(self.body_id, -1, mass=self._mass, physicsClientId=self.physics_id)
         self._is_frozen = False
         return True
 
@@ -126,16 +113,12 @@ class Link:
         except AttributeError:
             pass
 
-        self._name = p.getJointInfo(
-            self.body_id, self.link_id, physicsClientId=self.physics_id
-        )[12].decode("utf8")
+        self._name = p.getJointInfo(self.body_id, self.link_id, physicsClientId=self.physics_id)[12].decode("utf8")
         return self._name
 
     def pose(self) -> math.Pose:
         """World pose of the center of mass."""
-        pos, quat = p.getLinkState(
-            self.body_id, self.link_id, physicsClientId=self.physics_id
-        )[:2]
+        pos, quat = p.getLinkState(self.body_id, self.link_id, physicsClientId=self.physics_id)[:2]
         return math.Pose(np.array(pos), np.array(quat))
 
     @property
@@ -146,15 +129,11 @@ class Link:
         except AttributeError:
             pass
 
-        dynamics_info = p.getDynamicsInfo(
-            self.body_id, self.link_id, physicsClientId=self.physics_id
-        )
+        dynamics_info = p.getDynamicsInfo(self.body_id, self.link_id, physicsClientId=self.physics_id)
         mass = dynamics_info[0]
         inertia_xyz = dynamics_info[2]
         com = np.zeros(3)
-        self._inertia = dyn.SpatialInertiad(
-            mass, com, np.concatenate([inertia_xyz, np.zeros(3)])
-        )
+        self._inertia = dyn.SpatialInertiad(mass, com, np.concatenate([inertia_xyz, np.zeros(3)]))
 
         return self._inertia
 
@@ -166,9 +145,7 @@ class Link:
         except AttributeError:
             pass
 
-        joint_info = p.getJointInfo(
-            self.body_id, self.link_id, physicsClientId=self.physics_id
-        )
+        joint_info = p.getJointInfo(self.body_id, self.link_id, physicsClientId=self.physics_id)
         self._joint_limits = np.array(joint_info[8:10])
 
         return self._joint_limits

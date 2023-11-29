@@ -55,7 +55,3 @@ env_kwargs:
         variants:
           - configs/pybullet/envs/assets/milk.yaml
           - object_type: Null
-    - object_type: Human
-      object_kwargs:
-        name: human
-        color: [1.0, 0.0, 0.0, 0.5]

@@ -20,9 +20,7 @@ def create_body(
         base_shape = shapes[0]
         link_shapes = shapes[1:]
 
-    base_collision_id, base_visual_id = base_shape.create_visual(
-        physics_id, is_base=True
-    )
+    base_collision_id, base_visual_id = base_shape.create_shape(physics_id, is_base=True)
     kwargs: Dict[str, Any] = {
         "baseMass": base_shape.mass,
         "baseCollisionShapeIndex": base_collision_id,
@@ -34,10 +32,7 @@ def create_body(
 
     if len(link_shapes) > 0:
         masses, poses, joints, collision_ids, visual_ids = zip(
-            *[
-                (shape.mass, shape.pose, shape.joint, *shape.create_visual(physics_id))
-                for shape in link_shapes
-            ]
+            *[(shape.mass, shape.pose, shape.joint, *shape.create_shape(physics_id)) for shape in link_shapes]
         )
 
         kwargs["linkMasses"] = masses
@@ -49,9 +44,7 @@ def create_body(
         kwargs["linkPositions"] = [pose.pos for pose in link_poses]
         kwargs["linkOrientations"] = [pose.quat for pose in link_poses]
         kwargs["linkInertialFramePositions"] = [pose.pos for pose in link_inertia_poses]
-        kwargs["linkInertialFrameOrientations"] = [
-            pose.quat for pose in link_inertia_poses
-        ]
+        kwargs["linkInertialFrameOrientations"] = [pose.quat for pose in link_inertia_poses]
 
         link_joints = [Joint() if joint is None else joint for joint in joints]
         if link_parents is None:
@@ -88,9 +81,7 @@ class Shape:
     pose: Optional[Pose] = None
     joint: Optional[Joint] = None
 
-    def visual_kwargs(
-        self, is_base: bool = False
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def shape_kwargs(self, is_base: bool = False) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         collision_kwargs = {}
         visual_kwargs = {}
         if self.color is not None:
@@ -104,25 +95,52 @@ class Shape:
 
         return collision_kwargs, visual_kwargs
 
-    def create_visual(self, physics_id: int, is_base: bool = False) -> Tuple[int, int]:
-        collision_kwargs, visual_kwargs = self.visual_kwargs(is_base)
+    def create_shape(self, physics_id: int, is_base: bool = False) -> Tuple[int, int]:
+        collision_kwargs, visual_kwargs = self.shape_kwargs(is_base)
 
-        collision_id = p.createCollisionShape(
-            physicsClientId=physics_id, **collision_kwargs
-        )
+        collision_id = p.createCollisionShape(physicsClientId=physics_id, **collision_kwargs)
         visual_id = p.createVisualShape(physicsClientId=physics_id, **visual_kwargs)
 
         return collision_id, visual_id
+
+
+class Visual(Shape):
+    def __init__(self, shape: Shape):
+        self._shape = shape
+
+    def shape_kwargs(self, is_base: bool = False) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        collision_kwargs, visual_kwargs = self._shape.shape_kwargs(is_base)
+        collision_kwargs["shapeType"] = p.GEOM_BOX
+        collision_kwargs["halfExtents"] = [0.0, 0.0, 0.0]
+        return collision_kwargs, visual_kwargs
+
+    @property
+    def shape(self) -> Shape:
+        return self._shape
+
+    @property
+    def mass(self) -> float:
+        return self._shape.mass
+
+    @property
+    def color(self) -> Optional[np.ndarray]:
+        return self._shape.color
+
+    @property
+    def pose(self) -> Optional[Pose]:
+        return self._shape.pose
+
+    @property
+    def joint(self) -> Optional[Joint]:
+        return self._shape.joint
 
 
 @dataclasses.dataclass
 class Box(Shape):
     size: np.ndarray = np.array([0.1, 0.1, 0.1])
 
-    def visual_kwargs(
-        self, is_base: bool = False
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        collision_kwargs, visual_kwargs = super().visual_kwargs(is_base)
+    def shape_kwargs(self, is_base: bool = False) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        collision_kwargs, visual_kwargs = super().shape_kwargs(is_base)
 
         collision_kwargs["shapeType"] = p.GEOM_BOX
         collision_kwargs["halfExtents"] = self.size / 2
@@ -138,10 +156,8 @@ class Cylinder(Shape):
     radius: float = 0.05
     length: float = 0.1
 
-    def visual_kwargs(
-        self, is_base: bool = False
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        collision_kwargs, visual_kwargs = super().visual_kwargs(is_base)
+    def shape_kwargs(self, is_base: bool = False) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        collision_kwargs, visual_kwargs = super().shape_kwargs(is_base)
 
         collision_kwargs["shapeType"] = p.GEOM_CYLINDER
         collision_kwargs["radius"] = self.radius
@@ -158,10 +174,8 @@ class Cylinder(Shape):
 class Sphere(Shape):
     radius: float = 0.05
 
-    def visual_kwargs(
-        self, is_base: bool = False
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        collision_kwargs, visual_kwargs = super().visual_kwargs(is_base)
+    def shape_kwargs(self, is_base: bool = False) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        collision_kwargs, visual_kwargs = super().shape_kwargs(is_base)
 
         collision_kwargs["shapeType"] = p.GEOM_SPHERE
         collision_kwargs["radius"] = self.radius

@@ -18,13 +18,7 @@ from stap.envs.pybullet.real import object_tracker
 from stap.envs.pybullet.sim import math, robot
 from stap.envs.pybullet.table import object_state, predicates, utils
 from stap.envs.pybullet.table.objects import Null, Object, ObjectGroup
-from stap.envs.pybullet.table.primitives import (
-    Pick,
-    Primitive,
-    Pull,
-    Push,
-    initialize_robot_pose,
-)
+from stap.envs.pybullet.table.primitives import Pick, Primitive, Pull, Push, initialize_robot_pose
 from stap.envs.variant import VariantEnv
 from stap.utils import random as random_utils
 from stap.utils import recording
@@ -825,6 +819,8 @@ class TableEnv(PybulletEnv):
 
     def step_simulation(self) -> None:
         p.stepSimulation(physicsClientId=self.physics_id)
+        # We could get the robot collisions like this
+        # contact_points = p.getContactPoints(physicsClientId=self.physics_id, bodyA=self.robot.arm.body_id)
         self._recorder.add_frame(self.render)
 
         if self.object_tracker is not None and not isinstance(self.robot.arm, real.arm.Arm):

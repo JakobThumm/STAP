@@ -1,18 +1,17 @@
 import abc
 import random
-from typing import Callable, Dict, List, Optional, NamedTuple, Type, Union
+from typing import Callable, Dict, List, NamedTuple, Optional, Type, Union
 
-from ctrlutils import eigen
 import gym
 import numpy as np
 import symbolic
+from ctrlutils import eigen
 
 from stap.envs import base as envs
 from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.sim.robot import ControlException, Robot
-from stap.envs.pybullet.table.objects import Box, Hook, Rack, Null, Object
-from stap.envs.pybullet.table import object_state, utils, primitive_actions
-
+from stap.envs.pybullet.table import object_state, primitive_actions, utils
+from stap.envs.pybullet.table.objects import Box, Hook, Null, Object, Rack
 
 dbprint = lambda *args: None  # noqa
 # dbprint = print
@@ -116,9 +115,7 @@ class Primitive(envs.Primitive, abc.ABC):
         if not uniform and random.random() < 0.9:
             action = self.normalize_action(self.sample_action().vector)
             action = np.random.normal(loc=action, scale=0.05)
-            action = action.astype(np.float32).clip(
-                self.action_space.low, self.action_space.high
-            )
+            action = action.astype(np.float32).clip(self.action_space.low, self.action_space.high)
             return action
         else:
             return super().sample()
@@ -149,14 +146,9 @@ class Primitive(envs.Primitive, abc.ABC):
         observation_indices = [TableEnv.EE_OBSERVATION_IDX]
 
         # Get an ordered list of all other indices besides the end-effector.
-        object_to_observation_indices = [
-            i
-            for i in range(TableEnv.MAX_NUM_OBJECTS)
-            if i != TableEnv.EE_OBSERVATION_IDX
-        ]
+        object_to_observation_indices = [i for i in range(TableEnv.MAX_NUM_OBJECTS) if i != TableEnv.EE_OBSERVATION_IDX]
         object_indices = {
-            obj: object_to_observation_indices[idx_object]
-            for idx_object, obj in enumerate(self.env.real_objects())
+            obj: object_to_observation_indices[idx_object] for idx_object, obj in enumerate(self.env.real_objects())
         }
 
         # Add primitive args next.
@@ -164,11 +156,7 @@ class Primitive(envs.Primitive, abc.ABC):
         idx_shuffle_start = len(observation_indices)
 
         # Add non-null objects next.
-        observation_indices += [
-            idx_object
-            for obj, idx_object in object_indices.items()
-            if obj not in self.arg_objects
-        ]
+        observation_indices += [idx_object for obj, idx_object in object_indices.items() if obj not in self.arg_objects]
         idx_shuffle_end = len(observation_indices)
 
         # Add all remaining indices in sequential order.
@@ -185,11 +173,7 @@ class Primitive(envs.Primitive, abc.ABC):
 
     def get_non_arg_objects(self, objects: Dict[str, Object]) -> List[Object]:
         """Gets the non-primitive argument objects."""
-        return [
-            obj
-            for obj in objects.values()
-            if obj not in self.arg_objects and not obj.isinstance(Null)
-        ]
+        return [obj for obj in objects.values() if obj not in self.arg_objects and not obj.isinstance(Null)]
 
     def create_object_movement_check(
         self,
@@ -200,22 +184,16 @@ class Primitive(envs.Primitive, abc.ABC):
     ) -> Callable[[], bool]:
         """Returns a function that checks if any non-primitive argument has been significantly perturbed."""
         if sum([non_arg_objects, arg_objects, custom_objects]) != 1:
-            raise ValueError(
-                "Must specify only one of non_arg_objects, arg_objects, or custom_objects."
-            )
+            raise ValueError("Must specify only one of non_arg_objects, arg_objects, or custom_objects.")
 
         # Get specified objects.
         if non_arg_objects:
             if objects is None or not isinstance(objects, dict):
-                raise ValueError(
-                    "Require dictionary of objects for non-arg object movement check."
-                )
+                raise ValueError("Require dictionary of objects for non-arg object movement check.")
             objects = self.get_non_arg_objects(objects)
         elif custom_objects:
             if objects is None or not isinstance(objects, list):
-                raise ValueError(
-                    "Require list of objects for custom object movement check."
-                )
+                raise ValueError("Require list of objects for custom object movement check.")
         else:
             objects = self.arg_objects
 
@@ -224,10 +202,7 @@ class Primitive(envs.Primitive, abc.ABC):
 
         def did_non_args_move() -> bool:
             """Checks if any object has moved significantly from its old pose."""
-            return any(
-                did_object_move(obj, old_pose)
-                for obj, old_pose in zip(objects, old_poses)
-            )
+            return any(did_object_move(obj, old_pose) for obj, old_pose in zip(objects, old_poses))
 
         return did_non_args_move
 
@@ -296,16 +271,12 @@ class Pick(Primitive):
 
             robot.goto_pose(pre_pos, command_quat)
             if not allow_collisions and did_non_args_move():
-                raise ControlException(
-                    f"Robot.goto_pose({pre_pos}, {command_quat}) collided"
-                )
+                raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
 
             robot.goto_pose(
                 command_pos,
                 command_quat,
-                check_collisions=[
-                    obj.body_id for obj in self.get_non_arg_objects(objects)
-                ],
+                check_collisions=[obj.body_id for obj in self.get_non_arg_objects(objects)],
             )
 
             if not robot.grasp_object(obj):
@@ -313,9 +284,7 @@ class Pick(Primitive):
 
             robot.goto_pose(pre_pos, command_quat)
             if not allow_collisions and did_non_args_move():
-                raise ControlException(
-                    f"Robot.goto_pose({pre_pos}, {command_quat}) collided"
-                )
+                raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
         except ControlException as e:
             dbprint("Pick.execute():\n", e)
             return ExecutionResult(success=False, truncated=True)
@@ -331,9 +300,7 @@ class Pick(Primitive):
                 hook.head_length, hook.handle_length, hook.handle_y, hook.radius
             )
             action_range = self.Action.range()
-            if random.random() < hook.handle_length / (
-                hook.handle_length + hook.head_length
-            ):
+            if random.random() < hook.handle_length / (hook.handle_length + hook.head_length):
                 # Handle.
                 random_x = np.random.uniform(*action_range[:, 0])
                 pos = np.array([random_x, pos_handle[1], 0])
@@ -358,9 +325,7 @@ class Place(Primitive):
     Action = primitive_actions.PlaceAction
     ALLOW_COLLISIONS = False
 
-    def execute(
-        self, action: np.ndarray, real_world: bool = False, verbose: bool = False
-    ) -> ExecutionResult:
+    def execute(self, action: np.ndarray, real_world: bool = False, verbose: bool = False) -> ExecutionResult:
         from stap.envs.pybullet.table_env import TableEnv
 
         assert isinstance(self.env, TableEnv)
@@ -379,22 +344,16 @@ class Place(Primitive):
 
         # Scale action to target bbox.
         xy_action_range = primitive_actions.PlaceAction.range()[:, :2]
-        xy_normalized = (a.pos[:2] - xy_action_range[0]) / (
-            xy_action_range[1] - xy_action_range[0]
-        )
+        xy_normalized = (a.pos[:2] - xy_action_range[0]) / (xy_action_range[1] - xy_action_range[0])
         xy_target_range = np.array(target.bbox[:, :2])
         if target.name == "table":
             xy_target_range[0, 0] = utils.TABLE_CONSTRAINTS["table_x_min"]
             xy_target_range[1, 0] = ACTION_CONSTRAINTS["max_lift_radius"]
-        xy_target = (
-            xy_target_range[1] - xy_target_range[0]
-        ) * xy_normalized + xy_target_range[0]
+        xy_target = (xy_target_range[1] - xy_target_range[0]) * xy_normalized + xy_target_range[0]
         pos = np.append(xy_target, a.pos[2])
         if real_world:
             pos[2] = min(
-                self.env.robot.arm.ee_pose().pos[2]
-                - obj.pose().pos[2]
-                + 0.5 * obj.size[2],
+                self.env.robot.arm.ee_pose().pos[2] - obj.pose().pos[2] + 0.5 * obj.size[2],
                 pos[2],
             )
 
@@ -416,29 +375,22 @@ class Place(Primitive):
             did_non_args_move = self.create_object_movement_check(objects=objects)
         try:
             if not real_world and not utils.is_inworkspace(obj_pos=pre_pos[:2]):
-                raise ControlException(
-                    f"Placement location {pre_pos} is beyond robot workspace."
-                )
+                raise ControlException(f"Placement location {pre_pos} is beyond robot workspace.")
 
             robot.goto_pose(pre_pos, command_quat)
             if not allow_collisions and did_non_args_move():
                 if verbose:
                     print("Robot.goto_pose(pre_pos, command_quat) collided")
-                raise ControlException(
-                    f"Robot.goto_pose({pre_pos}, {command_quat}) collided"
-                )
+                raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
 
             robot.goto_pose(
                 command_pos,
                 command_quat,
-                check_collisions=[target.body_id]
-                + [obj.body_id for obj in self.get_non_arg_objects(objects)],
+                check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
             )
 
             # Make sure object won't drop from too high.
-            if not real_world and not utils.is_within_distance(
-                obj, target, MAX_DROP_DISTANCE, robot.physics_id
-            ):
+            if not real_world and not utils.is_within_distance(obj, target, MAX_DROP_DISTANCE, robot.physics_id):
                 if verbose:
                     print("Object dropped from too high.")
                 raise ControlException("Object dropped from too high.")
@@ -453,9 +405,7 @@ class Place(Primitive):
             if not allow_collisions and did_non_args_move():
                 if verbose:
                     print("Robot.goto_pose(pre_pos, command_quat) collided")
-                raise ControlException(
-                    f"Robot.goto_pose({pre_pos}, {command_quat}) collided"
-                )
+                raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
         except ControlException as e:
             # If robot fails before grasp(0), object may still be grasped.
             dbprint("Place.execute():\n", e)
@@ -501,9 +451,7 @@ class Pull(Primitive):
     Action = primitive_actions.PullAction
     ALLOW_COLLISIONS = False
 
-    def execute(
-        self, action: np.ndarray, real_world: bool = False, verbose: bool = False
-    ) -> ExecutionResult:
+    def execute(self, action: np.ndarray, real_world: bool = False, verbose: bool = False) -> ExecutionResult:
         from stap.envs.pybullet.table_env import TableEnv
 
         assert isinstance(self.env, TableEnv)
@@ -549,12 +497,8 @@ class Pull(Primitive):
         command_pose_reach = math.Pose.from_eigen(T_reach_to_world)
         command_pose_pull = math.Pose.from_eigen(T_pull_to_world)
 
-        pre_pos = np.append(
-            command_pose_reach.pos[:2], ACTION_CONSTRAINTS["max_lift_height"]
-        )
-        post_pos = np.append(
-            command_pose_pull.pos[:2], ACTION_CONSTRAINTS["max_lift_height"]
-        )
+        pre_pos = np.append(command_pose_reach.pos[:2], ACTION_CONSTRAINTS["max_lift_height"])
+        post_pos = np.append(command_pose_pull.pos[:2], ACTION_CONSTRAINTS["max_lift_height"])
 
         objects = self.env.objects
         robot = self.env.robot
@@ -567,18 +511,12 @@ class Pull(Primitive):
                 if verbose:
                     if verbose:
                         print("Robot collided during pre-pose")
-                raise ControlException(
-                    f"Robot.goto_pose({pre_pos}, {command_pose_reach.quat}) collided"
-                )
+                raise ControlException(f"Robot.goto_pose({pre_pos}, {command_pose_reach.quat}) collided")
 
             robot.goto_pose(
                 command_pose_reach.pos,
                 command_pose_reach.quat,
-                check_collisions=[
-                    obj.body_id
-                    for obj in self.get_non_arg_objects(objects)
-                    if obj.name != "table"
-                ],
+                check_collisions=[obj.body_id for obj in self.get_non_arg_objects(objects) if obj.name != "table"],
             )
             if not real_world and not utils.is_upright(target):
                 if verbose:
@@ -593,9 +531,7 @@ class Pull(Primitive):
             if not allow_collisions and did_non_args_move():
                 if verbose:
                     print("Pull.execute(): collided")
-                raise ControlException(
-                    f"Robot.goto_pose({command_pose_pull.pos}, {command_pose_pull.quat}) collided"
-                )
+                raise ControlException(f"Robot.goto_pose({command_pose_pull.pos}, {command_pose_pull.quat}) collided")
             if allow_collisions:
                 # No objects should move after lifting the hook.
                 did_non_args_move = self.create_object_movement_check(objects=objects)
@@ -604,9 +540,7 @@ class Pull(Primitive):
             if did_non_args_move():
                 if verbose:
                     print("Pull.execute(): collided 1")
-                raise ControlException(
-                    f"Robot.goto_pose({post_pos}, {command_pose_pull.quat}) collided"
-                )
+                raise ControlException(f"Robot.goto_pose({post_pos}, {command_pose_pull.quat}) collided")
         except ControlException as e:
             dbprint("Pull.execute():\n", e)
             return ExecutionResult(success=False, truncated=True)
@@ -616,27 +550,20 @@ class Pull(Primitive):
         if not real_world and not utils.is_upright(target):
             dbprint("Pull.execute(): not upright")
             if verbose:
-                print(f"Pull.execute(): not upright")
+                print("Pull.execute(): not upright")
             return ExecutionResult(success=False, truncated=False)
 
         if not real_world and not utils.is_inworkspace(obj=target):
             dbprint("Pull.execute(): not in workspace")
             if verbose:
-                print(f"Pull.execute(): not in workspace")
+                print("Pull.execute(): not in workspace")
             return ExecutionResult(success=False, truncated=False)
 
         new_target_distance = np.linalg.norm(target.pose().pos[:2])
-        if (
-            not real_world
-            and new_target_distance >= target_distance - MIN_PULL_DISTANCE
-        ):
+        if not real_world and new_target_distance >= target_distance - MIN_PULL_DISTANCE:
             if verbose:
-                print(
-                    f"Pull.execute(): not moved enough {new_target_distance} {target_distance}"
-                )
-            dbprint(
-                "Pull.execute(): not moved enough", new_target_distance, target_distance
-            )
+                print(f"Pull.execute(): not moved enough {new_target_distance} {target_distance}")
+            dbprint("Pull.execute(): not moved enough", new_target_distance, target_distance)
             return ExecutionResult(success=False, truncated=False)
 
         return ExecutionResult(success=True, truncated=False)
@@ -706,9 +633,7 @@ class Push(Primitive):
         T_push_to_world = T_push_hook_to_world * T_gripper_to_hook
         command_pose_reach = math.Pose.from_eigen(T_reach_to_world)
         command_pose_push = math.Pose.from_eigen(T_push_to_world)
-        pre_pos = np.append(
-            command_pose_reach.pos[:2], ACTION_CONSTRAINTS["max_lift_height"]
-        )
+        pre_pos = np.append(command_pose_reach.pos[:2], ACTION_CONSTRAINTS["max_lift_height"])
 
         objects = self.env.objects
         allow_collisions = self.ALLOW_COLLISIONS or real_world
@@ -716,22 +641,17 @@ class Push(Primitive):
             did_non_args_move = self.create_object_movement_check(
                 non_arg_objects=False,
                 custom_objects=True,
-                objects=[obj for obj in objects.values() if obj.isinstance(Rack)]
-                + self.get_non_arg_objects(objects),
+                objects=[obj for obj in objects.values() if obj.isinstance(Rack)] + self.get_non_arg_objects(objects),
             )
         try:
             robot.goto_pose(pre_pos, command_pose_reach.quat)
             if not allow_collisions and did_non_args_move():
-                raise ControlException(
-                    f"Robot.goto_pose({pre_pos}, {command_pose_reach.quat}) collided"
-                )
+                raise ControlException(f"Robot.goto_pose({pre_pos}, {command_pose_reach.quat}) collided")
 
             robot.goto_pose(
                 command_pose_reach.pos,
                 command_pose_reach.quat,
-                check_collisions=[
-                    obj.body_id for obj in self.get_non_arg_objects(objects)
-                ],
+                check_collisions=[obj.body_id for obj in self.get_non_arg_objects(objects)],
             )
             if not utils.is_upright(target):
                 raise ControlException("Target is not upright", target.pose().quat)
@@ -751,9 +671,7 @@ class Push(Primitive):
             if (not allow_collisions and did_non_args_move()) or (
                 self.ALLOW_COLLISIONS and not real_world and did_rack_move()
             ):
-                raise ControlException(
-                    f"Robot.goto_pose({command_pose_push.pos}, {command_pose_push.quat}) collided"
-                )
+                raise ControlException(f"Robot.goto_pose({command_pose_push.pos}, {command_pose_push.quat}) collided")
 
             # Target must be pushed a minimum distance.
             new_target_distance = np.linalg.norm(target.pose().pos[:2])
@@ -795,22 +713,16 @@ class Push(Primitive):
 class Null(Primitive):
     """Null primitive."""
 
-    def __init__(
-        self, env: Optional[envs.Env] = None, arg_objects: Optional[List[str]] = None
-    ):
+    def __init__(self, env: Optional[envs.Env] = None, arg_objects: Optional[List[str]] = None):
         self._env = env
         if arg_objects is None:
             arg_objects = []
         self._arg_objects = arg_objects
 
-    def scale_action(
-        self, action: primitive_actions.PrimitiveAction
-    ) -> primitive_actions.PrimitiveAction:
+    def scale_action(self, action: primitive_actions.PrimitiveAction) -> primitive_actions.PrimitiveAction:
         return action
 
-    def execute(
-        self, action: primitive_actions.PrimitiveAction, real_world: bool = False
-    ) -> ExecutionResult:
+    def execute(self, action: primitive_actions.PrimitiveAction, real_world: bool = False) -> ExecutionResult:
         return ExecutionResult(success=True, truncated=False)
 
     def sample_action(self) -> primitive_actions.PrimitiveAction:
@@ -826,14 +738,10 @@ class Stop(Primitive):
             arg_objects = []
         self._arg_objects = arg_objects
 
-    def scale_action(
-        self, action: primitive_actions.PrimitiveAction
-    ) -> primitive_actions.PrimitiveAction:
+    def scale_action(self, action: primitive_actions.PrimitiveAction) -> primitive_actions.PrimitiveAction:
         return action
 
-    def execute(
-        self, action: primitive_actions.PrimitiveAction, real_world: bool = False
-    ) -> ExecutionResult:
+    def execute(self, action: primitive_actions.PrimitiveAction, real_world: bool = False) -> ExecutionResult:
         return ExecutionResult(success=True, truncated=False)
 
     def sample_action(self) -> primitive_actions.PrimitiveAction:
