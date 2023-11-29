@@ -8,6 +8,7 @@ from typing import Any, Dict, Generator, List, Optional, Sequence, Tuple, Union
 
 import gym
 import numpy as np
+import pybullet as p  # Import after envs.pybullet.base to avoid print statement.
 from PIL import Image, ImageDraw, ImageFont
 
 from stap.envs import base as envs
@@ -16,18 +17,17 @@ from stap.envs.pybullet.base import PybulletEnv
 from stap.envs.pybullet.real import object_tracker
 from stap.envs.pybullet.sim import math, robot
 from stap.envs.pybullet.table import object_state, predicates, utils
+from stap.envs.pybullet.table.objects import Null, Object, ObjectGroup
 from stap.envs.pybullet.table.primitives import (
-    Primitive,
     Pick,
+    Primitive,
     Pull,
     Push,
     initialize_robot_pose,
 )
-from stap.envs.pybullet.table.objects import Null, Object, ObjectGroup
 from stap.envs.variant import VariantEnv
-from stap.utils import random as random_utils, recording
-
-import pybullet as p  # Import after envs.pybullet.base to avoid print statement.
+from stap.utils import random as random_utils
+from stap.utils import recording
 
 dbprint = lambda *args: None  # noqa
 # dbprint = print
@@ -69,16 +69,11 @@ class Task:
             primitives.append(primitive)
 
         # Initial state.
-        initial_propositions = [
-            predicates.Predicate.create(prop) for prop in initial_state
-        ]
+        initial_propositions = [predicates.Predicate.create(prop) for prop in initial_state]
 
         # Goal predicates.
         if goal_propositions is not None:
-            goal_propositions = [
-                [predicates.Predicate.create(pred) for pred in goal]
-                for goal in goal_propositions
-            ]
+            goal_propositions = [[predicates.Predicate.create(pred) for pred in goal] for goal in goal_propositions]
 
         return Task(
             action_skeleton=primitives,
@@ -93,14 +88,10 @@ class Task:
 class TaskDistribution:
     def __init__(self, env: "TableEnv", tasks: List[Dict[str, Any]]):
         self._tasks = [Task.create(env, **task) for task in tasks]
-        assert all(np.isnan(task.prob) for task in self.tasks) or all(
-            not np.isnan(task.prob) for task in self.tasks
-        )
+        assert all(np.isnan(task.prob) for task in self.tasks) or all(not np.isnan(task.prob) for task in self.tasks)
 
         # Normalize probabilities.
-        self._probabilities = np.array(
-            [1.0 if np.isnan(task.prob) else task.prob for task in self.tasks]
-        )
+        self._probabilities = np.array([1.0 if np.isnan(task.prob) else task.prob for task in self.tasks])
         self._probabilities /= self._probabilities.sum()
         for task, prob in zip(self.tasks, self._probabilities):
             task.prob = prob
@@ -118,9 +109,7 @@ class TableEnv(PybulletEnv):
     MAX_NUM_OBJECTS = 8  # Number of rows in the observation matrix.
     EE_OBSERVATION_IDX = 0  # Index of the end-effector in the observation matrix.
 
-    state_space = gym.spaces.Box(
-        low=0, high=np.iinfo(np.int32).max, shape=(1,), dtype=np.int32
-    )
+    state_space = gym.spaces.Box(low=0, high=np.iinfo(np.int32).max, shape=(1,), dtype=np.int32)
     image_space = gym.spaces.Box(low=0, high=255, shape=(64, 64, 3), dtype=np.uint8)
 
     # Vector containing num_policy_args + 1 object states, corresponding to the
@@ -243,12 +232,8 @@ class TableEnv(PybulletEnv):
         #     ]
         #     for process in self._reset_processes:
         #         process.start()
-        self._process_pipes: Optional[
-            List[multiprocessing.connection.Connection]
-        ] = None
-        self._seed_queue: Optional[
-            multiprocessing.Queue[Tuple[int, Optional[dict]]]
-        ] = None
+        self._process_pipes: Optional[List[multiprocessing.connection.Connection]] = None
+        self._seed_queue: Optional[multiprocessing.Queue[Tuple[int, Optional[dict]]]] = None
         self._seed_buffer = None
         self._reset_processes = None
         self._process_id: Optional[Tuple[int, int]] = None
@@ -272,8 +257,7 @@ class TableEnv(PybulletEnv):
             object_group_list = []
         else:
             object_group_list = [
-                ObjectGroup(physics_id=self.physics_id, **group_config)
-                for group_config in object_groups
+                ObjectGroup(physics_id=self.physics_id, **group_config) for group_config in object_groups
             ]
         self._object_groups = {group.name: group for group in object_group_list}
 
@@ -292,12 +276,8 @@ class TableEnv(PybulletEnv):
 
         # Load optional object tracker.
         if object_tracker_config is not None:
-            object_tracker_kwargs: Dict[str, Any] = utils.load_config(
-                object_tracker_config
-            )
-            self._object_tracker: Optional[
-                object_tracker.ObjectTracker
-            ] = object_tracker.ObjectTracker(
+            object_tracker_kwargs: Dict[str, Any] = utils.load_config(object_tracker_config)
+            self._object_tracker: Optional[object_tracker.ObjectTracker] = object_tracker.ObjectTracker(
                 objects=self.objects, **object_tracker_kwargs
             )
         else:
@@ -448,9 +428,7 @@ class TableEnv(PybulletEnv):
         elif idx_policy is not None and policy_args is not None:
             arg_indices = [
                 idx_obs - 1 if idx_obs > TableEnv.EE_OBSERVATION_IDX else idx_obs
-                for idx_obs in policy_args["observation_indices"][
-                    : policy_args["shuffle_range"][0]
-                ]
+                for idx_obs in policy_args["observation_indices"][: policy_args["shuffle_range"][0]]
                 if idx_obs != TableEnv.EE_OBSERVATION_IDX
             ]
             object_names = list(self.objects.keys())
@@ -458,9 +436,7 @@ class TableEnv(PybulletEnv):
             action_call = f"{self.primitives[idx_policy]}({args})"
             return Primitive.from_action_call(action_call, self)
         else:
-            raise ValueError(
-                "One of action_call or (idx_policy, policy_args) must not be None."
-            )
+            raise ValueError("One of action_call or (idx_policy, policy_args) must not be None.")
 
     def get_state(self) -> np.ndarray:
         state_id = p.saveState(physicsClientId=self.physics_id)
@@ -486,9 +462,7 @@ class TableEnv(PybulletEnv):
             raise NotImplementedError
 
         obj_states = self.object_states()
-        observation = np.zeros(
-            self.observation_space.shape, dtype=self.observation_space.dtype
-        )
+        observation = np.zeros(self.observation_space.shape, dtype=self.observation_space.dtype)
         for i, obj_state in enumerate(obj_states.values()):
             observation[i] = obj_state.vector
         return observation
@@ -573,9 +547,7 @@ class TableEnv(PybulletEnv):
             seed_queue.put((seed, options))
             seed += 1
 
-    def _seed_generator(
-        self, seed: Optional[int]
-    ) -> Generator[Tuple[int, Optional[dict]], None, None]:
+    def _seed_generator(self, seed: Optional[int]) -> Generator[Tuple[int, Optional[dict]], None, None]:
         """Gets the next seed from the multiprocess queue or an incremented seed."""
         MAX_SIMPLE_INT = 2**30  # Largest simple int in Python.
         if self._seed_queue is None:
@@ -586,9 +558,7 @@ class TableEnv(PybulletEnv):
                     idx_process, num_processes = 0, 0
                 else:
                     idx_process, num_processes = self._process_id
-                seed = random.randint(
-                    0, MAX_SIMPLE_INT // (num_processes + 1) * (idx_process + 1)
-                )
+                seed = random.randint(0, MAX_SIMPLE_INT // (num_processes + 1) * (idx_process + 1))
 
             # Increment seeds until one results in a valid env initialization.
             for seed in itertools.count(start=seed):
@@ -643,17 +613,13 @@ class TableEnv(PybulletEnv):
                         for {self._task}: failed to sample task \
                         propositions after {max_samples_per_trial} trials."
                     )
-                self._task = self.tasks.sample()
+                self._task = self.tasks.tasks[0]  # self.tasks.sample()
                 self.set_primitive(self.task.action_skeleton[0])
 
             self.robot.reset()
-            p.restoreState(
-                stateId=self._initial_state_id, physicsClientId=self.physics_id
-            )
+            p.restoreState(stateId=self._initial_state_id, physicsClientId=self.physics_id)
 
-            if self.object_tracker is not None and isinstance(
-                self.robot.arm, real.arm.Arm
-            ):
+            if self.object_tracker is not None and isinstance(self.robot.arm, real.arm.Arm):
                 # Track objects from the real world.
                 self.object_tracker.update_poses()
                 break
@@ -673,14 +639,12 @@ class TableEnv(PybulletEnv):
 
             # Make sure none of the action skeleton args is Null.
             assert not any(
-                any(obj.isinstance(Null) for obj in primitive.arg_objects)
-                for primitive in self.task.action_skeleton
+                any(obj.isinstance(Null) for obj in primitive.arg_objects) for primitive in self.task.action_skeleton
             )
 
             # Sample initial state.
             if not all(
-                prop.sample(self.robot, self.objects, self.task.initial_state)
-                for prop in self.task.initial_state
+                prop.sample(self.robot, self.objects, self.task.initial_state) for prop in self.task.initial_state
             ):
                 # Continue if a proposition failed after max_attempts.
                 dbprint(f"TableEnv.reset(seed={seed}): Failed to sample propositions")
@@ -694,9 +658,7 @@ class TableEnv(PybulletEnv):
                 continue
 
             # Check state again after objects have settled.
-            num_iters = self.wait_until_stable(
-                min_iters=1, max_iters=math.PYBULLET_STEPS_PER_SEC
-            )
+            num_iters = self.wait_until_stable(min_iters=1, max_iters=math.PYBULLET_STEPS_PER_SEC)
             if num_iters == math.PYBULLET_STEPS_PER_SEC:
                 # Skip if settling takes longer than 1s.
                 dbprint(f"TableEnv.reset(seed={seed}): Failed to stabilize")
@@ -739,11 +701,7 @@ class TableEnv(PybulletEnv):
         assert isinstance(primitive, Primitive)
 
         if self._recorder.is_recording() or self._timelapse.is_recording():
-            self._recording_text = (
-                "Action: ["
-                + ", ".join([f"{a:.2f}" for a in primitive.scale_action(action)])
-                + "]"
-            )
+            self._recording_text = "Action: [" + ", ".join([f"{a:.2f}" for a in primitive.scale_action(action)]) + "]"
             if custom_recording_text is not None:
                 self._recording_text = custom_recording_text
 
@@ -752,9 +710,7 @@ class TableEnv(PybulletEnv):
 
         self._recorder.add_frame(self.render, override_frequency=True)
         self._timelapse.add_frame(self.render)
-        result = primitive.execute(
-            action, real_world=isinstance(self.robot.arm, real.arm.Arm)
-        )
+        result = primitive.execute(action, real_world=isinstance(self.robot.arm, real.arm.Arm))
 
         if (
             self.object_tracker is not None
@@ -796,10 +752,7 @@ class TableEnv(PybulletEnv):
         """Return list of supported task-agnostic goal predicates signatures."""
         if self.task.supported_predicates is None:
             raise ValueError("Supported goal predicates not declared in task.")
-        if not all(
-            pred in predicates.SUPPORTED_PREDICATES
-            for pred in self.task.supported_predicates
-        ):
+        if not all(pred in predicates.SUPPORTED_PREDICATES for pred in self.task.supported_predicates):
             ValueError("Task require unsupported goal predicates.")
         return self.task.supported_predicates
 
@@ -819,10 +772,7 @@ class TableEnv(PybulletEnv):
         )
 
     def _is_any_object_below_table(self) -> bool:
-        return any(
-            not obj.is_static and utils.is_below_table(obj)
-            for obj in self.real_objects()
-        )
+        return any(not obj.is_static and utils.is_below_table(obj) for obj in self.real_objects())
 
     def _is_any_object_falling_off_parent(self) -> bool:
         def is_falling_off(child: Object, parent: Object) -> bool:
@@ -842,19 +792,15 @@ class TableEnv(PybulletEnv):
 
     def _is_any_object_touching_base(self) -> bool:
         return any(
-            not obj.is_static and utils.is_touching(self.robot, obj, link_id_a=-1)
-            for obj in self.real_objects()
+            not obj.is_static and utils.is_touching(self.robot, obj, link_id_a=-1) for obj in self.real_objects()
         )
 
-    def wait_until_stable(
-        self, min_iters: int = 0, max_iters: int = 3 * math.PYBULLET_STEPS_PER_SEC
-    ) -> int:
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = 3 * math.PYBULLET_STEPS_PER_SEC) -> int:
         IS_MOVING_KEY = "TableEnv.wait_until_stable"
 
         def is_any_object_moving() -> bool:
             return any(
-                not obj.is_static and utils.is_moving(obj, use_history=IS_MOVING_KEY)
-                for obj in self.real_objects()
+                not obj.is_static and utils.is_moving(obj, use_history=IS_MOVING_KEY) for obj in self.real_objects()
             )
 
         # Reset history for `utils.is_moving()`.
@@ -881,9 +827,7 @@ class TableEnv(PybulletEnv):
         p.stepSimulation(physicsClientId=self.physics_id)
         self._recorder.add_frame(self.render)
 
-        if self.object_tracker is not None and not isinstance(
-            self.robot.arm, real.arm.Arm
-        ):
+        if self.object_tracker is not None and not isinstance(self.robot.arm, real.arm.Arm):
             # Send objects to RedisGl.
             self.object_tracker.send_poses(self.real_objects())
 
@@ -1036,9 +980,7 @@ class VariantTableEnv(VariantEnv, TableEnv):  # type: ignore
     def object_states(self) -> Dict[str, object_state.ObjectState]:
         return self.env.object_states()
 
-    def wait_until_stable(
-        self, min_iters: int = 0, max_iters: int = int(3.0 / math.PYBULLET_TIMESTEP)
-    ) -> int:
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / math.PYBULLET_TIMESTEP)) -> int:
         return self.env.wait_until_stable(min_iters, max_iters)
 
     def step_simulation(self) -> None:

@@ -1,18 +1,17 @@
 import dataclasses
-from typing import Optional, Dict, List, Sequence, Tuple, Type
-
 import random
-from ctrlutils import eigen
+from typing import Dict, List, Optional, Sequence, Tuple, Type
+
 import numpy as np
 import pybullet as p
 import symbolic
-from shapely.geometry import Polygon, LineString
+from ctrlutils import eigen
+from shapely.geometry import LineString, Polygon
 
-from stap.envs.pybullet.table import primitive_actions, utils
-from stap.envs.pybullet.table.objects import Box, Hook, Null, Object, Rack
 from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.sim.robot import Robot
-
+from stap.envs.pybullet.table import primitive_actions, utils
+from stap.envs.pybullet.table.objects import Box, Hook, Null, Object, Rack
 
 dbprint = lambda *args: None  # noqa
 # dbprint = print
@@ -35,15 +34,11 @@ class Predicate:
     @classmethod
     def create(cls, proposition: str) -> "Predicate":
         predicate, args = symbolic.parse_proposition(proposition)
-        predicate_classes = {
-            name.lower(): predicate_class for name, predicate_class in globals().items()
-        }
+        predicate_classes = {name.lower(): predicate_class for name, predicate_class in globals().items()}
         predicate_class = predicate_classes[predicate]
         return predicate_class(args)
 
-    def sample(
-        self, robot: Robot, objects: Dict[str, Object], state: Sequence["Predicate"]
-    ) -> bool:
+    def sample(self, robot: Robot, objects: Dict[str, Object], state: Sequence["Predicate"]) -> bool:
         """Generates a geometric grounding of a predicate."""
         return True
 
@@ -66,17 +61,11 @@ class Predicate:
         use sim=True for checking predicates at environment initialization, and sim=False for planning.
         """
         if (robot is None and self.robot_req) and (state is None and self.state_req):
-            raise ValueError(
-                f"{str(self.__class__)}.value() requires robot and state, but None were given."
-            )
+            raise ValueError(f"{str(self.__class__)}.value() requires robot and state, but None were given.")
         elif robot is None and self.robot_req:
-            raise ValueError(
-                f"{str(self.__class__)}.value() requires robot, but None was given."
-            )
+            raise ValueError(f"{str(self.__class__)}.value() requires robot, but None was given.")
         elif state is None and self.state_req:
-            raise ValueError(
-                f"{str(self.__class__)}.value() requires state, but None was given."
-            )
+            raise ValueError(f"{str(self.__class__)}.value() requires state, but None was given.")
         return True
 
     def get_arg_objects(self, objects: Dict[str, Object]) -> List[Object]:
@@ -140,9 +129,7 @@ class Free(Predicate):
                 dbprint(f"{self}.value():", False, f"{child_obj} under {obj}")
                 return False
 
-            obj_a, obj_b = sorted(
-                (child_obj.type(), obj.type()), key=lambda x: x.__name__
-            )
+            obj_a, obj_b = sorted((child_obj.type(), obj.type()), key=lambda x: x.__name__)
             try:
                 min_distance = Free.DISTANCE_MIN[(obj_a, obj_b)]
             except KeyError:
@@ -153,9 +140,9 @@ class Free(Predicate):
                 or f"infront({obj}, rack)" in state
             ):
                 min_distance = 0.04
-            if utils.is_within_distance(
-                child_obj, obj, min_distance, obj.physics_id
-            ) and not utils.is_above(child_obj, obj):
+            if utils.is_within_distance(child_obj, obj, min_distance, obj.physics_id) and not utils.is_above(
+                child_obj, obj
+            ):
                 dbprint(
                     f"{self}.value():",
                     False,
@@ -232,11 +219,7 @@ class TableBounds:
         obj: Object,
         state: Sequence[Predicate],
     ) -> Optional["TableBounds"]:
-        zones = [
-            prop
-            for prop in state
-            if isinstance(prop, TableBounds) and prop.args[0] == obj
-        ]
+        zones = [prop for prop in state if isinstance(prop, TableBounds) and prop.args[0] == obj]
         if not zones and f"on({obj}, table)" in state:
             return cls()
         elif len(zones) == 1:
@@ -333,9 +316,7 @@ class InWorkspace(Predicate, TableBounds):
         obj_pos = obj.pose(sim=sim).pos[:2]
         distance = float(np.linalg.norm(obj_pos))
         if not utils.is_inworkspace(obj_pos=obj_pos, distance=distance, sim=sim):
-            dbprint(
-                f"{self}.value():", False, "- pos:", obj_pos[:2], "distance:", distance
-            )
+            dbprint(f"{self}.value():", False, "- pos:", obj_pos[:2], "distance:", distance)
             return False
 
         return True
@@ -389,9 +370,7 @@ class InCollisionZone(Predicate, TableBounds):
         obj_pos = obj.pose(sim=sim).pos[:2]
         distance = float(np.linalg.norm(obj_pos))
         if not (
-            utils.TABLE_CONSTRAINTS["workspace_x_min"]
-            <= obj_pos[0]
-            < utils.TABLE_CONSTRAINTS["operational_x_min"]
+            utils.TABLE_CONSTRAINTS["workspace_x_min"] <= obj_pos[0] < utils.TABLE_CONSTRAINTS["operational_x_min"]
             and distance < utils.TABLE_CONSTRAINTS["workspace_radius"]
         ):
             dbprint(f"{self}.value():", False, "- pos:", obj_pos, "distance:", distance)
@@ -438,9 +417,7 @@ class InOperationalZone(Predicate, TableBounds):
         obj_pos = obj.pose(sim=sim).pos[:2]
         distance = float(np.linalg.norm(obj_pos))
         if not (
-            utils.TABLE_CONSTRAINTS["operational_x_min"]
-            <= obj_pos[0]
-            < utils.TABLE_CONSTRAINTS["operational_x_max"]
+            utils.TABLE_CONSTRAINTS["operational_x_min"] <= obj_pos[0] < utils.TABLE_CONSTRAINTS["operational_x_max"]
             and distance < utils.TABLE_CONSTRAINTS["workspace_radius"]
         ):
             dbprint(f"{self}.value():", False, "- pos:", obj_pos, "distance:", distance)
@@ -609,9 +586,7 @@ class InOodZone(Predicate, TableBounds):
 class Inhand(Predicate):
     MAX_GRASP_ATTEMPTS = 1
 
-    def sample(
-        self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]
-    ) -> bool:
+    def sample(self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]) -> bool:
         """Samples a geometric grounding of the InHand(a) predicate."""
         obj = self.get_arg_objects(objects)[0]
         if obj.is_static:
@@ -646,9 +621,7 @@ class Inhand(Predicate):
         return True
 
     @staticmethod
-    def generate_grasp_pose(
-        obj: Object, handlegrasp: bool = False, upperhandlegrasp: bool = False
-    ) -> math.Pose:
+    def generate_grasp_pose(obj: Object, handlegrasp: bool = False, upperhandlegrasp: bool = False) -> math.Pose:
         """Generates a grasp pose in the object frame of reference."""
         # Maximum deviation of the object from the gripper's center y.
         MAX_GRASP_Y_OFFSET = 0.01
@@ -670,8 +643,7 @@ class Inhand(Predicate):
             if (
                 handlegrasp
                 or upperhandlegrasp
-                or np.random.random()
-                < hook.handle_length / (hook.handle_length + hook.head_length)
+                or np.random.random() < hook.handle_length / (hook.handle_length + hook.head_length)
             ):
                 # Handle.
                 min_xyz, max_xyz = np.array(obj.bbox)
@@ -708,20 +680,12 @@ class Inhand(Predicate):
             min_xyz, max_xyz = np.array(obj.bbox)
             if theta == 0.0:
                 y_center = 0.5 * (min_xyz[1] + max_xyz[1])
-                min_xyz[1] = max(
-                    min_xyz[1] + 0.5 * FINGER_DISTANCE, y_center - MAX_GRASP_Y_OFFSET
-                )
-                max_xyz[1] = min(
-                    max_xyz[1] - 0.5 * FINGER_DISTANCE, y_center + MAX_GRASP_Y_OFFSET
-                )
+                min_xyz[1] = max(min_xyz[1] + 0.5 * FINGER_DISTANCE, y_center - MAX_GRASP_Y_OFFSET)
+                max_xyz[1] = min(max_xyz[1] - 0.5 * FINGER_DISTANCE, y_center + MAX_GRASP_Y_OFFSET)
             elif theta == np.pi / 2:
                 x_center = 0.5 * (min_xyz[0] + max_xyz[0])
-                min_xyz[0] = max(
-                    min_xyz[0] + 0.5 * FINGER_DISTANCE, x_center - MAX_GRASP_Y_OFFSET
-                )
-                max_xyz[0] = min(
-                    max_xyz[0] - 0.5 * FINGER_DISTANCE, x_center + MAX_GRASP_Y_OFFSET
-                )
+                min_xyz[0] = max(min_xyz[0] + 0.5 * FINGER_DISTANCE, x_center - MAX_GRASP_Y_OFFSET)
+                max_xyz[0] = min(max_xyz[0] - 0.5 * FINGER_DISTANCE, x_center + MAX_GRASP_Y_OFFSET)
 
             min_xyz[2] += FINGER_COLLISION_MARGIN
             min_xyz[2] = max(min_xyz[2], max_xyz[0] - FINGER_HEIGHT)
@@ -878,18 +842,14 @@ class NonBlocking(Predicate):
         if intersect_obj.isinstance(Hook):
             convex_hulls = Object.convex_hulls(intersect_obj, project_2d=True, sim=sim)
         else:
-            convex_hulls = intersect_obj.convex_hulls(
-                world_frame=True, project_2d=True, sim=sim
-            )
+            convex_hulls = intersect_obj.convex_hulls(world_frame=True, project_2d=True, sim=sim)
 
         if len(convex_hulls) > 1:
-            raise NotImplementedError(f"Compound shapes are not yet supported")
+            raise NotImplementedError("Compound shapes are not yet supported")
         vertices = convex_hulls[0]
 
         try:
-            pull_margins = NonBlocking.PULL_MARGIN[
-                (target_obj.type(), intersect_obj.type())
-            ]
+            pull_margins = NonBlocking.PULL_MARGIN[(target_obj.type(), intersect_obj.type())]
         except KeyError:
             pull_margins = None
 
@@ -928,9 +888,7 @@ class On(Predicate):
     def robot_req(self) -> bool:
         return True
 
-    def sample(
-        self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]
-    ) -> bool:
+    def sample(self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]) -> bool:
         """Samples a geometric grounding of the On(a, b) predicate."""
         child_obj, parent_obj = self.get_arg_objects(objects)
 
@@ -959,11 +917,7 @@ class On(Predicate):
         except StopIteration:
             rack_obj = None
 
-        if (
-            parent_obj.name == "table"
-            and rack_obj is not None
-            and f"under({child_obj}, {rack_obj})" in state
-        ):
+        if parent_obj.name == "table" and rack_obj is not None and f"under({child_obj}, {rack_obj})" in state:
             # Restrict placement location to under the rack
             parent_obj = rack_obj
 
@@ -980,9 +934,7 @@ class On(Predicate):
                 xy_min, xy_max = bounds
 
             if rack_obj is not None and f"infront({child_obj}, {rack_obj})" in state:
-                infront_bounds = InFront.bounds(
-                    child_obj=child_obj, parent_obj=rack_obj, margin=margin_world_frame
-                )
+                infront_bounds = InFront.bounds(child_obj=child_obj, parent_obj=rack_obj, margin=margin_world_frame)
                 intersection = self.compute_bound_intersection(bounds, infront_bounds)
                 if intersection is None:
                     dbprint(
@@ -997,15 +949,11 @@ class On(Predicate):
             xy_min, xy_max = self.compute_stable_region(child_obj, parent_obj)
 
         else:
-            raise ValueError(
-                "[Predicate.On] parent object must be a table, rack, or box"
-            )
+            raise ValueError("[Predicate.On] parent object must be a table, rack, or box")
 
         # Obtain predicates to validate sampled pose
         propositions = [
-            prop
-            for prop in state
-            if isinstance(prop, (Free, TableBounds)) and prop.args[-1] == child_obj.name
+            prop for prop in state if isinstance(prop, (Free, TableBounds)) and prop.args[-1] == child_obj.name
         ]
 
         samples = 0
@@ -1022,25 +970,18 @@ class On(Predicate):
             if child_obj.isinstance(Rack):
                 xyz_world_frame[2] += 0.5 * child_obj.size[2]
 
-            if f"tippable({child_obj})" in state and not child_obj.isinstance(
-                (Hook, Rack)
-            ):
+            if f"tippable({child_obj})" in state and not child_obj.isinstance((Hook, Rack)):
                 # Tip the object over
                 if np.random.random() < utils.EPSILONS["tipping"]:
                     axis = np.random.uniform(-1, 1, size=2)
                     axis /= np.linalg.norm(axis)
-                    quat = quat * eigen.Quaterniond(
-                        eigen.AngleAxisd(np.pi / 2, np.array([*axis, 0.0]))
-                    )
+                    quat = quat * eigen.Quaterniond(eigen.AngleAxisd(np.pi / 2, np.array([*axis, 0.0])))
                     xyz_world_frame[2] = parent_z + 0.8 * child_obj.size[:2].max()
 
             pose = math.Pose(pos=xyz_world_frame, quat=quat.coeffs)
             child_obj.set_pose(pose)
 
-            if any(
-                not prop.value(robot=robot, objects=objects, state=state)
-                for prop in propositions
-            ):
+            if any(not prop.value(robot=robot, objects=objects, state=state) for prop in propositions):
                 samples += 1
                 continue
             success = True
@@ -1066,9 +1007,7 @@ class On(Predicate):
             return False
 
         if state is not None:
-            if f"tippable({child_obj})" not in state and not utils.is_upright(
-                child_obj, sim=sim
-            ):
+            if f"tippable({child_obj})" not in state and not utils.is_upright(child_obj, sim=sim):
                 dbprint(f"{self}.value():", False, "- child not upright")
                 return False
 
@@ -1095,9 +1034,7 @@ class On(Predicate):
         child_aabb = np.array([vertices.min(axis=1), vertices.max(axis=1)])
 
         # Compute margin in the parent frame
-        margin = 0.5 * np.array(
-            [child_aabb[1, 0] - child_aabb[0, 0], child_aabb[1, 1] - child_aabb[0, 1]]
-        )
+        margin = 0.5 * np.array([child_aabb[1, 0] - child_aabb[0, 0], child_aabb[1, 1] - child_aabb[0, 1]])
         xy_min = margin
         xy_max = parent_obj.size[:2] - margin
         if np.any(xy_max - xy_min <= 0):
@@ -1125,6 +1062,31 @@ class On(Predicate):
             return None
 
         return np.array([xy_min, xy_max])
+
+
+class TPose(Predicate):
+    """Predicate to put the human in a T-pose."""
+
+    MAX_SAMPLE_ATTEMPTS = 1
+
+    @property
+    def state_req(self) -> bool:
+        return True
+
+    @property
+    def robot_req(self) -> bool:
+        return False
+
+    def sample(self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]) -> bool:
+        """Samples a geometric grounding of the On(a, b) predicate."""
+        [human] = self.get_arg_objects(objects)
+
+        if human.is_static:
+            dbprint(f"{self}.sample():", True, "- static child")
+            return True
+
+        human.set_pose(math.Pose(pos=np.array([2, 0, 0]), quat=np.array([0, 0, 0, 1])))
+        return True
 
 
 UNARY_PREDICATES = {
@@ -1180,4 +1142,5 @@ SUPPORTED_PREDICATES = {
     "under(a, b)": Under,
     "on(a, b)": On,
     "inhand(a)": Inhand,
+    "tpose(a)": TPose,
 }

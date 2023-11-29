@@ -1,7 +1,6 @@
-from typing import Dict, Any, Tuple, Optional
-
 import os
 import sys
+from typing import Any, Dict, Tuple
 
 from stap.envs.base import Env
 from stap.envs.pybullet.utils import RedirectStream
@@ -9,6 +8,7 @@ from stap.envs.pybullet.utils import RedirectStream
 with RedirectStream(sys.stderr):
     import pybullet as p
 
+SIM_TIME_STEP = 1.0 / 60.0
 
 DEFAULT_OPTIONS = {
     "background_color_red": 0.12,
@@ -37,12 +37,8 @@ def connect_pybullet(gui: bool = True, gui_kwargs: Dict[str, Any] = {}) -> int:
             0,
             physicsClientId=physics_id,
         )
-        p.configureDebugVisualizer(
-            p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, 0, physicsClientId=physics_id
-        )
-        p.configureDebugVisualizer(
-            p.COV_ENABLE_RGB_BUFFER_PREVIEW, 0, physicsClientId=physics_id
-        )
+        p.configureDebugVisualizer(p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, 0, physicsClientId=physics_id)
+        p.configureDebugVisualizer(p.COV_ENABLE_RGB_BUFFER_PREVIEW, 0, physicsClientId=physics_id)
         p.configureDebugVisualizer(
             p.COV_ENABLE_SHADOWS,
             gui_kwargs.get("shadows", 0),
@@ -55,7 +51,7 @@ def connect_pybullet(gui: bool = True, gui_kwargs: Dict[str, Any] = {}) -> int:
             cameraTargetPosition=[0.76, 0.07, 0.37],
             physicsClientId=physics_id,
         )
-    p.setTimeStep(1 / 60)
+    p.setTimeStep(SIM_TIME_STEP)
     return physics_id
 
 

@@ -3,14 +3,13 @@ import itertools
 import random
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Type, Union
 
-from ctrlutils import eigen
 import numpy as np
 import pybullet as p
 import spatialdyn as dyn
+from ctrlutils import eigen
 
 from stap.envs.pybullet.sim import body, math, shapes
 from stap.envs.pybullet.table import object_state
-
 
 OBJECT_HIERARCHY = [
     "rack",
@@ -24,9 +23,7 @@ OBJECT_HIERARCHY = [
 ]
 
 
-def compute_bbox_vertices(
-    bbox: np.ndarray, pose: Optional[math.Pose] = None, project_2d: bool = False
-) -> np.ndarray:
+def compute_bbox_vertices(bbox: np.ndarray, pose: Optional[math.Pose] = None, project_2d: bool = False) -> np.ndarray:
     """Computes the vertices of the given 3D bounding box.
 
     Args:
@@ -41,13 +38,9 @@ def compute_bbox_vertices(
 
     if project_2d:
         # 2D box with vertices in clockwise order.
-        vertices = np.array(
-            [[xs[0], ys[0]], [xs[0], ys[1]], [xs[1], ys[1]], [xs[1], ys[0]]]
-        )
+        vertices = np.array([[xs[0], ys[0]], [xs[0], ys[1]], [xs[1], ys[1]], [xs[1], ys[0]]])
         if pose is not None:
-            vertices = np.concatenate(
-                (vertices, np.tile([zs.mean(), 1.0], (vertices.shape[0], 1))), axis=1
-            )
+            vertices = np.concatenate((vertices, np.tile([zs.mean(), 1.0], (vertices.shape[0], 1))), axis=1)
             vertices = (vertices @ pose.to_eigen().matrix.T)[:, :2]
     else:
         # 3D box.
@@ -64,17 +57,13 @@ class Object(body.Body):
     name: str
     is_static: bool = False
 
-    def __init__(
-        self, physics_id: int, body_id: int, name: str, is_static: bool = False
-    ):
+    def __init__(self, physics_id: int, body_id: int, name: str, is_static: bool = False):
         super().__init__(physics_id, body_id)
 
         self.name = name
         self.is_static = is_static
         T_pybullet_to_obj = super().pose().to_eigen()
-        self._modified_axes = not T_pybullet_to_obj.is_approx(
-            eigen.Isometry3d.identity()
-        )
+        self._modified_axes = not T_pybullet_to_obj.is_approx(eigen.Isometry3d.identity())
         if self._modified_axes:
             self._T_pybullet_to_obj = T_pybullet_to_obj
             self._T_obj_to_pybullet = T_pybullet_to_obj.inverse()
@@ -107,21 +96,15 @@ class Object(body.Body):
         if not self._modified_axes:
             return super().set_pose(pose)
 
-        return super().set_pose(
-            math.Pose.from_eigen(pose.to_eigen() * self._T_pybullet_to_obj)
-        )
+        return super().set_pose(math.Pose.from_eigen(pose.to_eigen() * self._T_pybullet_to_obj))
 
     def disable_collisions(self) -> None:
         for link_id in range(self.dof):
-            p.setCollisionFilterGroupMask(
-                self.body_id, link_id, 0, 0, physicsClientId=self.physics_id
-            )
+            p.setCollisionFilterGroupMask(self.body_id, link_id, 0, 0, physicsClientId=self.physics_id)
 
     def enable_collisions(self) -> None:
         for link_id in range(self.dof):
-            p.setCollisionFilterGroupMask(
-                self.body_id, link_id, 1, 0xFF, physicsClientId=self.physics_id
-            )
+            p.setCollisionFilterGroupMask(self.body_id, link_id, 1, 0xFF, physicsClientId=self.physics_id)
 
     @property
     def inertia(self) -> dyn.SpatialInertiad:
@@ -152,9 +135,7 @@ class Object(body.Body):
     def set_state(self, state: object_state.ObjectState) -> None:
         self.set_pose(state.pose())
 
-    def reset(
-        self, action_skeleton: List, initial_state: Optional[List] = None
-    ) -> None:
+    def reset(self, action_skeleton: List, initial_state: Optional[List] = None) -> None:
         pass
 
     @classmethod
@@ -195,9 +176,7 @@ class Object(body.Body):
         """
         raise NotImplementedError
 
-    def convex_hulls(
-        self, world_frame: bool = True, project_2d: bool = False, sim: bool = True
-    ) -> List[np.ndarray]:
+    def convex_hulls(self, world_frame: bool = True, project_2d: bool = False, sim: bool = True) -> List[np.ndarray]:
         """Computes the object's convex hull.
 
         These hulls will be used for rough collision checking. By default,
@@ -250,13 +229,9 @@ class Urdf(Object):
     AABB_MARGIN = 0.001  # Pybullet seems to expand aabbs by at least this amount.
 
     def __init__(self, physics_id: int, name: str, path: str, is_static: bool = False):
-        body_id = p.loadURDF(
-            fileName=path, useFixedBase=is_static, physicsClientId=physics_id
-        )
+        body_id = p.loadURDF(fileName=path, useFixedBase=is_static, physicsClientId=physics_id)
 
-        super().__init__(
-            physics_id=physics_id, body_id=body_id, name=name, is_static=is_static
-        )
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=is_static)
 
         xyz_min, xyz_max = body.Body.aabb(self)
         xyz_min += Urdf.AABB_MARGIN
@@ -286,9 +261,7 @@ class Box(Object):
         body_id = shapes.create_body(box, physics_id=physics_id)
         self._shape = box
 
-        super().__init__(
-            physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0
-        )
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0)
 
         self._state.box_size = box.size
         self._bbox = np.array([-0.5 * self.size, 0.5 * self.size])
@@ -306,21 +279,64 @@ class Box(Object):
         return [self._shape]
 
 
+class Human(Object):
+    def __init__(
+        self,
+        physics_id: int,
+        name: str,
+        color: Union[List[float], np.ndarray],
+    ):
+        custom_radius = 0.1
+        self._head = shapes.Sphere(mass=0, color=np.array(color), radius=custom_radius)
+        body_id = shapes.create_body(self._head, physics_id=physics_id)
+        self._bbox = np.array([-custom_radius, custom_radius])
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=True)
+        self.disable_collisions()
+        self.freeze()
+        self._animation = np.array([])
+        self._recording_freq = 0.0
+        self._start_time = None
+
+    def reset(self, action_skeleton: List, initial_state: Optional[List] = None) -> None:
+        self.set_pose(math.Pose(np.array([0.2, 0.2, 0.2]), np.array([0, 0, 0, 1])))
+        self._start_time = None
+
+    def set_animation(self, animation: np.ndarray, recording_freq: float) -> None:
+        self._animation = animation
+        self._recording_freq = recording_freq
+
+    def animate(self, time: float) -> None:
+        if self._start_time is None:
+            self._start_time = time
+        if self._animation.size == 0:
+            return
+        run_time = time - self._start_time
+        run_step = int(run_time * self._recording_freq)
+        animation_idx = run_step % self._animation.shape[0]
+        self.set_pose(math.Pose(self._animation[animation_idx, :3], np.array([0, 0, 0, 1])))
+
+    @property
+    def size(self) -> np.ndarray:
+        return np.array([self._head.radius])
+
+    @property
+    def bbox(self) -> np.ndarray:
+        return self._bbox
+
+    @property
+    def shapes(self) -> Sequence[shapes.Shape]:
+        return [self._head]
+
+
 class Hook(Object):
     @staticmethod
     def compute_link_positions(
         head_length: float, handle_length: float, handle_y: float, radius: float
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        dy = (
-            0.5
-            * np.sign(handle_y)
-            * max(0, (abs(handle_y) - 1.0) * head_length / 2 + radius)
-        )
+        dy = 0.5 * np.sign(handle_y) * max(0, (abs(handle_y) - 1.0) * head_length / 2 + radius)
         pos_handle = np.array([-radius / 2, handle_y * head_length / 2 - dy, 0.0])
         pos_head = np.array([(handle_length - radius) / 2, -dy, 0.0])
-        pos_joint = np.array(
-            [(handle_length - radius) / 2, handle_y * head_length / 2 - dy, 0.0]
-        )
+        pos_joint = np.array([(handle_length - radius) / 2, handle_y * head_length / 2 - dy, 0.0])
 
         return pos_handle, pos_head, pos_joint
 
@@ -351,9 +367,7 @@ class Hook(Object):
             color=color,
             pose=math.Pose(
                 pos=pos_handle,
-                quat=eigen.Quaterniond(
-                    eigen.AngleAxisd(angle=np.pi / 2, axis=np.array([0.0, 1.0, 0.0]))
-                ).coeffs,
+                quat=eigen.Quaterniond(eigen.AngleAxisd(angle=np.pi / 2, axis=np.array([0.0, 1.0, 0.0]))).coeffs,
             ),
         )
         head = shapes.Cylinder(
@@ -363,9 +377,7 @@ class Hook(Object):
             color=color,
             pose=math.Pose(
                 pos=pos_head,
-                quat=eigen.Quaterniond(
-                    eigen.AngleAxisd(angle=np.pi / 2, axis=np.array([1.0, 0.0, 0.0]))
-                ).coeffs,
+                quat=eigen.Quaterniond(eigen.AngleAxisd(angle=np.pi / 2, axis=np.array([1.0, 0.0, 0.0]))).coeffs,
             ),
         )
         joint = shapes.Sphere(
@@ -375,22 +387,16 @@ class Hook(Object):
             pose=math.Pose(pos=pos_joint),
         )
         self._shapes = [joint, handle, head]
-        body_id = shapes.create_body(
-            self.shapes, link_parents=[0, 0], physics_id=physics_id
-        )
+        body_id = shapes.create_body(self.shapes, link_parents=[0, 0], physics_id=physics_id)
 
-        super().__init__(
-            physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0
-        )
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0)
 
         self._state.head_length = head_length
         self._state.handle_length = handle_length
         self._state.handle_y = handle_y
         self._radius = radius
 
-        self._size = np.array(
-            [handle_length + radius, head_length + 2 * abs(pos_head[1]), 2 * radius]
-        )
+        self._size = np.array([handle_length + radius, head_length + 2 * abs(pos_head[1]), 2 * radius])
         self._bbox = np.array([-0.5 * self.size, 0.5 * self.size])
 
     @property
@@ -440,9 +446,7 @@ class Hook(Object):
                 [2 * self.radius, self.size[1], 2 * self.radius],
             ]
         )
-        bboxes = np.array([positions - 0.5 * sizes, positions + 0.5 * sizes]).swapaxes(
-            0, 1
-        )
+        bboxes = np.array([positions - 0.5 * sizes, positions + 0.5 * sizes]).swapaxes(0, 1)
 
         pose = self.pose(sim=sim) if world_frame else None
         vertices = [compute_bbox_vertices(bbox, pose, project_2d) for bbox in bboxes]
@@ -524,9 +528,7 @@ class Rack(Object):
             physics_id=physics_id,
         )
 
-        super().__init__(
-            physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0
-        )
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0)
 
         self._state.box_size = np.array(size)
         self._bbox = np.array([-0.5 * self.size, 0.5 * self.size])
@@ -551,9 +553,7 @@ class Null(Object):
         sphere = shapes.Sphere(radius=0.001)
         body_id = shapes.create_body(sphere, physics_id=physics_id)
 
-        super().__init__(
-            physics_id=physics_id, body_id=body_id, name=name, is_static=True
-        )
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=True)
 
     def state(self) -> object_state.ObjectState:
         # Null object state is a zero vector.
@@ -809,16 +809,11 @@ class ObjectGroup:
 
         self._name = name
         self._objects = [
-            Object.create(physics_id=physics_id, name=name, **load_config(obj_config))
-            for obj_config in objects
+            Object.create(physics_id=physics_id, name=name, **load_config(obj_config)) for obj_config in objects
         ]
 
-        self._real_indices = [
-            i for i, obj in enumerate(self.objects) if not isinstance(obj, Null)
-        ]
-        self._null_indices = [
-            i for i, obj in enumerate(self.objects) if isinstance(obj, Null)
-        ]
+        self._real_indices = [i for i, obj in enumerate(self.objects) if not isinstance(obj, Null)]
+        self._null_indices = [i for i, obj in enumerate(self.objects) if isinstance(obj, Null)]
 
     @property
     def name(self) -> str:
@@ -851,11 +846,7 @@ class ObjectGroup:
             max_num_objects = self.num_real_objects
 
         # Number of objects in this group that will be instantiated in the world.
-        instances = [
-            obj
-            for obj in objects.values()
-            if isinstance(obj, Variant) and obj.variants == self
-        ]
+        instances = [obj for obj in objects.values() if isinstance(obj, Variant) and obj.variants == self]
         num_used = len(instances)
 
         # Remember objects that will be used in the action skeleton.
@@ -863,10 +854,7 @@ class ObjectGroup:
             obj
             for obj in instances
             if any(obj in primitive.arg_objects for primitive in action_skeleton)
-            or (
-                initial_state is not None
-                and any(obj in predicate.args for predicate in initial_state)
-            )
+            or (initial_state is not None and any(obj in predicate.args for predicate in initial_state))
         ]
         num_required = len(self._required_instances)
 
@@ -943,10 +931,7 @@ class ObjectGroup:
         num_total = len(self.objects)
 
         # Number of objects in this group that will be instantiated by variants.
-        num_used = sum(
-            isinstance(obj, Variant) and obj.variants == self
-            for obj in objects.values()
-        )
+        num_used = sum(isinstance(obj, Variant) and obj.variants == self for obj in objects.values())
 
         # Number of objects in this group that will remain uninstantiated.
         num_unused = num_total - num_used
@@ -993,14 +978,8 @@ class Variant(WrapperObject):
                 )
                 for obj_config in variants
             ]
-            self._real_indices = [
-                i
-                for i, variant in enumerate(self.variants)
-                if not variant.isinstance(Null)
-            ]
-            self._null_indices = [
-                i for i, variant in enumerate(self.variants) if variant.isinstance(Null)
-            ]
+            self._real_indices = [i for i, variant in enumerate(self.variants) if not variant.isinstance(Null)]
+            self._null_indices = [i for i, variant in enumerate(self.variants) if variant.isinstance(Null)]
             if not len(self._null_indices) > 0:
                 print(
                     "No null variants available; please specify `- object_type: Null' \
@@ -1045,9 +1024,7 @@ class Variant(WrapperObject):
             if idx_variant is None:
                 if any(self in primitive.arg_objects for primitive in action_skeleton):
                     idx_variant = random.choice(self._real_indices)
-                elif initial_state is not None and any(
-                    self.name in predicate.args for predicate in initial_state
-                ):
+                elif initial_state is not None and any(self.name in predicate.args for predicate in initial_state):
                     idx_variant = random.choice(self._real_indices)
                 else:
                     assert (
@@ -1067,9 +1044,7 @@ class Variant(WrapperObject):
         if lock:
             self._idx_variant = idx_variant
 
-    def reset(
-        self, action_skeleton: List, initial_state: Optional[List] = None
-    ) -> None:
+    def reset(self, action_skeleton: List, initial_state: Optional[List] = None) -> None:
         self.set_variant(self._idx_variant, action_skeleton, initial_state)
         self.enable_collisions()
         self.unfreeze()
