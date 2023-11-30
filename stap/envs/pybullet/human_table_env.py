@@ -4,7 +4,7 @@ Author: Jakob Thumm
 Created: 28.11.2023
 """
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pybullet as p
@@ -15,7 +15,8 @@ from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.sim.human import Human
 from stap.envs.pybullet.table import object_state, utils
 from stap.envs.pybullet.table.primitives import Primitive
-from stap.envs.pybullet.table_env import TableEnv
+from stap.envs.pybullet.table_env import CameraView, TableEnv
+from stap.utils.animation_utils import load_human_animation_data
 
 dbprint = lambda *args: None  # noqa
 # dbprint = print
@@ -26,6 +27,10 @@ class HumanTableEnv(TableEnv):
 
     def __init__(
         self,
+        human_config: Union[str, Dict[str, Any]],
+        animation_type: str,
+        animation_frequency: int,
+        human_animation_names: Optional[List[str]] = None,
         **kwargs,
     ):
         """Constructs the TableEnv.
@@ -34,43 +39,47 @@ class HumanTableEnv(TableEnv):
             kwargs: Keyword arguments for `TableEnv`.
         """
         super().__init__(**kwargs)
-        body_names = ["head", "torso"]
-        body_measurement_ids = {
-            "head": (int(0), int(1)),
-            "torso": (int(2), int(3)),
-        }
-        body_radii = {
-            "head": 0.1,
-            "torso": 0.2,
-        }
-        body_lengths = {
-            "head": 0.0,
-            "torso": 0.3,
-        }
-        self.human = Human(
-            self.physics_id,
-            name="human",
-            color=[1.0, 0.0, 0.0, 0.5],
-            body_names=body_names,
-            body_measurement_ids=body_measurement_ids,
-            body_radii=body_radii,
-            body_lengths=body_lengths,
+        human_kwargs = utils.load_config(human_config)
+        self._animations = load_human_animation_data(
+            animation_type=animation_type,
+            human_animation_names=human_animation_names,
+            load_post_processed=True,
+            verbose=False,
         )
+        self.human = Human(self.physics_id, **human_kwargs)
         self.human.reset(self.task.action_skeleton, self.task.initial_state)
         self._initial_state_id = p.saveState(physicsClientId=self.physics_id)
         # Animation: Time, Point, Pos
-        self._animation = 0.2 * np.ones((100, 4, 3), dtype=np.float32)
-        self._animation[:, 0, 0] = np.linspace(0.0, 1.0, 100)
-        self._animation[:, 1, 0] = np.linspace(0.0, 1.0, 100)
-        # self._animation[:, 2, 0] = np.linspace(0.0, 1.0, 100)
-        # self._animation[:, 3, 0] = np.linspace(0.0, 1.0, 100)
-        self._animation[:, 2, 0] = 0.5 * np.ones((100,), dtype=np.float32)
-        self._animation[:, 3, 0] = 0.5 * np.ones((100,), dtype=np.float32)
-        self._animation[:, 2, 1] = 0.1 + 0.1 * np.linspace(0.0, 1.0, 100)
-        self._animation[:, 3, 1] = 0.1 - 0.1 * np.linspace(0.0, 1.0, 100)
-        self._animation[:, 3, 2] = 0.5 * np.ones((100,), dtype=np.float32)
-        self._animation_freq = 100
+        self._animation_freq = animation_frequency
         self._sim_time = 0.0
+        self._animation_number = 0
+        WIDTH, HEIGHT = 405, 405
+        PROJECTION_MATRIX = p.computeProjectionMatrixFOV(
+            fov=60,
+            aspect=1.5,
+            nearVal=0.02,
+            farVal=100,
+        )
+        gui_kwargs = kwargs["gui_kwargs"] if "gui_kwargs" in kwargs else {}
+        shadows = gui_kwargs.get("shadows", 0)
+        self._camera_views["front"] = CameraView(
+            width=WIDTH,
+            height=HEIGHT,
+            view_matrix=p.computeViewMatrix(
+                cameraEyePosition=[3.0, 0.0, 1.0],
+                cameraTargetPosition=[0.0, 0.0, 0.1],
+                cameraUpVector=[0.0, 0.0, 1.0],
+            ),
+            projection_matrix=PROJECTION_MATRIX,
+            shadow=shadows,
+        )
+        p.resetDebugVisualizerCamera(
+            cameraDistance=2.0,
+            cameraYaw=90,
+            cameraPitch=-30,
+            cameraTargetPosition=[0, 0, 0],
+            physicsClientId=self.physics_id,
+        )
 
     def reset(  # type: ignore
         self,
@@ -82,7 +91,11 @@ class HumanTableEnv(TableEnv):
         self.human.disable_animation()
         obs, info = super().reset(seed=seed, options=options, max_samples_per_trial=max_samples_per_trial)
         self.human.reset(self.task.action_skeleton, self.task.initial_state)
-        self.human.set_animation(self._animation, self._animation_freq)
+        self._animation_number += 1
+        if self._animation_number >= len(self._animations):
+            self._animation_number = 0
+        animation, animation_info = self._animations[self._animation_number]
+        self.human.set_animation(animation, animation_info, self._animation_freq)
         self.human.enable_animation()
         self._sim_time = 0.0
         return obs, info

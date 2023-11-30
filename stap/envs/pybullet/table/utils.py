@@ -1,17 +1,16 @@
 import collections
+import itertools
 from typing import Any, Dict, Optional, Union
 
-from ctrlutils import eigen
-import itertools
 import numpy as np
 import pybullet as p
-from shapely.geometry import Polygon
 import yaml
+from ctrlutils import eigen
+from shapely.geometry import Polygon
 
 from stap.envs.pybullet.sim import body, math
 from stap.envs.pybullet.table.objects import Object
 from stap.envs.pybullet.table.primitives import ACTION_CONSTRAINTS
-
 
 TABLE_CONSTRAINTS = {
     "table_z_max": 0.00,
@@ -57,15 +56,9 @@ def is_upright(obj: Object, sim: bool = True) -> bool:
     return abs(aa.axis.dot(np.array([0.0, 0.0, 1.0]))) >= EPSILONS["align"]
 
 
-def is_within_distance(
-    obj_a: Object, obj_b: Object, distance: float, physics_id: int
-) -> bool:
+def is_within_distance(obj_a: Object, obj_b: Object, distance: float, physics_id: int) -> bool:
     """Returns True if the closest points between two objects are within distance."""
-    return bool(
-        p.getClosestPoints(
-            obj_a.body_id, obj_b.body_id, distance, physicsClientId=physics_id
-        )
-    )
+    return bool(p.getClosestPoints(obj_a.body_id, obj_b.body_id, distance, physicsClientId=physics_id))
 
 
 TWIST_HISTORY: Dict[str, Dict[Object, np.ndarray]] = collections.defaultdict(dict)
@@ -127,19 +120,10 @@ def is_touching(
 
 def is_intersecting(obj_a: Object, obj_b: Object, sim: bool = True) -> bool:
     """Returns True if object a intersects object b in the world x-y plane."""
-    polygons_a = [
-        Polygon(hull)
-        for hull in obj_a.convex_hulls(world_frame=True, project_2d=True, sim=sim)
-    ]
-    polygons_b = [
-        Polygon(hull)
-        for hull in obj_b.convex_hulls(world_frame=True, project_2d=True, sim=sim)
-    ]
+    polygons_a = [Polygon(hull) for hull in obj_a.convex_hulls(world_frame=True, project_2d=True, sim=sim)]
+    polygons_b = [Polygon(hull) for hull in obj_b.convex_hulls(world_frame=True, project_2d=True, sim=sim)]
 
-    return any(
-        poly_a.intersects(poly_b)
-        for poly_a, poly_b in itertools.product(polygons_a, polygons_b)
-    )
+    return any(poly_a.intersects(poly_b) for poly_a, poly_b in itertools.product(polygons_a, polygons_b))
 
 
 def is_under(obj_a: Object, obj_b: Object, sim: bool = True) -> bool:
@@ -164,9 +148,7 @@ def is_inhand(obj: Object) -> bool:
     return z_pos > z_min
 
 
-def is_on(
-    obj_a: Object, obj_b: Object, on_distance: float = 0.04, sim: bool = True
-) -> bool:
+def is_on(obj_a: Object, obj_b: Object, on_distance: float = 0.04, sim: bool = True) -> bool:
     """Returns True if object a is on top of object b."""
     if (
         is_above(obj_a, obj_b, sim=sim)
@@ -199,10 +181,7 @@ def is_inworkspace(
     if distance is None:
         distance = float(np.linalg.norm(obj_pos))
 
-    if not (
-        TABLE_CONSTRAINTS["workspace_x_min"] <= obj_pos[0]
-        and distance < TABLE_CONSTRAINTS["workspace_radius"]
-    ):
+    if not (TABLE_CONSTRAINTS["workspace_x_min"] <= obj_pos[0] and distance < TABLE_CONSTRAINTS["workspace_radius"]):
         return False
 
     return True

@@ -1,0 +1,18 @@
+name: "MonsieurHuman"
+color: [1.0, 0.0, 0.0, 0.5]
+
+body_names:
+  - "head"
+  - "torso"
+
+body_measurement_ids:
+  head: [0, 1]
+  torso: [2, 3]
+
+body_radii:
+  head: 0.1
+  torso: 0.2
+
+body_lengths:
+  head: 0.0
+  torso: 0.3
