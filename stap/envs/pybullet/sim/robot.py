@@ -1,21 +1,16 @@
 import copy
-import time
+import time as t
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
-from ctrlutils import eigen
 import numpy as np
 import pybullet as p
 import spatialdyn as dyn
+from ctrlutils import eigen
 
 from stap.envs import pybullet
-from stap.envs.pybullet.sim import (
-    articulated_body,
-    arm,
-    body,
-    gripper,
-    math,
-)
 from stap.envs.pybullet import real
+from stap.envs.pybullet.sim import arm, articulated_body, body, gripper, math
+from stap.envs.pybullet.sim.safe_arm import SafeArm
 from stap.utils import configs
 
 
@@ -52,22 +47,18 @@ class Robot(body.Body):
         body_id = p.loadURDF(
             fileName=urdf,
             useFixedBase=True,
-            flags=p.URDF_USE_INERTIA_FROM_FILE
-            | p.URDF_MAINTAIN_LINK_ORDER,  # | p.URDF_MERGE_FIXED_LINKS
+            flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER,  # | p.URDF_MERGE_FIXED_LINKS
             physicsClientId=physics_id,
         )
         super().__init__(physics_id, body_id)
-
         if isinstance(arm_class, str):
             arm_class = configs.get_class(arm_class, pybullet)
         if isinstance(gripper_class, str):
             gripper_class = configs.get_class(gripper_class, pybullet)
-
+        self._arm_class = arm_class
         self._arm = arm_class(self.physics_id, self.body_id, **arm_kwargs)
         T_world_to_ee = dyn.cartesian_pose(self.arm.ab).inverse()
-        self._gripper = gripper_class(
-            self.physics_id, self.body_id, T_world_to_ee, **gripper_kwargs
-        )
+        self._gripper = gripper_class(self.physics_id, self.body_id, T_world_to_ee, **gripper_kwargs)
 
         self.step_simulation = step_simulation_fn
 
@@ -85,14 +76,16 @@ class Robot(body.Body):
     def home_pose(self) -> math.Pose:
         return self.arm.home_pose
 
-    def reset(self) -> bool:
+    def reset(self, time: Optional[float] = None) -> bool:
         """Resets the robot by setting the arm to its home configuration and the gripper to the open position.
 
         This method disables torque control and bypasses simulation.
         """
+        if self._arm_class == SafeArm:
+            assert time is not None
         self.gripper.reset()
         self.clear_load()
-        status = self.arm.reset()
+        status = self.arm.reset(time)
         if isinstance(self.arm, real.arm.Arm):
             status = self.goto_configuration(self.arm.q_home)
         return status
@@ -132,15 +125,11 @@ class Robot(body.Body):
             ori_gains=(64, 16),
         )
 
-    def _is_colliding(
-        self, body_id_a: int, body_id_b: int, link_id_a: Optional[int] = None
-    ) -> bool:
+    def _is_colliding(self, body_id_a: int, body_id_b: int, link_id_a: Optional[int] = None) -> bool:
         kwargs = {}
         if link_id_a is not None:
             kwargs["linkIndexA"] = link_id_a
-        contacts = p.getContactPoints(
-            bodyA=body_id_a, bodyB=body_id_b, physicsClientId=self.physics_id, **kwargs
-        )
+        contacts = p.getContactPoints(bodyA=body_id_a, bodyB=body_id_b, physicsClientId=self.physics_id, **kwargs)
 
         if not contacts:
             return False
@@ -193,9 +182,9 @@ class Robot(body.Body):
         self.gripper.update_torques()
         iter = 0
         while status == articulated_body.ControlStatus.IN_PROGRESS:
-            self.step_simulation()
-            # time.sleep(0.01)
-            status = self.arm.update_torques()
+            sim_time = self.step_simulation()
+            t.sleep(0.01)
+            status = self.arm.update_torques(sim_time)
             self.gripper.update_torques()
             iter += 1
 
@@ -319,18 +308,20 @@ class Robot(body.Body):
 
             # Wait for grasped object to settle.
             status = self.gripper.update_torques()
-            while (
-                status
-                in (
-                    articulated_body.ControlStatus.VEL_CONVERGED,
-                    articulated_body.ControlStatus.IN_PROGRESS,
-                )
-                and self.gripper._gripper_state.iter_timeout >= 0
-                and (obj.twist() > 0.001).any()
-            ):
+            # while (
+            #     status
+            #     in (
+            #         articulated_body.ControlStatus.VEL_CONVERGED,
+            #         articulated_body.ControlStatus.IN_PROGRESS,
+            #     )
+            #     and self.gripper._gripper_state.iter_timeout >= 0
+            #     and (obj.twist() > 0.001).any()
+            # ):
+            while True:
                 self.arm.update_torques()
                 status = self.gripper.update_torques()
                 self.step_simulation()
+                t.sleep(0.01)
 
             # Make sure fingers aren't fully closed.
             if status == articulated_body.ControlStatus.POS_CONVERGED:

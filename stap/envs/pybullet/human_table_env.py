@@ -10,13 +10,12 @@ import numpy as np
 import pybullet as p
 
 from stap.envs import base as envs
-from stap.envs.pybullet.base import SIM_TIME_STEP
-from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.sim.human import Human
 from stap.envs.pybullet.table import object_state, utils
 from stap.envs.pybullet.table.primitives import Primitive
 from stap.envs.pybullet.table_env import CameraView, TableEnv
 from stap.utils.animation_utils import load_human_animation_data
+from stap.utils.macros import SIMULATION_FREQUENCY, SIMULATION_TIME_STEP
 
 dbprint = lambda *args: None  # noqa
 # dbprint = print
@@ -173,8 +172,8 @@ class HumanTableEnv(TableEnv):
         )
         return obs, reward, terminated, truncated_result, info
 
-    def step_simulation(self) -> None:
-        self._sim_time += SIM_TIME_STEP
+    def step_simulation(self) -> float:
+        self._sim_time += SIMULATION_TIME_STEP
         self.human.animate(self._sim_time)
         super().step_simulation()
         human_contact_points = p.getContactPoints(
@@ -182,8 +181,9 @@ class HumanTableEnv(TableEnv):
         )
         if len(human_contact_points) > 0:
             stop = True
+        return self._sim_time
 
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = 3 * math.PYBULLET_STEPS_PER_SEC) -> int:
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = 3 * SIMULATION_FREQUENCY) -> int:
         IS_MOVING_KEY = "TableEnv.wait_until_stable"
 
         def is_any_object_moving() -> bool:

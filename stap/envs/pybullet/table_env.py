@@ -15,13 +15,14 @@ from stap.envs import base as envs
 from stap.envs.pybullet import real
 from stap.envs.pybullet.base import PybulletEnv
 from stap.envs.pybullet.real import object_tracker
-from stap.envs.pybullet.sim import math, robot
+from stap.envs.pybullet.sim import robot
 from stap.envs.pybullet.table import object_state, predicates, utils
 from stap.envs.pybullet.table.objects import Null, Object, ObjectGroup
 from stap.envs.pybullet.table.primitives import Pick, Primitive, Pull, Push, initialize_robot_pose
 from stap.envs.variant import VariantEnv
 from stap.utils import random as random_utils
 from stap.utils import recording
+from stap.utils.macros import SIMULATION_FREQUENCY, SIMULATION_TIME_STEP
 
 dbprint = lambda *args: None  # noqa
 # dbprint = print
@@ -652,8 +653,8 @@ class TableEnv(PybulletEnv):
                 continue
 
             # Check state again after objects have settled.
-            num_iters = self.wait_until_stable(min_iters=1, max_iters=math.PYBULLET_STEPS_PER_SEC)
-            if num_iters == math.PYBULLET_STEPS_PER_SEC:
+            num_iters = self.wait_until_stable(min_iters=1, max_iters=SIMULATION_FREQUENCY)
+            if num_iters == SIMULATION_FREQUENCY:
                 # Skip if settling takes longer than 1s.
                 dbprint(f"TableEnv.reset(seed={seed}): Failed to stabilize")
                 continue
@@ -789,7 +790,7 @@ class TableEnv(PybulletEnv):
             not obj.is_static and utils.is_touching(self.robot, obj, link_id_a=-1) for obj in self.real_objects()
         )
 
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = 3 * math.PYBULLET_STEPS_PER_SEC) -> int:
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = 3 * SIMULATION_FREQUENCY) -> int:
         IS_MOVING_KEY = "TableEnv.wait_until_stable"
 
         def is_any_object_moving() -> bool:
@@ -826,6 +827,7 @@ class TableEnv(PybulletEnv):
         if self.object_tracker is not None and not isinstance(self.robot.arm, real.arm.Arm):
             # Send objects to RedisGl.
             self.object_tracker.send_poses(self.real_objects())
+        return None
 
     def render(self) -> np.ndarray:  # type: ignore
         try:
@@ -976,7 +978,31 @@ class VariantTableEnv(VariantEnv, TableEnv):  # type: ignore
     def object_states(self) -> Dict[str, object_state.ObjectState]:
         return self.env.object_states()
 
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / math.PYBULLET_TIMESTEP)) -> int:
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
+        return self.env.wait_until_stable(min_iters, max_iters)
+
+    def step_simulation(self) -> None:
+        return self.env.step_simulation()
+
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
+        return self.env.wait_until_stable(min_iters, max_iters)
+
+    def step_simulation(self) -> None:
+        return self.env.step_simulation()
+
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
+        return self.env.wait_until_stable(min_iters, max_iters)
+
+    def step_simulation(self) -> None:
+        return self.env.step_simulation()
+
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
+        return self.env.wait_until_stable(min_iters, max_iters)
+
+    def step_simulation(self) -> None:
+        return self.env.step_simulation()
+
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
         return self.env.wait_until_stable(min_iters, max_iters)
 
     def step_simulation(self) -> None:

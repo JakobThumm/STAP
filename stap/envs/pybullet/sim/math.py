@@ -1,14 +1,13 @@
+import dataclasses
 import math
 
-import dataclasses
-
-from ctrlutils import eigen
 import numpy as np
-
+from ctrlutils import eigen
 
 # dangerous if we're updating pybullet timestep (hardcoding timestep in connect_pybullet for now)
-PYBULLET_STEPS_PER_SEC = 60
-PYBULLET_TIMESTEP = 1 / PYBULLET_STEPS_PER_SEC
+# PYBULLET_STEPS_PER_SEC = 60
+# PYBULLET_TIMESTEP = 1 / PYBULLET_STEPS_PER_SEC
+# -> Moved to utils/macros.py SIMULATION_FREQUENCY, SIMULATION_TIME_STEP
 
 
 @dataclasses.dataclass

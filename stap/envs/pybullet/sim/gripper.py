@@ -2,12 +2,13 @@ import copy
 import dataclasses
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from ctrlutils import eigen
 import numpy as np
 import pybullet as p
 import spatialdyn as dyn
+from ctrlutils import eigen
 
 from stap.envs.pybullet.sim import articulated_body, body, math
+from stap.utils.macros import SIMULATION_TIME_STEP
 
 
 @dataclasses.dataclass
@@ -72,9 +73,7 @@ class Gripper(articulated_body.ArticulatedBody):
 
         self._command_multipliers = np.array(command_multipliers, dtype=np.float64)
         self._torque_multipliers = self._command_multipliers[: len(self.torque_joints)]
-        self._position_multipliers = self._command_multipliers[
-            len(self.torque_joints) :
-        ]
+        self._position_multipliers = self._command_multipliers[len(self.torque_joints) :]
 
         link_ids = {self.link(joint_id).name: joint_id for joint_id in range(self.dof)}
         self._finger_links = [link_ids[link_name] for link_name in finger_links]
@@ -83,22 +82,13 @@ class Gripper(articulated_body.ArticulatedBody):
         self._finger_contact_normals = [np.array(n) for n in finger_contact_normals]
 
         def get_link_mass(joint_id: int):
-            return p.getDynamicsInfo(
-                self.body_id, joint_id, physicsClientId=self.physics_id
-            )[0]
+            return p.getDynamicsInfo(self.body_id, joint_id, physicsClientId=self.physics_id)[0]
 
-        self._masses = np.array(
-            [get_link_mass(joint_id) for joint_id in self.torque_joints]
-        )
+        self._masses = np.array([get_link_mass(joint_id) for joint_id in self.torque_joints])
 
         # Compute gripper inertia.
         self._inertia = dyn.SpatialInertiad()
-        gripper_links = set(
-            [self._base_link]
-            + self.torque_joints
-            + self.position_joints
-            + self.finger_links
-        )
+        gripper_links = set([self._base_link] + self.torque_joints + self.position_joints + self.finger_links)
         for link_id in sorted(gripper_links):
             link = body.Link(physics_id, body_id, link_id)
             T_link_to_ee = T_world_to_ee * link.pose().to_eigen()
@@ -152,9 +142,7 @@ class Gripper(articulated_body.ArticulatedBody):
         """
         CONTACT_NORMAL_ALIGNMENT = 0.98  # Allows roughly 10 deg error.
 
-        for finger_link_id, finger_contact_normal in zip(
-            self.finger_links, self.finger_contact_normals
-        ):
+        for finger_link_id, finger_contact_normal in zip(self.finger_links, self.finger_contact_normals):
             contacts = p.getContactPoints(
                 bodyA=body_id,
                 bodyB=self.body_id,
@@ -204,9 +192,7 @@ class Gripper(articulated_body.ArticulatedBody):
         T_ee_to_world = self.link(self._base_link).pose().to_eigen()
         T_body_to_ee = math.Pose.from_eigen(T_ee_to_world.inverse() * T_body_to_world)
 
-        self._gripper_state.grasp_constraint_id = self._create_grasp_constraint(
-            body_id, T_body_to_ee
-        )
+        self._gripper_state.grasp_constraint_id = self._create_grasp_constraint(body_id, T_body_to_ee)
         self._gripper_state.grasp_body_id = body_id
         self._gripper_state.grasp_T_body_to_ee = T_body_to_ee
 
@@ -231,9 +217,7 @@ class Gripper(articulated_body.ArticulatedBody):
         if self._gripper_state.grasp_constraint_id is None:
             return
 
-        p.removeConstraint(
-            self._gripper_state.grasp_constraint_id, physicsClientId=self.physics_id
-        )
+        p.removeConstraint(self._gripper_state.grasp_constraint_id, physicsClientId=self.physics_id)
         self._gripper_state.grasp_constraint_id = None
         self._gripper_state.grasp_body_id = None
         self._gripper_state.grasp_T_body_to_ee = None
@@ -259,7 +243,7 @@ class Gripper(articulated_body.ArticulatedBody):
         self._pos_gains = self.pos_gains if pos_gains is None else pos_gains
 
         self._gripper_state.dq_avg = 1.0
-        self._gripper_state.iter_timeout = int(timeout / math.PYBULLET_TIMESTEP)
+        self._gripper_state.iter_timeout = int(timeout / SIMULATION_TIME_STEP)
 
         self._gripper_state.torque_control = True
 
@@ -272,9 +256,7 @@ class Gripper(articulated_body.ArticulatedBody):
         if not self._gripper_state.torque_control:
             return articulated_body.ControlStatus.UNINITIALIZED
 
-        joint_states = p.getJointStates(
-            self.body_id, self._torque_joints, physicsClientId=self.physics_id
-        )
+        joint_states = p.getJointStates(self.body_id, self._torque_joints, physicsClientId=self.physics_id)
         q, dq, _, _ = zip(*joint_states)
         q = np.array(q)
         dq = np.array(dq)

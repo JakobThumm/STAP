@@ -2,11 +2,12 @@ import copy
 import dataclasses
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from ctrlutils import eigen
 import numpy as np
 import spatialdyn as dyn
+from ctrlutils import eigen
 
 from stap.envs.pybullet.sim import articulated_body, math, redisgl
+from stap.utils.macros import SIMULATION_TIME_STEP
 
 
 @dataclasses.dataclass
@@ -87,16 +88,12 @@ class Arm(articulated_body.ArticulatedBody):
         self.quat_home = eigen.Quaterniond(T_home_to_world.linear)
         self.home_pose = self.ee_pose(update=False)
 
-        self._q_limits = np.array(
-            [self.link(link_id).joint_limits for link_id in self.torque_joints]
-        ).T
+        self._q_limits = np.array([self.link(link_id).joint_limits for link_id in self.torque_joints]).T
 
         self._redisgl = (
             None
             if redisgl_config is None
-            else redisgl.RedisGl(
-                **redisgl_config, ee_offset=self.ee_offset, arm_urdf=arm_urdf
-            )
+            else redisgl.RedisGl(**redisgl_config, ee_offset=self.ee_offset, arm_urdf=arm_urdf)
         )
 
         self._arm_state = ArmState()
@@ -107,7 +104,7 @@ class Arm(articulated_body.ArticulatedBody):
         """Spatialdyn articulated body."""
         return self._ab
 
-    def reset(self) -> bool:
+    def reset(self, time: Optional[float] = None) -> bool:
         """Disables torque control and resets the arm to the home configuration (bypassing simulation)."""
         self._arm_state = ArmState()
         self.set_configuration_goal(self.q_home, skip_simulation=True)
@@ -146,7 +143,7 @@ class Arm(articulated_body.ArticulatedBody):
 
         self._arm_state.dx_avg = 1.0
         self._arm_state.w_avg = 1.0
-        self._arm_state.iter_timeout = int(timeout / math.PYBULLET_TIMESTEP)
+        self._arm_state.iter_timeout = int(timeout / SIMULATION_TIME_STEP)
         self._arm_state.torque_control = True
 
     def get_joint_state(self, joints: List[int]) -> Tuple[np.ndarray, np.ndarray]:
@@ -159,14 +156,10 @@ class Arm(articulated_body.ArticulatedBody):
         """
         q, dq = super().get_joint_state(joints)
         if self._redisgl is not None:
-            self._redisgl.update(
-                q, dq, self._arm_state.pos_des, self._arm_state.quat_des
-            )
+            self._redisgl.update(q, dq, self._arm_state.pos_des, self._arm_state.quat_des)
         return q, dq
 
-    def set_configuration_goal(
-        self, q: np.ndarray, skip_simulation: bool = False
-    ) -> None:
+    def set_configuration_goal(self, q: np.ndarray, skip_simulation: bool = False) -> None:
         """Sets the robot to the desired joint configuration.
 
         Args:
@@ -192,7 +185,7 @@ class Arm(articulated_body.ArticulatedBody):
         quat_ee = quat_ee_to_world * self.quat_home.inverse()
         return math.Pose(T_ee_to_world.translation, quat_ee.coeffs)
 
-    def update_torques(self) -> articulated_body.ControlStatus:
+    def update_torques(self, time: Optional[float] = None) -> articulated_body.ControlStatus:
         """Computes and applies the torques to control the articulated body to the goal set with `Arm.set_pose_goal().
 
         Returns:
@@ -203,21 +196,15 @@ class Arm(articulated_body.ArticulatedBody):
 
         self.ab.q, self.ab.dq = self.get_joint_state(self.torque_joints)
 
-        if (self._q_limits[0] >= self.ab.q).any() or (
-            self.ab.q >= self._q_limits[1]
-        ).any():
+        if (self._q_limits[0] >= self.ab.q).any() or (self.ab.q >= self._q_limits[1]).any():
             return articulated_body.ControlStatus.ABORTED
 
         # Compute torques.
         q_nullspace = np.array(self.ab.q)
         if self._arm_state.pos_des is not None:
             # Assume base joint rotates about z-axis.
-            q_nullspace[0] = np.arctan2(
-                self._arm_state.pos_des[1], self._arm_state.pos_des[0]
-            )
-        q_nullspace[self.nullspace_joint_indices] = self.q_home[
-            self.nullspace_joint_indices
-        ]
+            q_nullspace[0] = np.arctan2(self._arm_state.pos_des[1], self._arm_state.pos_des[0])
+        q_nullspace[self.nullspace_joint_indices] = self.q_home[self.nullspace_joint_indices]
         tau, status = dyn.opspace_control(
             self.ab,
             pos=self._arm_state.pos_des,
@@ -246,9 +233,7 @@ class Arm(articulated_body.ArticulatedBody):
         dx = dx_w[:3]
         w = dx_w[3:]
 
-        self._arm_state.dx_avg = (
-            0.5 * np.sqrt(dx.dot(dx)) + 0.5 * self._arm_state.dx_avg
-        )
+        self._arm_state.dx_avg = 0.5 * np.sqrt(dx.dot(dx)) + 0.5 * self._arm_state.dx_avg
         self._arm_state.w_avg = 0.5 * np.sqrt(w.dot(w)) + 0.5 * self._arm_state.w_avg
         if self._arm_state.dx_avg < 0.001 and self._arm_state.w_avg < 0.02:
             return articulated_body.ControlStatus.VEL_CONVERGED

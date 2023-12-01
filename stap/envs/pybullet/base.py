@@ -4,11 +4,11 @@ from typing import Any, Dict, Tuple
 
 from stap.envs.base import Env
 from stap.envs.pybullet.utils import RedirectStream
+from stap.utils.macros import SIMULATION_TIME_STEP
 
 with RedirectStream(sys.stderr):
     import pybullet as p
 
-SIM_TIME_STEP = 1.0 / 60.0
 
 DEFAULT_OPTIONS = {
     "background_color_red": 0.12,
@@ -51,7 +51,7 @@ def connect_pybullet(gui: bool = True, gui_kwargs: Dict[str, Any] = {}) -> int:
             cameraTargetPosition=[0.76, 0.07, 0.37],
             physicsClientId=physics_id,
         )
-    p.setTimeStep(SIM_TIME_STEP)
+    p.setTimeStep(SIMULATION_TIME_STEP)
     return physics_id
 
 

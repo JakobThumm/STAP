@@ -3,11 +3,13 @@ import json
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import ctrlutils
-from ctrlutils import eigen
 import numpy as np
 import spatialdyn as dyn
+from ctrlutils import eigen
 
-from stap.envs.pybullet.sim import arm as sim_arm, articulated_body, math
+from stap.envs.pybullet.sim import arm as sim_arm
+from stap.envs.pybullet.sim import articulated_body
+from stap.utils.macros import SIMULATION_TIME_STEP
 
 
 @dataclasses.dataclass
@@ -87,9 +89,7 @@ class Arm(sim_arm.Arm):
             timeout=timeout,
         )
 
-        self._is_real_world = (
-            self._redis.get(self._redis_keys.driver_status) is not None
-        )
+        self._is_real_world = self._redis.get(self._redis_keys.driver_status) is not None
 
     def get_joint_state(self, joints: List[int]) -> Tuple[np.ndarray, np.ndarray]:
         """Gets the position and velocities of the given joints.
@@ -122,12 +122,10 @@ class Arm(sim_arm.Arm):
     def reset_joints(self, q: np.ndarray, joints: List[int]) -> None:
         raise NotImplementedError
 
-    def apply_torques(
-        self, torques: np.ndarray, joints: Optional[List[int]] = None
-    ) -> None:
+    def apply_torques(self, torques: np.ndarray, joints: Optional[List[int]] = None) -> None:
         raise NotImplementedError
 
-    def reset(self) -> bool:
+    def reset(self, time: Optional[float] = None) -> bool:
         """Resets the pose goals."""
         self._arm_state = sim_arm.ArmState()
         return True
@@ -146,26 +144,20 @@ class Arm(sim_arm.Arm):
             "type": "pose",
             "pos_tolerance": self.pos_threshold[0],
             "ori_tolerance": self.ori_threshold[0],
-            "timeout": self._arm_state.iter_timeout * math.PYBULLET_TIMESTEP,
+            "timeout": self._arm_state.iter_timeout * SIMULATION_TIME_STEP,
         }
         if self._arm_state.pos_des is not None:
             pub_command["pos"] = self._arm_state.pos_des.tolist()
         if self._arm_state.quat_des is not None:
             quat_des = eigen.Quaterniond(self._arm_state.quat_des)
-            quat_curr = eigen.Quaterniond(
-                self._redis.get_matrix(self._redis_keys.sensor_ori)
-            )
+            quat_curr = eigen.Quaterniond(self._redis.get_matrix(self._redis_keys.sensor_ori))
             quat_des = ctrlutils.near_quaternion(quat_des, quat_curr)
             pub_command["quat"] = quat_des.coeffs.tolist()
 
         self._redis_sub.subscribe(self._redis_keys.control_pub_status)
-        self._redis.publish(
-            self._redis_keys.control_pub_command, json.dumps(pub_command)
-        )
+        self._redis.publish(self._redis_keys.control_pub_command, json.dumps(pub_command))
 
-    def set_configuration_goal(
-        self, q: np.ndarray, skip_simulation: bool = False
-    ) -> None:
+    def set_configuration_goal(self, q: np.ndarray, skip_simulation: bool = False) -> None:
         """Sets the robot to the desired joint configuration.
 
         Joint space control is not implemented yet, so sets an equivalent pose
@@ -185,7 +177,7 @@ class Arm(sim_arm.Arm):
 
         self.set_pose_goal(T_ee_to_world.translation, quat_ee)
 
-    def update_torques(self) -> articulated_body.ControlStatus:
+    def update_torques(self, time: Optional[float] = None) -> articulated_body.ControlStatus:
         """Gets the latest status from the Redis opspace controller.
 
         Returns:
@@ -215,13 +207,8 @@ class Arm(sim_arm.Arm):
         quat_ee_to_world = eigen.Quaterniond(T_ee_to_world.linear)
         quat_ee = quat_ee_to_world * self.quat_home.inverse()
         if (
-            np.linalg.norm(T_ee_to_world.translation - self._arm_state.pos_des)
-            < self.pos_threshold[0]
-            and np.linalg.norm(
-                ctrlutils.orientation_error(
-                    quat_ee, eigen.Quaterniond(self._arm_state.quat_des)
-                )
-            )
+            np.linalg.norm(T_ee_to_world.translation - self._arm_state.pos_des) < self.pos_threshold[0]
+            and np.linalg.norm(ctrlutils.orientation_error(quat_ee, eigen.Quaterniond(self._arm_state.quat_des)))
             < self.ori_threshold[0]
         ):
             return articulated_body.ControlStatus.POS_CONVERGED
@@ -239,4 +226,5 @@ class Arm(sim_arm.Arm):
         return articulated_body.ControlStatus.TIMEOUT
 
     def set_state(self, state: Dict[str, Any]) -> None:
+        raise NotImplementedError
         raise NotImplementedError
