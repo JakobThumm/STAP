@@ -11,6 +11,7 @@ import pybullet as p
 
 from stap.envs import base as envs
 from stap.envs.pybullet.sim.human import Human
+from stap.envs.pybullet.sim.safe_arm import SafeArm
 from stap.envs.pybullet.table import object_state, utils
 from stap.envs.pybullet.table.primitives import Primitive
 from stap.envs.pybullet.table_env import CameraView, TableEnv
@@ -30,6 +31,7 @@ class HumanTableEnv(TableEnv):
         animation_type: str,
         animation_frequency: int,
         human_animation_names: Optional[List[str]] = None,
+        visualize_shield: bool = False,
         **kwargs,
     ):
         """Constructs the TableEnv.
@@ -45,6 +47,7 @@ class HumanTableEnv(TableEnv):
             load_post_processed=True,
             verbose=False,
         )
+        self._visualize_shield = visualize_shield
         self.human = Human(self.physics_id, **human_kwargs)
         self.human.reset(self.task.action_skeleton, self.task.initial_state)
         self._initial_state_id = p.saveState(physicsClientId=self.physics_id)
@@ -87,14 +90,16 @@ class HumanTableEnv(TableEnv):
         options: Optional[dict] = None,
         max_samples_per_trial: int = 100,
     ) -> Tuple[np.ndarray, dict]:
-        self.human.disable_animation()
-        obs, info = super().reset(seed=seed, options=options, max_samples_per_trial=max_samples_per_trial)
         self.human.reset(self.task.action_skeleton, self.task.initial_state)
         self._animation_number += 1
         if self._animation_number >= len(self._animations):
             self._animation_number = 0
         animation, animation_info = self._animations[self._animation_number]
         self.human.set_animation(animation, animation_info, self._animation_freq)
+        if self._sim_time is None:
+            self._sim_time = 0.0
+        self.human.disable_animation()
+        obs, info = super().reset(seed=seed, options=options, max_samples_per_trial=max_samples_per_trial)
         self.human.enable_animation()
         self._sim_time = 0.0
         return obs, info
@@ -176,6 +181,14 @@ class HumanTableEnv(TableEnv):
         self._sim_time += SIMULATION_TIME_STEP
         self.human.animate(self._sim_time)
         super().step_simulation()
+        if self.robot._arm_class == SafeArm:
+            self.robot.arm.human_measurement(self._sim_time, self.human.measurement(self._sim_time))
+            if self.gui and self._visualize_shield:
+                init_before = self.robot.arm.visualization_initialized
+                self.robot.arm.visualize()
+                if not init_before and self.robot.arm.visualization_initialized:
+                    # We have to save the state after the first visualization, to include the shield markers.
+                    self._initial_state_id = p.saveState(physicsClientId=self.physics_id)
         human_contact_points = p.getContactPoints(
             physicsClientId=self.physics_id, bodyA=self.robot.arm.body_id, bodyB=self.human.body_id
         )
@@ -183,7 +196,7 @@ class HumanTableEnv(TableEnv):
             stop = True
         return self._sim_time
 
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = 3 * SIMULATION_FREQUENCY) -> int:
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3 * SIMULATION_FREQUENCY)) -> int:
         IS_MOVING_KEY = "TableEnv.wait_until_stable"
 
         def is_any_object_moving() -> bool:
@@ -203,7 +216,7 @@ class HumanTableEnv(TableEnv):
             and not self._is_any_object_touching_base()
             and not self._is_any_object_falling_off_parent()
         ):
-            self.robot.arm.update_torques()
+            self.robot.arm.update_torques(self._sim_time)
             self.robot.gripper.update_torques()
             self.step_simulation()
             num_iters += 1

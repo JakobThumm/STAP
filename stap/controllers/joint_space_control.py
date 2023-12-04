@@ -33,8 +33,9 @@ def joint_space_control(
         that indicates whether the position and orientation convergence criteria
         are satisfied, if given.
     """
-    tau_cmd = dyn.inverse_dynamics(ab, ddq_desired, centrifugal_coriolis=False, gravity=gravity_comp)
-
+    tau_cmd = dyn.inverse_dynamics(ab, ddq_desired, centrifugal_coriolis=False, gravity=False)
+    if gravity_comp:
+        tau_cmd += dyn.gravity(ab)
     # Apply command torques to update ab.q, ab.dq.
     if integration_step is not None:
         dyn.integrate(ab, tau_cmd, integration_step)

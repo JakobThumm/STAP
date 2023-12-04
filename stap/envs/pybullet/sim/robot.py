@@ -44,6 +44,7 @@ class Robot(body.Body):
             gripper_class: In the temporal_policies.envs.pybullet namespace.
             gripper_kwargs: Gripper kwargs from yaml config.
         """
+        self._sim_time = None
         body_id = p.loadURDF(
             fileName=urdf,
             useFixedBase=True,
@@ -56,11 +57,21 @@ class Robot(body.Body):
         if isinstance(gripper_class, str):
             gripper_class = configs.get_class(gripper_class, pybullet)
         self._arm_class = arm_class
-        self._arm = arm_class(self.physics_id, self.body_id, **arm_kwargs)
+        if self._arm_class == SafeArm:
+            base_pos, base_ori = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.physics_id)
+            self._arm = SafeArm(
+                base_pos=base_pos,
+                base_orientation=base_ori,
+                physics_id=self.physics_id,
+                body_id=self.body_id,
+                **arm_kwargs,
+            )
+        else:
+            self._arm = arm_class(self.physics_id, self.body_id, **arm_kwargs)
         T_world_to_ee = dyn.cartesian_pose(self.arm.ab).inverse()
         self._gripper = gripper_class(self.physics_id, self.body_id, T_world_to_ee, **gripper_kwargs)
 
-        self.step_simulation = step_simulation_fn
+        self._step_simulation_fn = step_simulation_fn
 
     @property
     def arm(self) -> arm.Arm:
@@ -76,11 +87,16 @@ class Robot(body.Body):
     def home_pose(self) -> math.Pose:
         return self.arm.home_pose
 
+    def step_simulation(self) -> None:
+        """Steps the simulation and sets self._sim_time to the current simulation time."""
+        self._sim_time = self._step_simulation_fn()
+
     def reset(self, time: Optional[float] = None) -> bool:
         """Resets the robot by setting the arm to its home configuration and the gripper to the open position.
 
         This method disables torque control and bypasses simulation.
         """
+        self._sim_time = time
         if self._arm_class == SafeArm:
             assert time is not None
         self.gripper.reset()
@@ -178,13 +194,13 @@ class Robot(body.Body):
         self.arm.set_pose_goal(pos, quat, pos_gains, ori_gains, timeout)
 
         # Simulate until the pose goal is reached.
-        status = self.arm.update_torques()
+        status = self.arm.update_torques(self._sim_time)
         self.gripper.update_torques()
         iter = 0
         while status == articulated_body.ControlStatus.IN_PROGRESS:
-            sim_time = self.step_simulation()
+            self.step_simulation()
             t.sleep(0.01)
-            status = self.arm.update_torques(sim_time)
+            status = self.arm.update_torques(self._sim_time)
             self.gripper.update_torques()
             iter += 1
 
@@ -222,14 +238,14 @@ class Robot(body.Body):
             velocity, false if the command times out.
         """
         # Set the configuration goal.
-        self.arm.set_configuration_goal(q)
+        self.arm.set_configuration_goal(q, time=self._sim_time)
 
         # Simulate until the pose goal is reached.
-        status = self.arm.update_torques()
+        status = self.arm.update_torques(time=self._sim_time)
         self.gripper.update_torques()
         while status == articulated_body.ControlStatus.IN_PROGRESS:
             self.step_simulation()
-            status = self.arm.update_torques()
+            status = self.arm.update_torques(time=self._sim_time)
             self.gripper.update_torques()
 
         return status in (
@@ -269,7 +285,7 @@ class Robot(body.Body):
         # Simulate until the grasp command finishes.
         status = self.gripper.update_torques()
         while status == articulated_body.ControlStatus.IN_PROGRESS:
-            self.arm.update_torques()
+            self.arm.update_torques(time=self._sim_time)
             self.step_simulation()
             status = self.gripper.update_torques()
         # print("Robot.grasp:", command, status)
@@ -318,7 +334,7 @@ class Robot(body.Body):
             #     and (obj.twist() > 0.001).any()
             # ):
             while True:
-                self.arm.update_torques()
+                self.arm.update_torques(time=self._sim_time)
                 status = self.gripper.update_torques()
                 self.step_simulation()
                 t.sleep(0.01)

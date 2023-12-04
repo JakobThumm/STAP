@@ -58,6 +58,27 @@ def create_body(
         **kwargs,
     )
 
+    # Make visual shapes uncollidable
+    if isinstance(shapes, Shape):
+        if isinstance(base_shape, Visual):
+            p.setCollisionFilterGroupMask(
+                bodyUniqueId=body_id,
+                linkIndexA=-1,
+                collisionFilterGroup=0,
+                collisionFilterMask=0,
+                physicsClientId=physics_id,
+            )
+    else:
+        for i, shape in enumerate(shapes):
+            if isinstance(shape, Visual):
+                p.setCollisionFilterGroupMask(
+                    bodyUniqueId=body_id,
+                    linkIndexA=i,
+                    collisionFilterGroup=0,
+                    collisionFilterMask=0,
+                    physicsClientId=physics_id,
+                )
+
     return body_id
 
 
@@ -110,8 +131,8 @@ class Visual(Shape):
 
     def shape_kwargs(self, is_base: bool = False) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         collision_kwargs, visual_kwargs = self._shape.shape_kwargs(is_base)
-        collision_kwargs["shapeType"] = p.GEOM_BOX
-        collision_kwargs["halfExtents"] = [0.0, 0.0, 0.0]
+        # collision_kwargs["shapeType"] = p.GEOM_BOX
+        # collision_kwargs["halfExtents"] = [0.0, 0.0, 0.0]
         return collision_kwargs, visual_kwargs
 
     @property

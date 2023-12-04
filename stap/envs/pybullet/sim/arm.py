@@ -97,7 +97,7 @@ class Arm(articulated_body.ArticulatedBody):
         )
 
         self._arm_state = ArmState()
-        self.reset()
+        self.reset(time=0.0)
 
     @property
     def ab(self) -> dyn.ArticulatedBody:
@@ -107,7 +107,7 @@ class Arm(articulated_body.ArticulatedBody):
     def reset(self, time: Optional[float] = None) -> bool:
         """Disables torque control and resets the arm to the home configuration (bypassing simulation)."""
         self._arm_state = ArmState()
-        self.set_configuration_goal(self.q_home, skip_simulation=True)
+        self.set_configuration_goal(self.q_home, skip_simulation=True, time=time)
         return True
 
     def set_pose_goal(
@@ -159,7 +159,9 @@ class Arm(articulated_body.ArticulatedBody):
             self._redisgl.update(q, dq, self._arm_state.pos_des, self._arm_state.quat_des)
         return q, dq
 
-    def set_configuration_goal(self, q: np.ndarray, skip_simulation: bool = False) -> None:
+    def set_configuration_goal(
+        self, q: np.ndarray, skip_simulation: bool = False, time: Optional[float] = None
+    ) -> None:
         """Sets the robot to the desired joint configuration.
 
         Args:
@@ -256,3 +258,13 @@ class Arm(articulated_body.ArticulatedBody):
         super().set_state(state["articulated_body"])
         self._arm_state = copy.deepcopy(state["arm"])
         self.ab.q, self.ab.dq = self.get_joint_state(self.torque_joints)
+
+    def human_measurement(self, time: Optional[float] = None, human_pos: Optional[np.ndarray] = None) -> None:
+        pass
+
+    def visualize(self) -> None:
+        pass
+
+    @property
+    def visualization_initialized(self) -> bool:
+        return True

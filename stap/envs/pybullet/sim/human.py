@@ -20,6 +20,19 @@ class ControlException(Exception):
     pass
 
 
+def transform_animation_point(p: np.ndarray, position_offset: np.ndarray, base_orientation: np.ndarray) -> np.ndarray:
+    """Transform a point of the animation to the world frame.
+
+    Args:
+        p [3]: Point in the animation.
+        position_offset [3]: Offset of the human body.
+        base_orientation [4]: Orientation of the human body as quaternion of the form (x, y, z, w).
+    Returns:
+        [3]: Point in the world frame.
+    """
+    return Rotation.from_quat(base_orientation).apply(p) + position_offset
+
+
 def calc_capsule_pose(
     p1: np.ndarray, p2: np.ndarray, position_offset: np.ndarray, base_orientation: np.ndarray
 ) -> Pose:
@@ -31,11 +44,8 @@ def calc_capsule_pose(
         position_offset [3]: Offset of the human body.
         base_orientation [4]: Orientation of the human body as quaternion of the form (x, y, z, w).
     """
-    animation_offset_rot = Rotation.from_quat(base_orientation)
-    p1 = animation_offset_rot.apply(p1)
-    p2 = animation_offset_rot.apply(p2)
-    p1 += position_offset
-    p2 += position_offset
+    p1 = transform_animation_point(p1, position_offset, base_orientation)
+    p2 = transform_animation_point(p2, position_offset, base_orientation)
     p1x = p1[0]
     p1y = p1[1]
     p1z = p1[2]
@@ -109,7 +119,7 @@ class Human(body.Body):
 
     def reset(self, action_skeleton: List, initial_state: Optional[List] = None) -> None:
         for body_name in self._body_names:
-            self._bodies[body_name].set_pose(Pose(np.array([0.0, 0.0, 0.0]), np.array([0.0, 0.0, 0.0, 1.0])))
+            self._bodies[body_name].set_pose(Pose(np.array([10.0, 0.0, 0.0]), np.array([0.0, 0.0, 0.0, 1.0])))
         self._start_time = None
 
     def set_animation(self, animation: np.ndarray, animation_info: Dict[str, Any], recording_freq: float) -> None:
@@ -117,16 +127,22 @@ class Human(body.Body):
         self._animation_info = animation_info
         self._recording_freq = recording_freq
 
-    def animate(self, time: float) -> None:
+    def get_animation_idx(self, time: float) -> Optional[int]:
         if not self._allow_animation:
-            return
+            return None
         if self._start_time is None:
             self._start_time = time
         if self._animation.size == 0:
-            return
+            return None
         run_time = time - self._start_time
         run_step = int(run_time * self._recording_freq)
         animation_idx = run_step % self._animation.shape[0]
+        return animation_idx
+
+    def animate(self, time: float) -> None:
+        animation_idx = self.get_animation_idx(time)
+        if animation_idx is None:
+            return
 
         self._set_poses(
             self._animation[animation_idx],
@@ -153,6 +169,36 @@ class Human(body.Body):
 
     def enable_animation(self) -> None:
         self._allow_animation = True
+
+    def measurement(self, time: float) -> Optional[np.ndarray]:
+        """Return the current measurement of the human body.
+
+        Converts the animation points to the world frame.
+        Returns:
+            [n_joints, 3]: Measurements of the human joints in animation file.
+        """
+        animation_idx = self.get_animation_idx(time)
+        if animation_idx is None:
+            return self.dummy_measurement()
+        measurements = np.zeros((len(self._animation[animation_idx]), 3))
+        # Could probably prevent for loop here and do matrix operation.
+        for i in range(len(self._animation[animation_idx])):
+            measurements[i, :] = transform_animation_point(
+                p=self._animation[animation_idx][i],
+                position_offset=self._animation_info["position_offset"],
+                base_orientation=self._animation_info["orientation_quat"],
+            )
+        return measurements
+
+    def dummy_measurement(self) -> Optional[np.ndarray]:
+        """Return a dummy measurement of the human body.
+
+        Returns:
+            [n_joints, 3]: Dummy measurements of the human joints in animation file.
+        """
+        if len(self._animation) == 0:
+            return None
+        return 10 * np.ones((len(self._animation[0]), 3))
 
     @property
     def name(self) -> str:

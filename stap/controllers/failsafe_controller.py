@@ -13,12 +13,13 @@ Changelog:
 
 import os
 from ast import List
-from typing import List, Union
+from typing import List, Sequence, Union
 
 import numpy as np
 from safety_shield_py import SafetyShield, ShieldType  # noqa: F401
 from scipy.spatial.transform import Rotation
 
+from stap.utils.configs import load_config
 from stap.utils.macros import SIMULATION_TIME_STEP
 
 # from matplotlib import pyplot as plt
@@ -79,10 +80,10 @@ class FailsafeController:
         self.safety_shield = SafetyShield(
             sample_time=SIMULATION_TIME_STEP,
             trajectory_config_file=(
-                f"{dir_path}/../sara-shield/safety_shield/config/trajectory_parameters_{robot_name}.yaml"
+                f"{dir_path}/../../third_party/sara-shield/safety_shield/config/trajectory_parameters_{robot_name}.yaml"
             ),
-            robot_config_file=f"{dir_path}/../sara-shield/safety_shield/config/robot_parameters_{robot_name}.yaml",
-            mocap_config_file=dir_path + "/../sara-shield/safety_shield/config/mujoco_mocap.yaml",
+            robot_config_file=f"{dir_path}/../../third_party/sara-shield/safety_shield/config/robot_parameters_{robot_name}.yaml",
+            mocap_config_file=dir_path + "/../../configs/pybullet/shield/pybullet_mocap.yaml",
             init_x=base_pos[0],
             init_y=base_pos[1],
             init_z=base_pos[2],
@@ -92,6 +93,10 @@ class FailsafeController:
             init_qpos=init_qpos,
             shield_type=self.shield_type,
         )
+        trajectory_config = load_config(
+            f"{dir_path}/../../third_party/sara-shield/safety_shield/config/trajectory_parameters_{robot_name}.yaml"
+        )
+        self._a_max_allowed = np.array(trajectory_config["a_max_allowed"])
         self.desired_motion = self.safety_shield.step(0.0)
         # Place holder for dynamic variables
         self.command_vel = [0.0 for i in init_qpos]
@@ -166,11 +171,13 @@ class FailsafeController:
                 The order of joints is defined in the motion capture config file.
             time (float): Time of the human measurement
         """
+        if isinstance(human_measurement, np.ndarray):
+            human_measurement = human_measurement.tolist()
         self.safety_shield.humanMeasurement(human_measurement, time)
 
     def step(
         self, joint_pos: Union[List[float], np.ndarray], joint_vel: Union[List[float], np.ndarray], time: float
-    ) -> np.ndarray:
+    ) -> Sequence[np.ndarray]:
         """Calculate the torques required to reach the desired setpoint.
 
         Args:
@@ -218,14 +225,13 @@ class FailsafeController:
         position_error = desired_qpos - self.joint_pos
         vel_pos_error = desired_qvel - self.joint_vel
         ddq_control = (
-            np.multiply(np.array(position_error), np.array(self.kp))
-            + np.multiply(vel_pos_error, self.kd)
-            + desided_qacc
+            np.multiply(np.array(position_error), np.array(self.kp))  # + np.multiply(vel_pos_error, self.kd)
+            # + desided_qacc
         )
 
-        # TODO: clip ddq_control
-
-        return ddq_control
+        # Clip ddq_control to max acceleration
+        ddq_control = np.clip(ddq_control, -1 * self._a_max_allowed, self._a_max_allowed)
+        return ddq_control, desired_qpos, desired_qvel
 
     def get_safety(self):
         """Return if the failsafe controller intervened in this step or not.

@@ -17,10 +17,11 @@ env_kwargs:
         - on(hook, table)
         - on(icecream, table)
 
-  robot_config: configs/pybullet/envs/robots/franka_panda_sim.yaml
+  robot_config: configs/pybullet/envs/robots/safe_franka_panda_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
   animation_type: HumanRobotHandover
   animation_frequency: 100
+  visualize_shield: true
   # human_animation_names: ["0"]
 
   objects:

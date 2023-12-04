@@ -18,7 +18,13 @@ from stap.envs.pybullet.real import object_tracker
 from stap.envs.pybullet.sim import robot
 from stap.envs.pybullet.table import object_state, predicates, utils
 from stap.envs.pybullet.table.objects import Null, Object, ObjectGroup
-from stap.envs.pybullet.table.primitives import Pick, Primitive, Pull, Push, initialize_robot_pose
+from stap.envs.pybullet.table.primitives import (
+    Pick,
+    Primitive,
+    Pull,
+    Push,
+    initialize_robot_pose,
+)
 from stap.envs.variant import VariantEnv
 from stap.utils import random as random_utils
 from stap.utils import recording
@@ -176,6 +182,7 @@ class TableEnv(PybulletEnv):
                 main process!
             use_curriculum: Whether to use a curriculum on the number of objects.
         """
+        self._sim_time = None
         if render_mode not in TableEnv.metadata["render_modes"]:
             raise ValueError(f"Render mode {render_mode} is not supported.")
         gui_kwargs = {} if gui_kwargs is None else gui_kwargs
@@ -611,7 +618,7 @@ class TableEnv(PybulletEnv):
                 self._task = self.tasks.tasks[0]  # self.tasks.sample()
                 self.set_primitive(self.task.action_skeleton[0])
 
-            self.robot.reset()
+            self.robot.reset(time=self._sim_time)
             p.restoreState(stateId=self._initial_state_id, physicsClientId=self.physics_id)
 
             if self.object_tracker is not None and isinstance(self.robot.arm, real.arm.Arm):

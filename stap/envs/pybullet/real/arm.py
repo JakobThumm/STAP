@@ -157,7 +157,9 @@ class Arm(sim_arm.Arm):
         self._redis_sub.subscribe(self._redis_keys.control_pub_status)
         self._redis.publish(self._redis_keys.control_pub_command, json.dumps(pub_command))
 
-    def set_configuration_goal(self, q: np.ndarray, skip_simulation: bool = False) -> None:
+    def set_configuration_goal(
+        self, q: np.ndarray, skip_simulation: bool = False, time: Optional[float] = None
+    ) -> None:
         """Sets the robot to the desired joint configuration.
 
         Joint space control is not implemented yet, so sets an equivalent pose
@@ -228,3 +230,13 @@ class Arm(sim_arm.Arm):
     def set_state(self, state: Dict[str, Any]) -> None:
         raise NotImplementedError
         raise NotImplementedError
+
+    def human_measurement(self, time: float, human_pos: Optional[np.ndarray] = None) -> None:
+        pass
+
+    def visualize(self) -> None:
+        pass
+
+    @property
+    def visualization_initialized(self) -> bool:
+        return True
