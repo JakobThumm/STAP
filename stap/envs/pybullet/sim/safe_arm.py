@@ -165,7 +165,7 @@ class SafeArm(Arm):
         torques, converged = dyn.joint_space_control(
             ab=self.ab,
             joint=qpos_desired,
-            joint_gains=(40.0, 10.0),
+            joint_gains=(1000.0, 10.0),
             max_joint_acceleration=10.0,
             joint_threshold=None,
             gravity_comp=True,
