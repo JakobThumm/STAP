@@ -70,14 +70,16 @@ def initialize_robot_pose(robot: Robot) -> bool:
     pos = np.append(xy, ACTION_CONSTRAINTS["max_lift_height"])
     aa = eigen.AngleAxisd(theta, np.array([0.0, 0.0, 1.0]))
     quat = eigen.Quaterniond(aa)
-
-    try:
-        robot.goto_pose(pos, quat)
-    except ControlException as e:
-        dbprint("initialize_robot_pose():\n", e)
-        return False
-
-    return True
+    desired_qpos, success = robot.arm.inverse_kinematics(pos, quat)
+    if success:
+        robot.reset(qpos=desired_qpos)
+        return True
+    # try:
+    #     robot.goto_pose(pos, quat)
+    # except ControlException as e:
+    #     dbprint("initialize_robot_pose():\n", e)
+    #     return False
+    return False
 
 
 class ExecutionResult(NamedTuple):

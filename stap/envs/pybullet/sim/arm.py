@@ -117,10 +117,16 @@ class Arm(articulated_body.ArticulatedBody):
         """Spatialdyn articulated body."""
         return self._ab
 
-    def reset(self, time: Optional[float] = None) -> bool:
-        """Disables torque control and resets the arm to the home configuration (bypassing simulation)."""
+    def reset(self, time: Optional[float] = None, qpos: Optional[Union[np.ndarray, List[float]]] = None) -> bool:
+        """Disables torque control and resets the arm to the home configuration (bypassing simulation).
+
+        Args:
+            time (float): Simulation time.
+            qpos (np.ndarray): Joint configuration to reset to. If none, uses the home configuration.
+        """
         self._arm_state = ArmState()
-        self.set_configuration_goal(self.q_home, skip_simulation=True, time=time)
+        resetting_qpos = self.q_home if qpos is None else np.array(qpos)
+        self.set_configuration_goal(resetting_qpos, skip_simulation=True, time=time)
         return True
 
     def set_pose_goal(

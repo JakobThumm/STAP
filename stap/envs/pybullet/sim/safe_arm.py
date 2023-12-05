@@ -64,10 +64,10 @@ class SafeArm(Arm):
         self._human_sphere_viz = []
         self._robot_sphere_viz = []
 
-    def reset(self, time: Optional[float] = None) -> bool:
+    def reset(self, time: Optional[float] = None, qpos: Optional[Union[np.ndarray, List[float]]] = None) -> bool:
         """Disables torque control and resets the arm to the home configuration (bypassing simulation)."""
-        super().reset(time)
-        return self.reset_shield(time)
+        super().reset(time=time, qpos=qpos)
+        return self.reset_shield(time=time)
 
     def reset_shield(self, time: Optional[float] = None) -> bool:
         """Resets the shield to the home configuration (bypassing simulation)."""

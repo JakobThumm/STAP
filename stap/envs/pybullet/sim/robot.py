@@ -81,19 +81,26 @@ class Robot(body.Body):
         """Steps the simulation and sets self._sim_time to the current simulation time."""
         self._sim_time = self._step_simulation_fn()
 
-    def reset(self, time: Optional[float] = None) -> bool:
+    def reset(self, time: Optional[float] = None, qpos: Optional[Union[np.ndarray, List[float]]] = None) -> bool:
         """Resets the robot by setting the arm to its home configuration and the gripper to the open position.
 
         This method disables torque control and bypasses simulation.
+
+        Args:
+            time (float): Simulation time.
+            qpos (np.ndarray): Joint configuration to reset to. If none, uses the home configuration.
         """
-        self._sim_time = time
-        if self._arm_class == SafeArm:
-            assert time is not None
+        if self._arm_class == SafeArm and time is None:
+            self._sim_time = 0.0
+        else:
+            self._sim_time = time
+
         self.gripper.reset()
         self.clear_load()
-        status = self.arm.reset(time)
+        status = self.arm.reset(time=self._sim_time, qpos=qpos)
+        resetting_qpos = np.array(qpos) if qpos is not None else self.arm.q_home
         if isinstance(self.arm, real.arm.Arm):
-            status = self.goto_configuration(self.arm.q_home)
+            status = self.goto_configuration(resetting_qpos)
         return status
 
     def clear_load(self) -> None:
