@@ -24,7 +24,7 @@ def main(env_config: str, seed: Optional[int] = None) -> None:
             env.set_primitive(primitive=action_skeleton[step])
             primitive = env.get_primitive()
             assert isinstance(primitive, pybullet.table.primitives.Primitive)
-            input(f"Execute primitive: {primitive}")
+            print(f"Execute primitive: {primitive}")
 
             # Sample action and step environment
             action = primitive.sample_action()
@@ -35,7 +35,7 @@ def main(env_config: str, seed: Optional[int] = None) -> None:
             if truncated:
                 break
 
-        input("Done task, continue?\n")
+        print("Done task, continue?\n")
 
 
 if __name__ == "__main__":

@@ -80,7 +80,7 @@ class FailsafeController:
         self.safety_shield = SafetyShield(
             sample_time=SIMULATION_TIME_STEP,
             trajectory_config_file=(
-                f"{dir_path}/../../third_party/sara-shield/safety_shield/config/trajectory_parameters_{robot_name}.yaml"
+                f"{dir_path}/../../configs/pybullet/shield/trajectory_parameters_{robot_name}.yaml"
             ),
             robot_config_file=f"{dir_path}/../../third_party/sara-shield/safety_shield/config/robot_parameters_{robot_name}.yaml",
             mocap_config_file=dir_path + "/../../configs/pybullet/shield/pybullet_mocap.yaml",
@@ -120,7 +120,7 @@ class FailsafeController:
             base_orientation (list[float]): orientation of base as quaternion [x, y, z, w]
             shield_type (str): Shield type to use. Valid options are: "OFF", "SSM", and "PFL"
         """
-        self.goal_qpos = None
+        self._goal_qpos = None
         # Torques being outputted by the controller
         self.torques = None
         # Update flag to prevent redundant update calls
@@ -160,8 +160,8 @@ class FailsafeController:
         Raises:
             AssertionError: [Invalid action dimension size]
         """
-        self.goal_qpos = np.array(desired_qpos)
-        self.safety_shield.newLongTermTrajectory(self.goal_qpos, self.command_vel)
+        self._goal_qpos = np.array(desired_qpos)
+        self.safety_shield.newLongTermTrajectory(self._goal_qpos, self.command_vel)
 
     def set_human_measurement(self, human_measurement: Union[List[List[float]], np.ndarray], time):
         """Set the human measurement of the safety shield.
@@ -188,7 +188,7 @@ class FailsafeController:
              np.array: Command accelerations
         """
         # Make sure goal has been set
-        if self.goal_qpos is None:
+        if self._goal_qpos is None:
             self.set_goal(np.zeros(self.control_dim))
 
         self.joint_pos = joint_pos
@@ -266,3 +266,12 @@ class FailsafeController:
             human_spheres.append(cap[0:3])
             human_spheres.append(cap[3:6])
         return human_spheres
+
+    @property
+    def goal_qpos(self) -> np.ndarray:
+        """Return the goal joint position.
+
+        Returns:
+            np.ndarray: Goal joint position
+        """
+        return self._goal_qpos

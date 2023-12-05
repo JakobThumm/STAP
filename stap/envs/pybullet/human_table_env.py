@@ -99,9 +99,9 @@ class HumanTableEnv(TableEnv):
         if self._sim_time is None:
             self._sim_time = 0.0
         self.human.disable_animation()
+        self._sim_time = 0.0
         obs, info = super().reset(seed=seed, options=options, max_samples_per_trial=max_samples_per_trial)
         self.human.enable_animation()
-        self._sim_time = 0.0
         return obs, info
 
     def set_primitive(

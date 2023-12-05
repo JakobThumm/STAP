@@ -57,17 +57,7 @@ class Robot(body.Body):
         if isinstance(gripper_class, str):
             gripper_class = configs.get_class(gripper_class, pybullet)
         self._arm_class = arm_class
-        if self._arm_class == SafeArm:
-            base_pos, base_ori = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.physics_id)
-            self._arm = SafeArm(
-                base_pos=base_pos,
-                base_orientation=base_ori,
-                physics_id=self.physics_id,
-                body_id=self.body_id,
-                **arm_kwargs,
-            )
-        else:
-            self._arm = arm_class(self.physics_id, self.body_id, **arm_kwargs)
+        self._arm = arm_class(physics_id=self.physics_id, body_id=self.body_id, **arm_kwargs)
         T_world_to_ee = dyn.cartesian_pose(self.arm.ab).inverse()
         self._gripper = gripper_class(self.physics_id, self.body_id, T_world_to_ee, **gripper_kwargs)
 
@@ -324,16 +314,15 @@ class Robot(body.Body):
 
             # Wait for grasped object to settle.
             status = self.gripper.update_torques()
-            # while (
-            #     status
-            #     in (
-            #         articulated_body.ControlStatus.VEL_CONVERGED,
-            #         articulated_body.ControlStatus.IN_PROGRESS,
-            #     )
-            #     and self.gripper._gripper_state.iter_timeout >= 0
-            #     and (obj.twist() > 0.001).any()
-            # ):
-            while True:
+            while (
+                status
+                in (
+                    articulated_body.ControlStatus.VEL_CONVERGED,
+                    articulated_body.ControlStatus.IN_PROGRESS,
+                )
+                and self.gripper._gripper_state.iter_timeout >= 0
+                and (obj.twist() > 0.001).any()
+            ):
                 self.arm.update_torques(time=self._sim_time)
                 status = self.gripper.update_torques()
                 self.step_simulation()
