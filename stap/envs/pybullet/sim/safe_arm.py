@@ -2,7 +2,6 @@ import copy
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import pybullet as p
 import spatialdyn as dyn
 from ctrlutils import eigen
 
@@ -27,11 +26,7 @@ class SafeArm(Arm):
         robot_name: str = "panda",
         damping_ratio: float = 1.0,
         max_acceleration: float = 10.0,
-        end_effector_id: int = 6,
         joint_pos_threshold: float = 1e-3,
-        lower_limit: Optional[Union[List[float], np.ndarray]] = None,
-        upper_limit: Optional[Union[List[float], np.ndarray]] = None,
-        joint_ranges_ns: Optional[Union[List[float], np.ndarray]] = None,
         **kwargs,
     ):
         """Constructs the arm from yaml config.
@@ -43,17 +38,12 @@ class SafeArm(Arm):
             robot_name: Name of the robot.
             damping_ratio: Damping ratio for the joint space controller.
             max_acceleration: Maximum joint acceleration for the joint space controller.
-            end_effector_id: ID of the end effector.
             joint_pos_threshold: Threshold for joint position convergence.
             kwargs: Keyword arguments for `Arm`.
-            lower_limit: Lower joint limits. (lower limits for null space)
-            upper_limit: Upper joint limits. (upper limits for null space)
-            joint_ranges_ns: Joint ranges for null space.
         """
         self._shield_initialized = False
         super().__init__(**kwargs)
         self._redisgl = None
-        self.end_effector_id = end_effector_id
         self._base_pos = base_pos
         self._base_orientation = base_orientation
         self._shield_type = shield_type
@@ -69,9 +59,6 @@ class SafeArm(Arm):
             kp=self.pos_gains[0],
             damping_ratio=self._damping_ratio,
         )
-        self._lower_limit = lower_limit
-        self._upper_limit = upper_limit
-        self._joint_ranges_ns = joint_ranges_ns
         self._shield_initialized = True
         self._visualization_initialized = False
         self._human_sphere_viz = []
@@ -162,35 +149,9 @@ class SafeArm(Arm):
         if quat is None:
             quat = np.array([0, 0, 0, 1])
         q, _ = self.get_joint_state(self.torque_joints)
-        # Calculate the desired joint position from the desired pose.
-        desired_ee_pos = pos + self.ee_offset
-        # Find close quaternion
-        # This quaternion for some reason is (w, x, y, z) instead of (x, y, z, w) and it defines roll pitch yaw of the end-effector.
-        if isinstance(quat, eigen.Quaterniond):
-            quat = np.array([quat.w, quat.z, -quat.y, -quat.x])
-        elif isinstance(quat, np.ndarray):
-            quat = np.array([quat[3], -quat[2], -quat[1], -quat[0]])
-        # Define current position and limits
-        rest_pose = None if self._lower_limit is None else q
-        desired_q_pos = list(
-            p.calculateInverseKinematics(
-                self.body_id,
-                self.end_effector_id,
-                desired_ee_pos,
-                quat,
-                lowerLimits=self._lower_limit,
-                upperLimits=self._upper_limit,
-                jointRanges=self._joint_ranges_ns,
-                restPoses=rest_pose,
-            )
-        )
-        last_rot = desired_q_pos[q.shape[0] - 1]
-        upper_limit = self._upper_limit[q.shape[0] - 1] if self._upper_limit is not None else np.pi
-        if ignore_last_half_rotation and abs(last_rot) > upper_limit:
-            # Last joint is rotating end-effector, so we can ignore 180 degree rotation.
-            desired_q_pos[q.shape[0] - 1] = last_rot - np.sign(last_rot) * np.pi
+        desired_q_pos, success = self.inverse_kinematics(pos, quat, ignore_last_half_rotation)
         # Set the desired joint position as new goal for sara-shield
-        self._shield.set_goal(desired_q_pos[: q.shape[0]])
+        self._shield.set_goal(desired_q_pos)
         if timeout is None:
             timeout = self.timeout
         self._arm_state.iter_timeout = int(timeout / SIMULATION_TIME_STEP)

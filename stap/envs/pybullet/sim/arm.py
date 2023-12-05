@@ -3,6 +3,7 @@ import dataclasses
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
+import pybullet as p
 import spatialdyn as dyn
 from ctrlutils import eigen
 
@@ -43,6 +44,10 @@ class Arm(articulated_body.ArticulatedBody):
         ori_threshold: Tuple[float, float],
         timeout: float,
         redisgl_config: Optional[Dict[str, Any]] = None,
+        end_effector_id: int = 6,
+        lower_limit: Optional[Union[List[float], np.ndarray]] = None,
+        upper_limit: Optional[Union[List[float], np.ndarray]] = None,
+        joint_ranges_ns: Optional[Union[List[float], np.ndarray]] = None,
     ):
         """Constructs the arm from yaml config.
 
@@ -62,6 +67,10 @@ class Arm(articulated_body.ArticulatedBody):
             ori_threshold: (orientation, angular velocity) threshold for orientation convergence.
             timeout: Default command timeout.
             redisgl_config: Config for setting up RedisGl visualization.
+            end_effector_id: ID of the end effector.
+            lower_limit: Lower joint limits. (lower limits for null space)
+            upper_limit: Upper joint limits. (upper limits for null space)
+            joint_ranges_ns: Joint ranges for null space.
         """
         super().__init__(
             physics_id=physics_id,
@@ -81,6 +90,10 @@ class Arm(articulated_body.ArticulatedBody):
 
         self.pos_threshold = np.array(pos_threshold, dtype=np.float64)
         self.ori_threshold = np.array(ori_threshold, dtype=np.float64)
+        self.end_effector_id = end_effector_id
+        self._lower_limit = np.array(lower_limit)
+        self._upper_limit = np.array(upper_limit)
+        self._joint_ranges_ns = np.array(joint_ranges_ns)
 
         self._ab = dyn.ArticulatedBody(dyn.urdf.load_model(arm_urdf))
         self.ab.q = self.q_home
@@ -186,6 +199,92 @@ class Arm(articulated_body.ArticulatedBody):
         quat_ee_to_world = eigen.Quaterniond(T_ee_to_world.linear)
         quat_ee = quat_ee_to_world * self.quat_home.inverse()
         return math.Pose(T_ee_to_world.translation, quat_ee.coeffs)
+
+    def accurate_calculate_inverse_kinematics(
+        self,
+        target_pos: np.ndarray,
+        target_quat: Optional[Union[eigen.Quaterniond, np.ndarray]] = None,
+        precision: Optional[float] = 1e-3,
+        max_iter: int = 5,
+    ) -> Tuple[np.ndarray, bool]:
+        current_q, _ = self.get_joint_state(self.torque_joints)
+        use_nullspace = not (self._lower_limit is None or self._upper_limit is None or self._joint_ranges_ns is None)
+        n_joints = self.q_home.shape[0]
+        rest_pose = self.q_home if use_nullspace else None
+        close_enough = False
+        iter = 0
+        dist2 = 1e30
+        desired_q_pos = np.zeros((n_joints,))
+        while not close_enough and iter < max_iter:
+            desired_q_pos = np.array(
+                p.calculateInverseKinematics(
+                    self.body_id,
+                    self.end_effector_id,
+                    target_pos,
+                    target_quat,
+                    lowerLimits=self._lower_limit,
+                    upperLimits=self._upper_limit,
+                    jointRanges=self._joint_ranges_ns,
+                    restPoses=rest_pose,
+                )
+            )
+            desired_q_pos = desired_q_pos[:n_joints]
+            for i in range(n_joints):
+                p.resetJointState(self.body_id, i, desired_q_pos[i])
+            ls = p.getLinkState(self.body_id, self.end_effector_id)
+            newPos = ls[4]
+            diff = [target_pos[0] - newPos[0], target_pos[1] - newPos[1], target_pos[2] - newPos[2]]
+            dist2 = diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]
+            close_enough = dist2 < precision if precision is not None else True
+            iter = iter + 1
+        for i in range(n_joints):
+            p.resetJointState(self.body_id, i, current_q[i])
+        return desired_q_pos, close_enough
+
+    def inverse_kinematics(
+        self,
+        pos: np.ndarray,
+        quat: Optional[Union[eigen.Quaterniond, np.ndarray]] = None,
+        ignore_last_half_rotation: bool = True,
+        precision: Optional[float] = 1e-3,
+        max_iter: int = 5,
+    ) -> Tuple[np.ndarray, bool]:
+        """Computes a suitable joint configuration to achieve the given end-effector pose.
+
+        Args:
+            pos: Desired end-effector position.
+            quat: Desired end-effector orientation.
+            ignore_last_half_rotation: Ignores rotation around the last joint that are larger than 180 degrees.
+                They are clipped back to the range [-pi, pi] by the modulo(alpha, pi) operator.
+            precision: Precision of the solution acceptance.
+            max_iter: Max. number of iterations to compute the solution.
+        Returns:
+            Joint configuration and whether the solution was accepted.
+        """
+        n_joints = self.q_home.shape[0]
+        desired_ee_pos = pos + self.ee_offset
+        if isinstance(quat, eigen.Quaterniond):
+            quat = np.array([quat.w, quat.z, -quat.y, -quat.x])
+        elif isinstance(quat, np.ndarray):
+            quat = np.array([quat[3], -quat[2], -quat[1], -quat[0]])
+        # Define current position and limits
+        desired_q_pos, close_enough = self.accurate_calculate_inverse_kinematics(
+            target_pos=desired_ee_pos, target_quat=quat, precision=precision, max_iter=max_iter
+        )
+        if not close_enough:
+            return desired_q_pos, False
+        last_rot = desired_q_pos[n_joints - 1]
+        upper_limit = self._upper_limit[n_joints - 1] if self._upper_limit is not None else np.pi
+        if ignore_last_half_rotation and abs(last_rot) > upper_limit:
+            # Last joint is rotating end-effector, so we can ignore 180 degree rotation.
+            desired_q_pos[n_joints - 1] = last_rot - np.sign(last_rot) * np.pi
+        if (
+            self._upper_limit is not None
+            and self._lower_limit is not None
+            and (not np.all(desired_q_pos >= self._lower_limit) or not np.all(desired_q_pos <= self._upper_limit))
+        ):
+            return desired_q_pos, False
+        return desired_q_pos, True
 
     def update_torques(self, time: Optional[float] = None) -> articulated_body.ControlStatus:
         """Computes and applies the torques to control the articulated body to the goal set with `Arm.set_pose_goal().
