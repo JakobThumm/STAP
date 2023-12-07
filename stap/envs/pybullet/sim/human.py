@@ -102,13 +102,16 @@ class Human(body.Body):
         self._body_measurement_ids = body_measurement_ids
         self._bodies = {}
         for body_name in body_names:
-            shape = shapes.Visual(
-                shape=shapes.Capsule(
-                    mass=0, color=np.array(color), radius=body_radii[body_name], height=body_lengths[body_name]
-                )
+            object_kwargs = {
+                "name": body_name,
+                "color": np.array(color),
+                "radius": body_radii[body_name],
+                "length": body_lengths[body_name],
+                "is_active": True,
+            }
+            self._bodies[body_name] = Object.create(
+                physics_id=physics_id, object_type="BodyPart", object_kwargs=object_kwargs
             )
-            body_id = shapes.create_body(shapes=shape, physics_id=physics_id)
-            self._bodies[body_name] = body.Body(physics_id=physics_id, body_id=body_id)
         super().__init__(physics_id=physics_id, body_id=self._bodies[body_names[0]].body_id)
         self.freeze()
         self._animation = np.array([])
@@ -199,6 +202,14 @@ class Human(body.Body):
         if len(self._animation) == 0:
             return None
         return 10 * np.ones((len(self._animation[0]), 3))
+
+    def get_hand_objects(self) -> Dict[str, Object]:
+        """Return the hand objects."""
+        hands = {}
+        for body_name in self._body_names:
+            if "hand" in body_name:
+                hands[body_name] = self._bodies[body_name]
+        return hands
 
     @property
     def name(self) -> str:
