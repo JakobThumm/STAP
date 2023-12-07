@@ -12,6 +12,7 @@ from stap.envs.pybullet import real
 from stap.envs.pybullet.sim import arm, articulated_body, body, gripper, math
 from stap.envs.pybullet.sim.safe_arm import SafeArm
 from stap.utils import configs
+from stap.utils.macros import SIMULATION_TIME_STEP
 
 
 class ControlException(Exception):
@@ -224,6 +225,93 @@ class Robot(body.Body):
             articulated_body.ControlStatus.POS_CONVERGED,
             articulated_body.ControlStatus.VEL_CONVERGED,
         )
+
+    def goto_dynamic_pose(
+        self,
+        pose_fn: Callable[..., math.Pose],
+        termination_fn: Callable[..., bool],
+        pos_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
+        ori_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
+        timeout: Optional[float] = None,
+        update_pose_every: Optional[int] = 5,
+        check_collisions: Sequence[int] = [],
+        check_collision_freq: int = 10,
+    ) -> bool:
+        """Uses opspace control to go to the desired pose.
+
+        This method blocks until the command finishes or times out. A
+        ControlException will be raised if the grasp controller is aborted.
+
+        Args:
+            pose_fn: Function that returns a math.Pose.
+            termination_fn: Function that checks if the dynamic pose goal has been reached.
+            pos_gains: (kp, kv) gains or [3 x 2] array of xyz gains.
+            ori_gains: (kp, kv) gains or [3 x 2] array of xyz gains.
+            timeout: Uses the timeout specified in the yaml arm config if None.
+            update_pose_every: Iteration interval with which to update the target pose.
+            check_collisions: Raise an exception if the gripper or grasped
+                object collides with any of the body_ids in this list.
+            check_collision_freq: Iteration interval with which to check
+                collisions.
+        Returns:
+            True if the grasp controller converges to the desired position or
+            zero velocity, false if the command times out.
+        """
+        if check_collisions:
+            body_ids_a = [self.body_id] * len(self.gripper.finger_links)
+            link_ids_a: List[Optional[int]] = list(self.gripper.finger_links)
+            grasp_body_id = self.gripper._gripper_state.grasp_body_id
+            if grasp_body_id is not None:
+                body_ids_a.append(grasp_body_id)
+                link_ids_a.append(None)
+        if update_pose_every is None:
+            update_pose_every = 10000000000
+        # Simulate until the pose goal is reached.
+        status = articulated_body.ControlStatus.IN_PROGRESS
+        iter = 0
+        while status == articulated_body.ControlStatus.IN_PROGRESS:
+            if iter % update_pose_every == 0:
+                pose = pose_fn()
+                new_timeout = timeout - iter * SIMULATION_TIME_STEP if timeout is not None else None
+                self.arm.set_pose_goal(
+                    pos=pose.pos,
+                    quat=pose.quat,
+                    pos_gains=pos_gains,
+                    ori_gains=ori_gains,
+                    timeout=new_timeout,
+                )
+            status = self.arm.update_torques(self._sim_time)
+            if status == articulated_body.ControlStatus.ABORTED:
+                raise ControlException(f"Robot.goto_pose({pos}, {quat}): Singularity")
+            if status in (
+                articulated_body.ControlStatus.POS_CONVERGED,
+                articulated_body.ControlStatus.VEL_CONVERGED,
+            ):
+                # We don't care about this kind of convergence here.
+                status = articulated_body.ControlStatus.IN_PROGRESS
+            if termination_fn():
+                return True
+            self.gripper.update_torques()
+            self.step_simulation()
+            t.sleep(0.01)
+            iter += 1
+
+            if isinstance(self.arm, real.arm.Arm):
+                continue
+
+            if not check_collisions or iter % check_collision_freq != 0:
+                continue
+
+            # Terminate early if there are collisions with the gripper fingers
+            # or grasped object.
+            for body_id_a, link_id_a in zip(body_ids_a, link_ids_a):
+                for body_id_b in check_collisions:
+                    if self._is_colliding(body_id_a, body_id_b, link_id_a):
+                        raise ControlException(
+                            f"Robot.goto_pose({pos}, {quat}): Collision {body_id_a}:{link_id_a}, {body_id_b}"
+                        )
+        # print("Robot.goto_pose:", pos, quat, status)
+        return False
 
     def goto_configuration(self, q: np.ndarray) -> bool:
         """Sets the robot to the desired joint configuration.

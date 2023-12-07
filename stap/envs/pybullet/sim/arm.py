@@ -6,6 +6,7 @@ import numpy as np
 import pybullet as p
 import spatialdyn as dyn
 from ctrlutils import eigen
+from scipy.spatial.transform import Rotation
 
 from stap.envs.pybullet.sim import articulated_body, math, redisgl
 from stap.utils.macros import SIMULATION_TIME_STEP
@@ -268,7 +269,11 @@ class Arm(articulated_body.ArticulatedBody):
             Joint configuration and whether the solution was accepted.
         """
         n_joints = self.q_home.shape[0]
-        desired_ee_pos = pos + self.ee_offset
+        if isinstance(quat, eigen.Quaterniond):
+            rot = Rotation.from_quat([quat.x, quat.y, quat.z, quat.w])
+        elif isinstance(quat, np.ndarray):
+            rot = Rotation.from_quat(quat)
+        desired_ee_pos = pos + rot.apply(self.ee_offset)
         if isinstance(quat, eigen.Quaterniond):
             quat = np.array([quat.w, quat.z, -quat.y, -quat.x])
         elif isinstance(quat, np.ndarray):

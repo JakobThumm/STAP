@@ -18,13 +18,7 @@ from stap.envs.pybullet.real import object_tracker
 from stap.envs.pybullet.sim import robot
 from stap.envs.pybullet.table import object_state, predicates, utils
 from stap.envs.pybullet.table.objects import Null, Object, ObjectGroup
-from stap.envs.pybullet.table.primitives import (
-    Pick,
-    Primitive,
-    Pull,
-    Push,
-    initialize_robot_pose,
-)
+from stap.envs.pybullet.table.primitives import Pick, Primitive, Pull, Push, initialize_robot_pose
 from stap.envs.variant import VariantEnv
 from stap.utils import random as random_utils
 from stap.utils import recording
@@ -264,15 +258,7 @@ class TableEnv(PybulletEnv):
         self._object_groups = {group.name: group for group in object_group_list}
 
         # Create objects.
-        object_list = [
-            Object.create(
-                physics_id=self.physics_id,
-                object_groups=self.object_groups,
-                **utils.load_config(obj_config),
-            )
-            for obj_config in object_kwargs
-        ]
-        self._objects = {obj.name: obj for obj in object_list}
+        self._create_objects(object_kwargs=object_kwargs)
         # for group in self.object_groups.values():
         #     group.compute_probabilities(self.objects)
 
@@ -354,6 +340,17 @@ class TableEnv(PybulletEnv):
         self._timelapse = recording.Recorder()
         self._recorder = recording.Recorder(recording_freq)
         self._recording_text = ""
+
+    def _create_objects(self, object_kwargs: Optional[List[Dict[str, Any]]] = None) -> None:
+        object_list = [
+            Object.create(
+                physics_id=self.physics_id,
+                object_groups=self.object_groups,
+                **utils.load_config(obj_config),
+            )
+            for obj_config in object_kwargs
+        ]
+        self._objects = {obj.name: obj for obj in object_list}
 
     def close(self) -> None:
         try:
@@ -984,6 +981,36 @@ class VariantTableEnv(VariantEnv, TableEnv):  # type: ignore
 
     def object_states(self) -> Dict[str, object_state.ObjectState]:
         return self.env.object_states()
+
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
+        return self.env.wait_until_stable(min_iters, max_iters)
+
+    def step_simulation(self) -> None:
+        return self.env.step_simulation()
+
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
+        return self.env.wait_until_stable(min_iters, max_iters)
+
+    def step_simulation(self) -> None:
+        return self.env.step_simulation()
+
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
+        return self.env.wait_until_stable(min_iters, max_iters)
+
+    def step_simulation(self) -> None:
+        return self.env.step_simulation()
+
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
+        return self.env.wait_until_stable(min_iters, max_iters)
+
+    def step_simulation(self) -> None:
+        return self.env.step_simulation()
+
+    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
+        return self.env.wait_until_stable(min_iters, max_iters)
+
+    def step_simulation(self) -> None:
+        return self.env.step_simulation()
 
     def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
         return self.env.wait_until_stable(min_iters, max_iters)

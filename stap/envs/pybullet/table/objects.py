@@ -56,12 +56,14 @@ def compute_bbox_vertices(bbox: np.ndarray, pose: Optional[math.Pose] = None, pr
 class Object(body.Body):
     name: str
     is_static: bool = False
+    is_active: bool = False
 
-    def __init__(self, physics_id: int, body_id: int, name: str, is_static: bool = False):
+    def __init__(self, physics_id: int, body_id: int, name: str, is_static: bool = False, is_active: bool = False):
         super().__init__(physics_id, body_id)
 
         self.name = name
         self.is_static = is_static
+        self.is_active = is_active
         T_pybullet_to_obj = super().pose().to_eigen()
         self._modified_axes = not T_pybullet_to_obj.is_approx(eigen.Isometry3d.identity())
         if self._modified_axes:
@@ -228,10 +230,10 @@ class Object(body.Body):
 class Urdf(Object):
     AABB_MARGIN = 0.001  # Pybullet seems to expand aabbs by at least this amount.
 
-    def __init__(self, physics_id: int, name: str, path: str, is_static: bool = False):
+    def __init__(self, physics_id: int, name: str, path: str, is_static: bool = False, is_active: bool = True):
         body_id = p.loadURDF(fileName=path, useFixedBase=is_static, physicsClientId=physics_id)
 
-        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=is_static)
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=is_static, is_active=is_active)
 
         xyz_min, xyz_max = body.Body.aabb(self)
         xyz_min += Urdf.AABB_MARGIN
@@ -256,12 +258,13 @@ class Box(Object):
         size: Union[List[float], np.ndarray],
         color: Union[List[float], np.ndarray],
         mass: float = 0.1,
+        is_active: bool = False,
     ):
         box = shapes.Box(size=np.array(size), mass=mass, color=np.array(color))
         body_id = shapes.create_body(box, physics_id=physics_id)
         self._shape = box
 
-        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0)
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0, is_active=is_active)
 
         self._state.box_size = box.size
         self._bbox = np.array([-0.5 * self.size, 0.5 * self.size])
@@ -288,12 +291,13 @@ class VisualCapsule(Object):
         radius: float,
         color: Union[List[float], np.ndarray],
         mass: float = 0.1,
+        is_active: bool = True,
     ):
         vis_cap = shapes.Visual(shape=shapes.Capsule(height=height, radius=radius, mass=mass, color=np.array(color)))
         body_id = shapes.create_body(vis_cap, physics_id=physics_id)
         self._shape = vis_cap
 
-        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0)
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0, is_active=is_active)
 
         self._state.box_size = np.array([height, 2 * radius, 2 * radius])
         self._bbox = np.array([-0.5 * self.size, 0.5 * self.size])
@@ -350,6 +354,7 @@ class Hook(Object):
         color: Union[List[float], np.ndarray],
         radius: float = 0.02,
         mass: float = 0.1,
+        is_active: bool = False,
     ):
         if not isinstance(color, np.ndarray):
             color = np.array(color)
@@ -389,7 +394,7 @@ class Hook(Object):
         self._shapes = [joint, handle, head]
         body_id = shapes.create_body(self.shapes, link_parents=[0, 0], physics_id=physics_id)
 
-        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0)
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0, is_active=is_active)
 
         self._state.head_length = head_length
         self._state.handle_length = handle_length
@@ -546,6 +551,36 @@ class Rack(Object):
     @property
     def shapes(self) -> Sequence[shapes.Shape]:
         return self._shapes
+
+
+class BodyPart(Object):
+    def __init__(
+        self,
+        physics_id: int,
+        name: str,
+        color: Union[List[float], np.ndarray],
+        radius: float = 0.0,
+        length: float = 0.0,
+        is_active: bool = True,
+    ):
+        shape = shapes.Visual(shape=shapes.Capsule(mass=0, color=np.array(color), radius=radius, height=length))
+        body_id = shapes.create_body(shapes=shape, physics_id=physics_id)
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=True, is_active=is_active)
+
+    def state(self) -> object_state.ObjectState:
+        # Null object state is a zero vector.
+        return self._state
+
+    def disable_collisions(self) -> None:
+        # NotImplemented
+        pass
+
+    def enable_collisions(self) -> None:
+        # NotImplemented
+        pass
+
+    def unfreeze(self) -> bool:
+        return False
 
 
 class Null(Object):

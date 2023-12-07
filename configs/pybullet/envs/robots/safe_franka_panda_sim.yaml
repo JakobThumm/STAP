@@ -35,7 +35,7 @@ arm_kwargs:
   timeout: 10.0
 
   # shield settings
-  shield_type: "SSM"
+  shield_type: "PFL"
   robot_name: "panda"
   max_acceleration: 30.0
   end_effector_id: 7

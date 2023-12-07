@@ -14,7 +14,7 @@ from stap.envs.pybullet.sim.human import Human
 from stap.envs.pybullet.sim.safe_arm import SafeArm
 from stap.envs.pybullet.table import object_state, utils
 from stap.envs.pybullet.table.primitives import Primitive
-from stap.envs.pybullet.table_env import CameraView, TableEnv
+from stap.envs.pybullet.table_env import TableEnv
 from stap.utils.animation_utils import load_human_animation_data
 from stap.utils.macros import SIMULATION_FREQUENCY, SIMULATION_TIME_STEP
 
@@ -39,8 +39,7 @@ class HumanTableEnv(TableEnv):
         Args:
             kwargs: Keyword arguments for `TableEnv`.
         """
-        super().__init__(**kwargs)
-        human_kwargs = utils.load_config(human_config)
+        self._human_kwargs = utils.load_config(human_config)
         self._animations = load_human_animation_data(
             animation_type=animation_type,
             human_animation_names=human_animation_names,
@@ -48,33 +47,13 @@ class HumanTableEnv(TableEnv):
             verbose=False,
         )
         self._visualize_shield = visualize_shield
-        self.human = Human(self.physics_id, **human_kwargs)
+        super().__init__(**kwargs)
         self.human.reset(self.task.action_skeleton, self.task.initial_state)
         self._initial_state_id = p.saveState(physicsClientId=self.physics_id)
         # Animation: Time, Point, Pos
         self._animation_freq = animation_frequency
         self._sim_time = 0.0
         self._animation_number = 0
-        WIDTH, HEIGHT = 405, 405
-        PROJECTION_MATRIX = p.computeProjectionMatrixFOV(
-            fov=60,
-            aspect=1.5,
-            nearVal=0.02,
-            farVal=100,
-        )
-        gui_kwargs = kwargs["gui_kwargs"] if "gui_kwargs" in kwargs else {}
-        shadows = gui_kwargs.get("shadows", 0)
-        self._camera_views["front"] = CameraView(
-            width=WIDTH,
-            height=HEIGHT,
-            view_matrix=p.computeViewMatrix(
-                cameraEyePosition=[3.0, 0.0, 1.0],
-                cameraTargetPosition=[0.0, 0.0, 0.1],
-                cameraUpVector=[0.0, 0.0, 1.0],
-            ),
-            projection_matrix=PROJECTION_MATRIX,
-            shadow=shadows,
-        )
         p.resetDebugVisualizerCamera(
             cameraDistance=2.0,
             cameraYaw=90,
@@ -82,6 +61,12 @@ class HumanTableEnv(TableEnv):
             cameraTargetPosition=[0, 0, 0],
             physicsClientId=self.physics_id,
         )
+
+    def _create_objects(self, object_kwargs: Optional[List[Dict[str, Any]]] = None) -> None:
+        super()._create_objects(object_kwargs=object_kwargs)
+        self.human = Human(self.physics_id, **self._human_kwargs)
+        human_hands = self.human.get_hand_objects()
+        self._objects.update(human_hands)
 
     def reset(  # type: ignore
         self,

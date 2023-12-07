@@ -8,10 +8,12 @@ env_kwargs:
     - place
     - push
     - pull
+    - handover
 
   tasks:
     - action_skeleton:
-        - pick(icecream)
+         - pick(icecream)
+         - handover(icecream, right_hand)
       initial_state:
         # - on(rack, table)
         - on(hook, table)

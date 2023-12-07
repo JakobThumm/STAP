@@ -245,3 +245,41 @@ class PushAction(PrimitiveAction):
             f"    theta: {self.theta},\n"
             "}"
         )
+
+
+class HandoverAction(PrimitiveAction):
+    RANGES = {
+        "pitch": (-np.pi, 0),
+        "distance": (0.0, 0.2),
+    }
+
+    def __init__(
+        self,
+        vector: Optional[np.ndarray] = None,
+        pitch: Optional[float] = None,
+        distance: Optional[float] = None,
+    ):
+        super().__init__(vector)
+        if pitch is not None:
+            self.pitch = pitch  # type: ignore
+        if distance is not None:
+            self.distance = distance  # type: ignore
+
+    @property
+    def pitch(self) -> np.ndarray:
+        return self.vector[..., 0]
+
+    @pitch.setter
+    def pitch(self, pitch: np.ndarray) -> None:
+        self.vector[..., 0] = pitch
+
+    @property
+    def distance(self) -> np.ndarray:
+        return self.vector[..., 1]
+
+    @distance.setter
+    def distance(self, distance: np.ndarray) -> None:
+        self.vector[..., 1] = distance
+
+    def __repr__(self) -> str:
+        return "Place {\n" f"    pitch: {self.pitch},\n" f"    distance: {self.distance},\n" "}"

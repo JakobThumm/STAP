@@ -1,17 +1,20 @@
 import abc
 import random
+from functools import partial
 from typing import Callable, Dict, List, NamedTuple, Optional, Type, Union
 
 import gym
 import numpy as np
 import symbolic
 from ctrlutils import eigen
+from scipy.spatial.transform import Rotation
 
 from stap.envs import base as envs
 from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.sim.robot import ControlException, Robot
 from stap.envs.pybullet.table import object_state, primitive_actions, utils
 from stap.envs.pybullet.table.objects import Box, Hook, Null, Object, Rack
+from stap.utils.macros import SIMULATION_FREQUENCY, SIMULATION_TIME_STEP
 
 dbprint = lambda *args: None  # noqa
 # dbprint = print
@@ -204,7 +207,12 @@ class Primitive(envs.Primitive, abc.ABC):
 
         def did_non_args_move() -> bool:
             """Checks if any object has moved significantly from its old pose."""
-            return any(did_object_move(obj, old_pose) for obj, old_pose in zip(objects, old_poses))
+            for obj, old_pose in zip(objects, old_poses):
+                if obj.is_active:
+                    continue
+                if did_object_move(obj, old_pose):
+                    return True
+            return False
 
         return did_non_args_move
 
@@ -441,6 +449,139 @@ class Place(Primitive):
         action.pos[2] = np.clip(action.pos[2], action_range[0, 2], action_range[1, 2])
 
         return action
+
+    @classmethod
+    def action(cls, action: np.ndarray) -> primitive_actions.PrimitiveAction:
+        return primitive_actions.PlaceAction(action)
+
+
+class Handover(Primitive):
+    """Handover primitive.
+
+    The action is two-dimensional, where the first dimension is the pitch angle of the end-effector and the second
+    dimension is the distance to the human hand.
+    The robot will always try to move to a position, such that the end-effector is pointing towards the human hand.
+    E.g, pitch=0: e   pitch=pi/2: x <----- e
+                  |                 |-----|
+                  v                   dist
+                  x
+    """
+
+    action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(2,))
+    action_scale = gym.spaces.Box(*primitive_actions.HandoverAction.range())
+    Action = primitive_actions.HandoverAction
+    ALLOW_COLLISIONS = False
+
+    def execute(self, action: np.ndarray, real_world: bool = False, verbose: bool = False) -> ExecutionResult:
+        from stap.envs.pybullet.human_table_env import HumanTableEnv
+
+        assert isinstance(self.env, HumanTableEnv)
+
+        APPROACH_DISTANCE = 0.1
+        START_DISTANCE = 0.5
+        SUCCESS_DISTANCE = 0.1
+        SUCCESS_TIME = 0.5
+        WAIT_TIME = 0.1
+
+        success = False
+        self.success_counter = 0
+        # Parse action.
+        a = primitive_actions.HandoverAction(self.scale_action(action))
+        dbprint(a)
+
+        obj, target = self.arg_objects
+        command_pose = self.calculate_command_pose(a, target)
+        pre_pos = self.env.robot.arm.ee_pose().pos
+
+        objects = self.env.objects
+        robot = self.env.robot
+        allow_collisions = self.ALLOW_COLLISIONS or real_world
+        if not allow_collisions:
+            did_non_args_move = self.create_object_movement_check(objects=objects)
+        try:
+            # if not real_world and not utils.is_inworkspace(obj_pos=pre_pos[:2]):
+            #    raise ControlException(f"Placement location {pre_pos} is beyond robot workspace.")
+            # If the human hand is too far away, move to home position.
+            human_close = self.termination_condition(target, START_DISTANCE, 0.0)
+            while not human_close:
+                robot.goto_pose(self.env.robot.arm.home_pose.pos, self.env.robot.arm.home_pose.quat)
+                human_close = self.termination_condition(target, START_DISTANCE, 0.0)
+                self.env.wait_until_stable(
+                    min_iters=np.ceil(WAIT_TIME * SIMULATION_FREQUENCY),
+                    max_iters=np.ceil(WAIT_TIME * SIMULATION_FREQUENCY),
+                )
+            # if not allow_collisions and did_non_args_move():
+            #    if verbose:
+            #        print("Robot.goto_pose(pre_pos, command_quat) collided")
+            #    raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
+
+            # TODO: Wait for fixed amount of time or until human hand is close enough.
+            pose_fn = partial(self.calculate_command_pose, a, target)
+            termination_fn = partial(self.termination_condition, target, SUCCESS_DISTANCE, SUCCESS_TIME)
+            success = robot.goto_dynamic_pose(
+                pose_fn=pose_fn,
+                termination_fn=termination_fn,
+                update_pose_every=5,
+                check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
+            )
+            if not success or (not allow_collisions and did_non_args_move()):
+                if verbose:
+                    print("Robot.goto_dynamic_pose() failed")
+                raise ControlException("Robot.goto_dynamic_pose() failed")
+
+            robot.grasp(0)
+            if not allow_collisions and did_non_args_move():
+                if verbose:
+                    print("Robot.grasp(0) collided")
+                raise ControlException("Robot.grasp(0) collided")
+
+            robot.goto_pose(self.env.robot.arm.home_pose.pos, self.env.robot.arm.home_pose.quat)
+            if not allow_collisions and did_non_args_move():
+                if verbose:
+                    print("Robot.goto_pose(pre_pos, command_quat) collided")
+                raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
+        except ControlException as e:
+            # If robot fails before grasp(0), object may still be grasped.
+            dbprint("Place.execute():\n", e)
+            if verbose:
+                print("Place.execute():\n", e)
+            return ExecutionResult(success=False, truncated=True)
+
+        self.env.wait_until_stable()
+
+        return ExecutionResult(success=success, truncated=False)
+
+    def calculate_command_pose(self, action: primitive_actions.HandoverAction, target: Object) -> math.Pose:
+        # Get target pose.
+        target_pos = target.pose().pos
+        ee_pos = self.env.robot.arm.ee_pose().pos + self.env.robot.arm.ee_offset
+        # The yaw angle is defined as the angle between the current end-effector position and the target position on the x-y plane.
+        yaw = np.arctan2(target_pos[1] - ee_pos[1], target_pos[0] - ee_pos[0])
+        pitch = action.pitch
+        distance = action.distance
+        vec_to_eef = np.array([0, 0, 1])
+        rot = Rotation.from_euler("ZY", [yaw, pitch])  # type: ignore
+        command_vec = rot.apply(vec_to_eef)
+        # command_vec = np.array([np.sin(pitch) * np.cos(yaw), np.sin(pitch) * np.sin(yaw), np.cos(pitch)])
+        command_pos = target_pos - command_vec * distance
+        command_quat = eigen.Quaterniond(rot.as_quat())
+        return math.Pose(command_pos, command_quat)
+
+    def termination_condition(self, target: Object, success_distance: float = 0.1, success_time: float = 0.5) -> bool:
+        """Checks if the human hand is within reach of the object for at least `success_time` seconds."""
+        target_pos = target.pose().pos
+        ee_pos = self.env.robot.arm.ee_pose().pos
+        if np.linalg.norm(target_pos[:2] - ee_pos[:2]) < success_distance:
+            self.success_counter += 1
+        else:
+            self.success_counter = 0
+        if self.success_counter * SIMULATION_TIME_STEP >= success_time:
+            return True
+        else:
+            return False
+
+    def sample_action(self) -> primitive_actions.PrimitiveAction:
+        return self.Action.random()
 
     @classmethod
     def action(cls, action: np.ndarray) -> primitive_actions.PrimitiveAction:
@@ -747,4 +888,5 @@ class Stop(Primitive):
         return ExecutionResult(success=True, truncated=False)
 
     def sample_action(self) -> primitive_actions.PrimitiveAction:
+        return np.ones(1)
         return np.ones(1)
