@@ -282,7 +282,7 @@ class Robot(body.Body):
                 )
             status = self.arm.update_torques(self._sim_time)
             if status == articulated_body.ControlStatus.ABORTED:
-                raise ControlException(f"Robot.goto_pose({pos}, {quat}): Singularity")
+                raise ControlException(f"Robot.goto_pose({pose.pos}, {pose.quat}): Singularity")
             if status in (
                 articulated_body.ControlStatus.POS_CONVERGED,
                 articulated_body.ControlStatus.VEL_CONVERGED,
@@ -308,7 +308,7 @@ class Robot(body.Body):
                 for body_id_b in check_collisions:
                     if self._is_colliding(body_id_a, body_id_b, link_id_a):
                         raise ControlException(
-                            f"Robot.goto_pose({pos}, {quat}): Collision {body_id_a}:{link_id_a}, {body_id_b}"
+                            f"Robot.goto_pose({pose.pos}, {pose.quat}): Collision {body_id_a}:{link_id_a}, {body_id_b}"
                         )
         # print("Robot.goto_pose:", pos, quat, status)
         return False
@@ -437,4 +437,5 @@ class Robot(body.Body):
         T_obj_to_ee = T_ee_to_world.inverse() * T_obj_to_world
         self.set_load(obj.inertia * T_obj_to_ee)
 
+        return True
         return True

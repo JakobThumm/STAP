@@ -273,6 +273,8 @@ class Arm(articulated_body.ArticulatedBody):
             rot = Rotation.from_quat([quat.x, quat.y, quat.z, quat.w])
         elif isinstance(quat, np.ndarray):
             rot = Rotation.from_quat(quat)
+        else:
+            rot = Rotation.from_quat([0.0, 0.0, 0.0, 1.0])
         desired_ee_pos = pos + rot.apply(self.ee_offset)
         if isinstance(quat, eigen.Quaterniond):
             quat = np.array([quat.w, quat.z, -quat.y, -quat.x])

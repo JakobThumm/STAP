@@ -482,6 +482,7 @@ class Handover(Primitive):
         SUCCESS_DISTANCE = 0.1
         SUCCESS_TIME = 0.5
         WAIT_TIME = 0.1
+        TIMEOUT = 10
 
         success = False
         self.success_counter = 0
@@ -522,6 +523,7 @@ class Handover(Primitive):
                 pose_fn=pose_fn,
                 termination_fn=termination_fn,
                 update_pose_every=5,
+                timeout=TIMEOUT,
                 check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
             )
             if not success or (not allow_collisions and did_non_args_move()):
@@ -563,7 +565,7 @@ class Handover(Primitive):
         rot = Rotation.from_euler("ZY", [yaw, pitch])  # type: ignore
         command_vec = rot.apply(vec_to_eef)
         # command_vec = np.array([np.sin(pitch) * np.cos(yaw), np.sin(pitch) * np.sin(yaw), np.cos(pitch)])
-        command_pos = target_pos - command_vec * distance
+        command_pos = target_pos + command_vec * distance
         command_quat = eigen.Quaterniond(rot.as_quat())
         return math.Pose(command_pos, command_quat)
 

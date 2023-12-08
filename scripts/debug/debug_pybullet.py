@@ -3,6 +3,8 @@
 import argparse
 from typing import Optional
 
+import numpy as np
+
 from stap import envs
 from stap.envs import pybullet
 
@@ -28,6 +30,9 @@ def main(env_config: str, seed: Optional[int] = None) -> None:
 
             # Sample action and step environment
             action = primitive.sample_action()
+            if isinstance(primitive, pybullet.table.primitives.Handover):
+                action.pitch = -np.pi / 2
+                action.distance = 0.1
             normalized_action = primitive.normalize_action(action.vector)
             _, success, _, truncated, _ = env.step(normalized_action)
             print(f"Success {primitive}: {success}")
@@ -49,4 +54,5 @@ if __name__ == "__main__":
     )
     parser.add_argument("--seed", "-s", type=int, help="Seed to reset env")
     args = parser.parse_args()
+    main(**vars(args))
     main(**vars(args))
