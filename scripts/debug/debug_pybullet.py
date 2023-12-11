@@ -32,7 +32,8 @@ def main(env_config: str, seed: Optional[int] = None) -> None:
             action = primitive.sample_action()
             if isinstance(primitive, pybullet.table.primitives.Handover):
                 action.pitch = -np.pi / 2
-                action.distance = 0.1
+                action.distance = 0.6
+                action.height = 0.3
             normalized_action = primitive.normalize_action(action.vector)
             _, success, _, truncated, _ = env.step(normalized_action)
             print(f"Success {primitive}: {success}")

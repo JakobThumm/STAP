@@ -467,7 +467,7 @@ class Handover(Primitive):
                   x
     """
 
-    action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(2,))
+    action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(3,))
     action_scale = gym.spaces.Box(*primitive_actions.HandoverAction.range())
     Action = primitive_actions.HandoverAction
     ALLOW_COLLISIONS = False
@@ -477,12 +477,14 @@ class Handover(Primitive):
 
         assert isinstance(self.env, HumanTableEnv)
 
-        APPROACH_DISTANCE = 0.1
         START_DISTANCE = 0.5
         SUCCESS_DISTANCE = 0.1
         SUCCESS_TIME = 0.5
         WAIT_TIME = 0.1
         TIMEOUT = 10
+        ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
+        UPDATE_POS_EVERY = 10
+        PRECISION = 0.1
 
         success = False
         self.success_counter = 0
@@ -503,10 +505,10 @@ class Handover(Primitive):
             # if not real_world and not utils.is_inworkspace(obj_pos=pre_pos[:2]):
             #    raise ControlException(f"Placement location {pre_pos} is beyond robot workspace.")
             # If the human hand is too far away, move to home position.
-            human_close = self.termination_condition(target, START_DISTANCE, 0.0)
+            human_close = self.termination_condition(obj, target, START_DISTANCE, 0.0)
             while not human_close:
                 robot.goto_pose(self.env.robot.arm.home_pose.pos, self.env.robot.arm.home_pose.quat)
-                human_close = self.termination_condition(target, START_DISTANCE, 0.0)
+                human_close = self.termination_condition(obj, target, START_DISTANCE, 0.0)
                 self.env.wait_until_stable(
                     min_iters=np.ceil(WAIT_TIME * SIMULATION_FREQUENCY),
                     max_iters=np.ceil(WAIT_TIME * SIMULATION_FREQUENCY),
@@ -516,14 +518,15 @@ class Handover(Primitive):
             #        print("Robot.goto_pose(pre_pos, command_quat) collided")
             #    raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
 
-            # TODO: Wait for fixed amount of time or until human hand is close enough.
-            pose_fn = partial(self.calculate_command_pose, a, target)
-            termination_fn = partial(self.termination_condition, target, SUCCESS_DISTANCE, SUCCESS_TIME)
+            pose_fn = partial(self.calculate_command_pose, a, target, ADDITIONAL_OFFSET)
+            termination_fn = partial(self.termination_condition, obj, target, SUCCESS_DISTANCE, SUCCESS_TIME)
+            robot.arm.set_prior_to_home()
             success = robot.goto_dynamic_pose(
                 pose_fn=pose_fn,
                 termination_fn=termination_fn,
-                update_pose_every=5,
+                update_pose_every=UPDATE_POS_EVERY,
                 timeout=TIMEOUT,
+                precision=PRECISION,
                 check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
             )
             if not success or (not allow_collisions and did_non_args_move()):
@@ -532,6 +535,8 @@ class Handover(Primitive):
                 raise ControlException("Robot.goto_dynamic_pose() failed")
 
             robot.grasp(0)
+            # Once the gripper is opened, we assume the handover was a success.
+            success = True
             if not allow_collisions and did_non_args_move():
                 if verbose:
                     print("Robot.grasp(0) collided")
@@ -553,27 +558,69 @@ class Handover(Primitive):
 
         return ExecutionResult(success=success, truncated=False)
 
-    def calculate_command_pose(self, action: primitive_actions.HandoverAction, target: Object) -> math.Pose:
+    def calculate_command_pose(
+        self,
+        action: primitive_actions.HandoverAction,
+        target: Object,
+        additional_offset: Optional[np.ndarray] = None,
+    ) -> math.Pose:
+        if additional_offset is None:
+            additional_offset = np.zeros(3)
+        target_pos = target.pose().pos
+        target_pos[2] = action.height
+        base_pos = self.env.robot.arm.base_pos + additional_offset
+        human_dist = np.linalg.norm(target_pos - base_pos)
+        if human_dist < action.distance:
+            return self.command_pose_close(action, target)
+        else:
+            return self.command_pose_far(action, target, additional_offset)
+
+    def command_pose_close(self, action: primitive_actions.HandoverAction, target: Object) -> math.Pose:
         # Get target pose.
         target_pos = target.pose().pos
         ee_pos = self.env.robot.arm.ee_pose().pos + self.env.robot.arm.ee_offset
         # The yaw angle is defined as the angle between the current end-effector position and the target position on the x-y plane.
         yaw = np.arctan2(target_pos[1] - ee_pos[1], target_pos[0] - ee_pos[0])
         pitch = action.pitch
-        distance = action.distance
+        distance = 0.05  # action.distance
         vec_to_eef = np.array([0, 0, 1])
         rot = Rotation.from_euler("ZY", [yaw, pitch])  # type: ignore
         command_vec = rot.apply(vec_to_eef)
-        # command_vec = np.array([np.sin(pitch) * np.cos(yaw), np.sin(pitch) * np.sin(yaw), np.cos(pitch)])
+        command_quat = eigen.Quaterniond(rot.as_quat())
         command_pos = target_pos + command_vec * distance
+        return math.Pose(command_pos, command_quat)
+
+    def command_pose_far(
+        self,
+        action: primitive_actions.HandoverAction,
+        target: Object,
+        additional_offset: Optional[np.ndarray] = None,
+    ) -> math.Pose:
+        if additional_offset is None:
+            additional_offset = np.zeros(3)
+        # Get target pose.
+        target_pos = target.pose().pos
+        target_pos[2] = action.height
+        base_pos = self.env.robot.arm.base_pos + additional_offset
+        # The yaw angle is defined as the angle between the current end-effector position and the target position on the x-y plane.
+        yaw = np.arctan2(target_pos[1] - base_pos[1], target_pos[0] - base_pos[0])
+        pitch = action.pitch
+        height = min(target_pos[2] - base_pos[2], action.distance)
+        phi = np.arcsin(height / action.distance)
+        command_pos = base_pos + np.array(
+            [np.cos(phi) * action.distance * np.cos(yaw), np.cos(phi) * action.distance * np.sin(yaw), height]
+        )
+        rot = Rotation.from_euler("ZY", [yaw, pitch])  # type: ignore
         command_quat = eigen.Quaterniond(rot.as_quat())
         return math.Pose(command_pos, command_quat)
 
-    def termination_condition(self, target: Object, success_distance: float = 0.1, success_time: float = 0.5) -> bool:
+    def termination_condition(
+        self, object: Object, target: Object, success_distance: float = 0.1, success_time: float = 0.5
+    ) -> bool:
         """Checks if the human hand is within reach of the object for at least `success_time` seconds."""
         target_pos = target.pose().pos
-        ee_pos = self.env.robot.arm.ee_pose().pos
-        if np.linalg.norm(target_pos[:2] - ee_pos[:2]) < success_distance:
+        obj_pos = object.pose().pos
+        if np.linalg.norm(target_pos - obj_pos) < success_distance:
             self.success_counter += 1
         else:
             self.success_counter = 0

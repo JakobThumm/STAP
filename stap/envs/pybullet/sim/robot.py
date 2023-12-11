@@ -160,6 +160,7 @@ class Robot(body.Body):
         timeout: Optional[float] = None,
         check_collisions: Sequence[int] = [],
         check_collision_freq: int = 10,
+        precision: Optional[float] = 1e-3,
     ) -> bool:
         """Uses opspace control to go to the desired pose.
 
@@ -189,7 +190,9 @@ class Robot(body.Body):
                 link_ids_a.append(None)
 
         # Set the pose goal.
-        self.arm.set_pose_goal(pos, quat, pos_gains, ori_gains, timeout)
+        success = self.arm.set_pose_goal(pos, quat, pos_gains, ori_gains, timeout, precision)
+        if not success:
+            raise ControlException(f"Could not resolve inverse kinematics for ({pos}, {quat}).")
 
         # Simulate until the pose goal is reached.
         status = self.arm.update_torques(self._sim_time)
@@ -233,6 +236,7 @@ class Robot(body.Body):
         pos_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         ori_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         timeout: Optional[float] = None,
+        precision: Optional[float] = 1e-3,
         update_pose_every: Optional[int] = 5,
         check_collisions: Sequence[int] = [],
         check_collision_freq: int = 10,
@@ -248,6 +252,7 @@ class Robot(body.Body):
             pos_gains: (kp, kv) gains or [3 x 2] array of xyz gains.
             ori_gains: (kp, kv) gains or [3 x 2] array of xyz gains.
             timeout: Uses the timeout specified in the yaml arm config if None.
+            precision: Precision for IK algorithm.
             update_pose_every: Iteration interval with which to update the target pose.
             check_collisions: Raise an exception if the gripper or grasped
                 object collides with any of the body_ids in this list.
@@ -269,16 +274,19 @@ class Robot(body.Body):
         # Simulate until the pose goal is reached.
         status = articulated_body.ControlStatus.IN_PROGRESS
         iter = 0
+        # self.arm.set_prior_to_current()
         while status == articulated_body.ControlStatus.IN_PROGRESS:
             if iter % update_pose_every == 0:
                 pose = pose_fn()
                 new_timeout = timeout - iter * SIMULATION_TIME_STEP if timeout is not None else None
-                self.arm.set_pose_goal(
+                success = self.arm.set_pose_goal(
                     pos=pose.pos,
                     quat=pose.quat,
                     pos_gains=pos_gains,
                     ori_gains=ori_gains,
                     timeout=new_timeout,
+                    precision=precision,
+                    use_prior=True,
                 )
             status = self.arm.update_torques(self._sim_time)
             if status == articulated_body.ControlStatus.ABORTED:
@@ -437,5 +445,18 @@ class Robot(body.Body):
         T_obj_to_ee = T_ee_to_world.inverse() * T_obj_to_world
         self.set_load(obj.inertia * T_obj_to_ee)
 
+        return True
+        return True
+        return True
+        return True
+        return True
+        return True
+        return True
+        return True
+        return True
+        return True
+        return True
+        return True
+        return True
         return True
         return True

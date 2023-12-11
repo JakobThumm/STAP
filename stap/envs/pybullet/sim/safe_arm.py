@@ -129,8 +129,10 @@ class SafeArm(Arm):
         pos_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         ori_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         timeout: Optional[float] = None,
+        precision: Optional[float] = 1e-3,
         ignore_last_half_rotation: bool = True,
-    ) -> None:
+        use_prior: bool = False,
+    ) -> bool:
         """Sets the pose goal.
 
         To actually control the robot, call `Arm.update_torques()`.
@@ -141,21 +143,32 @@ class SafeArm(Arm):
             pos_gains: Not used here.
             ori_gains: Not used here.
             timeout: Not used here.
+            precision: Precision for IK algorithm.
             ignore_last_half_rotation: Ignores rotation around the last joint that are larger than 180 degrees.
                 They are clipped back to the range [-pi, pi] by the modulo(alpha, pi) operator.
+            use_prior: Use the joint configuration from the last IK cycle to start the IK solver from.
+        Returns:
+            True if the goal is set successfully.
         """
         if pos is None:
-            return
+            return False
         if quat is None:
             quat = np.array([0, 0, 0, 1])
         q, _ = self.get_joint_state(self.torque_joints)
-        desired_q_pos, success = self.inverse_kinematics(pos, quat, ignore_last_half_rotation)
+        prior = self._prior if use_prior else None
+        desired_q_pos, success = self.inverse_kinematics(
+            pos=pos, quat=quat, precision=precision, ignore_last_half_rotation=ignore_last_half_rotation, prior=prior
+        )
+        if not success:
+            return False
+        self._prior = desired_q_pos
         # Set the desired joint position as new goal for sara-shield
         self._shield.set_goal(desired_q_pos)
         if timeout is None:
             timeout = self.timeout
         self._arm_state.iter_timeout = int(timeout / SIMULATION_TIME_STEP)
         self._arm_state.torque_control = True
+        return True
 
     def update_torques(self, time: Optional[float] = None) -> articulated_body.ControlStatus:
         """Computes and applies the torques to control the articulated body to the goal set with `Arm.set_pose_goal().
@@ -166,11 +179,14 @@ class SafeArm(Arm):
         assert time is not None
         if not self._arm_state.torque_control:
             return articulated_body.ControlStatus.UNINITIALIZED
-
+        # Return timeout.
+        if self._arm_state.iter_timeout <= 0:
+            return articulated_body.ControlStatus.TIMEOUT
         self.ab.q, self.ab.dq = self.get_joint_state(self.torque_joints)
 
         if (self._q_limits[0] >= self.ab.q).any() or (self.ab.q >= self._q_limits[1]).any():
-            return articulated_body.ControlStatus.ABORTED
+            print("Out of joint limits!")
+            # return articulated_body.ControlStatus.ABORTED
 
         # Step sara-shield to get desired pos, vel, acc
         ddq_desired, qpos_desired, qvel_desired = self._shield.step(self.ab.q, self.ab.dq, time)
@@ -200,9 +216,6 @@ class SafeArm(Arm):
         # Only count safe steps towards timeout.# Get current orientation.
         if self._shield.get_safety():
             self._arm_state.iter_timeout -= 1
-        # Return timeout.
-        if self._arm_state.iter_timeout <= 0:
-            return articulated_body.ControlStatus.TIMEOUT
 
         return articulated_body.ControlStatus.IN_PROGRESS
 
@@ -247,3 +260,26 @@ class SafeArm(Arm):
     @property
     def visualization_initialized(self) -> bool:
         return self._visualization_initialized
+
+    @property
+    def base_pos(self) -> np.ndarray:
+        return np.array(self._base_pos)
+
+    @property
+    def base_orientation(self) -> np.ndarray:
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)
+        return np.array(self._base_orientation)

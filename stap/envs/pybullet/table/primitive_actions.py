@@ -250,7 +250,8 @@ class PushAction(PrimitiveAction):
 class HandoverAction(PrimitiveAction):
     RANGES = {
         "pitch": (-np.pi, 0),
-        "distance": (0.0, 0.2),
+        "distance": (0.2, 1.0),
+        "height": (0.1, 0.5),
     }
 
     def __init__(
@@ -258,12 +259,15 @@ class HandoverAction(PrimitiveAction):
         vector: Optional[np.ndarray] = None,
         pitch: Optional[float] = None,
         distance: Optional[float] = None,
+        height: Optional[float] = None,
     ):
         super().__init__(vector)
         if pitch is not None:
             self.pitch = pitch  # type: ignore
         if distance is not None:
             self.distance = distance  # type: ignore
+        if height is not None:
+            self.height = height  # type: ignore
 
     @property
     def pitch(self) -> np.ndarray:
@@ -281,5 +285,19 @@ class HandoverAction(PrimitiveAction):
     def distance(self, distance: np.ndarray) -> None:
         self.vector[..., 1] = distance
 
+    @property
+    def height(self) -> np.ndarray:
+        return self.vector[..., 2]
+
+    @height.setter
+    def height(self, height: np.ndarray) -> None:
+        self.vector[..., 2] = height
+
     def __repr__(self) -> str:
-        return "Place {\n" f"    pitch: {self.pitch},\n" f"    distance: {self.distance},\n" "}"
+        return (
+            "Place {\n"
+            f"    pitch: {self.pitch},\n"
+            f"    distance: {self.distance},\n"
+            f"    distance: {self.height},\n"
+            "}"
+        )

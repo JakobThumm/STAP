@@ -111,6 +111,7 @@ class Arm(articulated_body.ArticulatedBody):
         )
 
         self._arm_state = ArmState()
+        self._prior = self.q_home
         self.reset(time=0.0)
 
     @property
@@ -137,7 +138,9 @@ class Arm(articulated_body.ArticulatedBody):
         pos_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         ori_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         timeout: Optional[float] = None,
-    ) -> None:
+        precision: Optional[float] = 1e-3,
+        use_prior: bool = False,
+    ) -> bool:
         """Sets the pose goal.
 
         To actually control the robot, call `Arm.update_torques()`.
@@ -148,6 +151,7 @@ class Arm(articulated_body.ArticulatedBody):
             pos_gains: (kp, kv) gains or [3 x 2] array of xyz gains.
             ori_gains: (kp, kv) gains or [3 x 2] array of xyz gains.
             timeout: Uses the timeout specified in the yaml arm config if None.
+            use_prior: Not used here.
         """
         if pos is not None:
             self._arm_state.pos_des = pos
@@ -165,6 +169,7 @@ class Arm(articulated_body.ArticulatedBody):
         self._arm_state.w_avg = 1.0
         self._arm_state.iter_timeout = int(timeout / SIMULATION_TIME_STEP)
         self._arm_state.torque_control = True
+        return True
 
     def get_joint_state(self, joints: List[int]) -> Tuple[np.ndarray, np.ndarray]:
         """Gets the position and velocities of the given joints.
@@ -207,12 +212,44 @@ class Arm(articulated_body.ArticulatedBody):
         quat_ee = quat_ee_to_world * self.quat_home.inverse()
         return math.Pose(T_ee_to_world.translation, quat_ee.coeffs)
 
+    def check_joint_limits(self, q: np.ndarray, ignore_last_half_rotation: bool = False) -> bool:
+        """Checks whether the given joint configuration is within the joint limits.
+
+        Args:
+            q: Joint configuration to check.
+            ignore_last_half_rotation: Ignores rotation around the last joint that are larger than 180 degrees.
+                They are clipped back to the range [-pi, pi] by the modulo(alpha, pi) operator.
+        """
+        n_joints = q.shape[0]
+        last_rot = q[n_joints - 1]
+        upper_limit = self._upper_limit[n_joints - 1] if self._upper_limit is not None else np.pi
+        if ignore_last_half_rotation and abs(last_rot) > upper_limit:
+            # Last joint is rotating end-effector, so we can ignore 180 degree rotation.
+            q[n_joints - 1] = last_rot - np.sign(last_rot) * np.pi
+        if (
+            self._upper_limit is not None
+            and self._lower_limit is not None
+            and (not np.all(q >= self._lower_limit) or not np.all(q <= self._upper_limit))
+        ):
+            return False
+        return True
+
+    def reset_joint_state(self, q: Union[List[float], np.ndarray]):
+        """Resets the joint state to the given configuration."""
+        if isinstance(q, list):
+            q = np.array(q)
+        assert q.shape[0] <= self.q_home.shape[0]
+        for i in range(q.shape[0]):
+            p.resetJointState(self.body_id, i, q[i])
+
     def accurate_calculate_inverse_kinematics(
         self,
         target_pos: np.ndarray,
         target_quat: Optional[Union[eigen.Quaterniond, np.ndarray]] = None,
         precision: Optional[float] = 1e-3,
         max_iter: int = 5,
+        prior: Optional[np.ndarray] = None,
+        ignore_last_half_rotation: bool = False,
     ) -> Tuple[np.ndarray, bool]:
         current_q, _ = self.get_joint_state(self.torque_joints)
         use_nullspace = not (self._lower_limit is None or self._upper_limit is None or self._joint_ranges_ns is None)
@@ -222,6 +259,8 @@ class Arm(articulated_body.ArticulatedBody):
         iter = 0
         dist2 = 1e30
         desired_q_pos = np.zeros((n_joints,))
+        if prior is not None:
+            self.reset_joint_state(prior)
         while not close_enough and iter < max_iter:
             desired_q_pos = np.array(
                 p.calculateInverseKinematics(
@@ -236,16 +275,16 @@ class Arm(articulated_body.ArticulatedBody):
                 )
             )
             desired_q_pos = desired_q_pos[:n_joints]
-            for i in range(n_joints):
-                p.resetJointState(self.body_id, i, desired_q_pos[i])
+            if not self.check_joint_limits(desired_q_pos, ignore_last_half_rotation):
+                desired_q_pos = np.clip(desired_q_pos, self._lower_limit, self._upper_limit)
+            self.reset_joint_state(desired_q_pos)
             ls = p.getLinkState(self.body_id, self.end_effector_id)
             newPos = ls[4]
             diff = [target_pos[0] - newPos[0], target_pos[1] - newPos[1], target_pos[2] - newPos[2]]
-            dist2 = diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]
+            dist2 = np.linalg.norm(diff)
             close_enough = dist2 < precision if precision is not None else True
             iter = iter + 1
-        for i in range(n_joints):
-            p.resetJointState(self.body_id, i, current_q[i])
+        self.reset_joint_state(current_q)
         return desired_q_pos, close_enough
 
     def inverse_kinematics(
@@ -255,6 +294,7 @@ class Arm(articulated_body.ArticulatedBody):
         ignore_last_half_rotation: bool = True,
         precision: Optional[float] = 1e-3,
         max_iter: int = 5,
+        prior: Optional[np.ndarray] = None,
     ) -> Tuple[np.ndarray, bool]:
         """Computes a suitable joint configuration to achieve the given end-effector pose.
 
@@ -265,6 +305,7 @@ class Arm(articulated_body.ArticulatedBody):
                 They are clipped back to the range [-pi, pi] by the modulo(alpha, pi) operator.
             precision: Precision of the solution acceptance.
             max_iter: Max. number of iterations to compute the solution.
+            prior: Prior joint configuration to start the IK solver from.
         Returns:
             Joint configuration and whether the solution was accepted.
         """
@@ -282,22 +323,16 @@ class Arm(articulated_body.ArticulatedBody):
             quat = np.array([quat[3], -quat[2], -quat[1], -quat[0]])
         # Define current position and limits
         desired_q_pos, close_enough = self.accurate_calculate_inverse_kinematics(
-            target_pos=desired_ee_pos, target_quat=quat, precision=precision, max_iter=max_iter
+            target_pos=desired_ee_pos,
+            target_quat=quat,
+            precision=precision,
+            max_iter=max_iter,
+            prior=prior,
+            ignore_last_half_rotation=ignore_last_half_rotation,
         )
         if not close_enough:
             return desired_q_pos, False
-        last_rot = desired_q_pos[n_joints - 1]
-        upper_limit = self._upper_limit[n_joints - 1] if self._upper_limit is not None else np.pi
-        if ignore_last_half_rotation and abs(last_rot) > upper_limit:
-            # Last joint is rotating end-effector, so we can ignore 180 degree rotation.
-            desired_q_pos[n_joints - 1] = last_rot - np.sign(last_rot) * np.pi
-        if (
-            self._upper_limit is not None
-            and self._lower_limit is not None
-            and (not np.all(desired_q_pos >= self._lower_limit) or not np.all(desired_q_pos <= self._upper_limit))
-        ):
-            return desired_q_pos, False
-        return desired_q_pos, True
+        return desired_q_pos, self.check_joint_limits(desired_q_pos, ignore_last_half_rotation)
 
     def update_torques(self, time: Optional[float] = None) -> articulated_body.ControlStatus:
         """Computes and applies the torques to control the articulated body to the goal set with `Arm.set_pose_goal().
@@ -358,6 +393,14 @@ class Arm(articulated_body.ArticulatedBody):
             return articulated_body.ControlStatus.TIMEOUT
 
         return articulated_body.ControlStatus.IN_PROGRESS
+
+    def set_prior_to_home(self) -> None:
+        """Sets the prior to the current joint configuration."""
+        self._prior = self.q_home
+
+    def set_prior_to_current(self) -> None:
+        """Sets the prior to the current joint configuration."""
+        self._prior = self.ab.q
 
     def get_state(self) -> Dict[str, Any]:
         state = {

@@ -10,8 +10,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from stap.envs.pybullet.sim import body, shapes
+from stap.envs.pybullet.sim import body
 from stap.envs.pybullet.sim.math import Pose
+from stap.envs.pybullet.table.objects import Object
 
 
 class ControlException(Exception):
@@ -102,9 +103,10 @@ class Human(body.Body):
         self._body_measurement_ids = body_measurement_ids
         self._bodies = {}
         for body_name in body_names:
+            object_color = np.array([0.0, 0.0, 1.0, 1.0]) if "hand" in body_name else color
             object_kwargs = {
                 "name": body_name,
-                "color": np.array(color),
+                "color": np.array(object_color),
                 "radius": body_radii[body_name],
                 "length": body_lengths[body_name],
                 "is_active": True,
@@ -141,6 +143,17 @@ class Human(body.Body):
         run_step = int(run_time * self._recording_freq)
         animation_idx = run_step % self._animation.shape[0]
         return animation_idx
+        # return 700
+
+    def get_human_body_pose(self, time: float, name: str) -> Pose:
+        animation_idx = self.get_animation_idx(time)
+        if animation_idx is None:
+            return Pose(np.array([10.0, 0.0, 0.0]), np.array([0.0, 0.0, 0.0, 1.0]))
+        p1 = self._animation[animation_idx][self._body_measurement_ids[name][0]]
+        p2 = self._animation[animation_idx][self._body_measurement_ids[name][1]]
+        return calc_capsule_pose(
+            p1, p2, self._animation_info["position_offset"], self._animation_info["orientation_quat"]
+        )
 
     def animate(self, time: float) -> None:
         animation_idx = self.get_animation_idx(time)

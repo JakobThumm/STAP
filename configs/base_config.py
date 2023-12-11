@@ -1,15 +1,14 @@
-from typing import Literal, Optional, Dict
-
-import os
 import dataclasses
+import os
 from dataclasses import dataclass
 from functools import cached_property
+from typing import Dict, Literal, Optional
 
 
 @dataclass
 class PDDLConfig:
     domain_dir: str = "configs/pybullet/envs/official/template"
-    domain_file: str = "template_valid_domain.pddl"
+    domain_file: str = "template_human_domain.pddl"
     problem_dir: Optional[str] = None
     problem_subdir: Optional[str] = None
     instruction_dir: Optional[str] = None
@@ -55,9 +54,7 @@ class PDDLConfig:
 
     def get_instructions_file(self, problem_name: str) -> str:
         if self.instruction_dir is not None:
-            return os.path.join(
-                self.instruction_dir, problem_name + "_instructions.txt"
-            )
+            return os.path.join(self.instruction_dir, problem_name + "_instructions.txt")
         return os.path.join(self.domain_dir, problem_name + "_instructions.txt")
 
     def get_prompt_file(self, problem_name: str) -> str:
@@ -93,9 +90,7 @@ class PolicyDatasetGenerationConfig:
     gui: bool = False
     # Dataset generation configs.
     pddl_handler: Optional[PDDLConfig] = None
-    template_env_yaml: str = (
-        "configs/pybullet/envs/official/template/template_env.yaml"
-    )
+    template_env_yaml: str = "configs/pybullet/envs/official/template/human_template_env.yaml"
     primitive: Literal["pick", "place", "push", "pull"] = "pick"
     symbolic_action_type: Literal["valid", "invalid"] = "valid"
     save_env_config: bool = False
@@ -105,9 +100,9 @@ class PolicyDatasetGenerationConfig:
             "rack": "receptacle",
             "hook": "tool",
             "milk": "box",
-            "yogurt": "box",
+            # "yogurt": "box",
             "icecream": "box",
-            "salt": "box",
+            # "salt": "box",
         }
     )
 
@@ -121,9 +116,7 @@ class PolicyDatasetGenerationConfig:
 
     @property
     def env_root_dir(self) -> str:
-        path = os.path.join(
-            "configs/pybullet/envs/official/primitives", self.exp_name
-        )
+        path = os.path.join("configs/pybullet/envs/official/primitives", self.exp_name)
         return path
 
     @property

@@ -137,7 +137,9 @@ class Arm(sim_arm.Arm):
         pos_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         ori_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         timeout: Optional[float] = None,
-    ) -> None:
+        precision: Optional[float] = 1e-3,
+        use_prior: bool = False,
+    ) -> bool:
         super().set_pose_goal(pos, quat, pos_gains, ori_gains, timeout)
 
         pub_command = {
@@ -156,6 +158,7 @@ class Arm(sim_arm.Arm):
 
         self._redis_sub.subscribe(self._redis_keys.control_pub_status)
         self._redis.publish(self._redis_keys.control_pub_command, json.dumps(pub_command))
+        return True
 
     def set_configuration_goal(
         self, q: np.ndarray, skip_simulation: bool = False, time: Optional[float] = None
