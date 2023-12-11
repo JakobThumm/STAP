@@ -67,7 +67,9 @@ class SafeArm(Arm):
     def reset(self, time: Optional[float] = None, qpos: Optional[Union[np.ndarray, List[float]]] = None) -> bool:
         """Disables torque control and resets the arm to the home configuration (bypassing simulation)."""
         super().reset(time=time, qpos=qpos)
-        return self.reset_shield(time=time)
+        # We don't need to reset the safety shield here, because the arm.reset() function
+        # calls set_configuration_goal() which resets the shield.
+        return True
 
     def reset_shield(self, time: Optional[float] = None) -> bool:
         """Resets the shield to the home configuration (bypassing simulation)."""

@@ -14,14 +14,15 @@ from stap.envs.pybullet.table.primitives import ACTION_CONSTRAINTS
 
 TABLE_CONSTRAINTS = {
     "table_z_max": 0.00,
-    "table_x_min": 0.28,
+    "table_x_min": 0.32,
     "table_y_min": -0.45,
     "table_y_max": 0.45,
     "workspace_x_min": 0.40,
     "operational_x_min": 0.50,
     "operational_x_max": 0.60,
     "obstruction_x_min": 0.575,
-    "workspace_radius": 0.70,
+    "workspace_min_radius": 0.40,
+    "workspace_max_radius": 0.80,
 }
 
 
@@ -181,10 +182,9 @@ def is_inworkspace(
     if distance is None:
         distance = float(np.linalg.norm(obj_pos))
 
-    if not (TABLE_CONSTRAINTS["workspace_x_min"] <= obj_pos[0] and distance < TABLE_CONSTRAINTS["workspace_radius"]):
-        return False
-
-    return True
+    return (
+        distance >= TABLE_CONSTRAINTS["workspace_min_radius"] and distance <= TABLE_CONSTRAINTS["workspace_max_radius"]
+    )
 
 
 def is_beyondworkspace(

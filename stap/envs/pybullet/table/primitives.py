@@ -73,7 +73,7 @@ def initialize_robot_pose(robot: Robot) -> bool:
     pos = np.append(xy, ACTION_CONSTRAINTS["max_lift_height"])
     aa = eigen.AngleAxisd(theta, np.array([0.0, 0.0, 1.0]))
     quat = eigen.Quaterniond(aa)
-    desired_qpos, success = robot.arm.inverse_kinematics(pos, quat)
+    desired_qpos, success = robot.arm.inverse_kinematics(pos, quat, precision=0.01)
     if success:
         robot.reset(qpos=desired_qpos)
         return True
