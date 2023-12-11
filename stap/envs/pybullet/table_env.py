@@ -18,7 +18,14 @@ from stap.envs.pybullet.real import object_tracker
 from stap.envs.pybullet.sim import robot
 from stap.envs.pybullet.table import object_state, predicates, utils
 from stap.envs.pybullet.table.objects import Null, Object, ObjectGroup
-from stap.envs.pybullet.table.primitives import Pick, Primitive, Pull, Push, initialize_robot_pose
+from stap.envs.pybullet.table.primitives import (
+    Pick,
+    Primitive,
+    Pull,
+    Push,
+    initialize_robot_pose,
+)
+from stap.envs.pybullet.table.utils import primitive_from_action_call
 from stap.envs.variant import VariantEnv
 from stap.utils import random as random_utils
 from stap.utils import recording
@@ -423,7 +430,7 @@ class TableEnv(PybulletEnv):
         policy_args: Optional[Any] = None,
     ) -> envs.Primitive:
         if action_call is not None:
-            return Primitive.from_action_call(action_call, self)
+            return primitive_from_action_call(action_call, self)
         elif idx_policy is not None and policy_args is not None:
             arg_indices = [
                 idx_obs - 1 if idx_obs > TableEnv.EE_OBSERVATION_IDX else idx_obs
@@ -433,7 +440,7 @@ class TableEnv(PybulletEnv):
             object_names = list(self.objects.keys())
             args = ", ".join(object_names[idx_obj] for idx_obj in arg_indices)
             action_call = f"{self.primitives[idx_policy]}({args})"
-            return Primitive.from_action_call(action_call, self)
+            return primitive_from_action_call(action_call, self)
         else:
             raise ValueError("One of action_call or (idx_policy, policy_args) must not be None.")
 
@@ -657,7 +664,7 @@ class TableEnv(PybulletEnv):
                 continue
 
             # Check state again after objects have settled.
-            num_iters = self.wait_until_stable(min_iters=10, max_iters=int(2 * SIMULATION_FREQUENCY))
+            num_iters = self.wait_until_stable(min_iters=20, max_iters=int(2 * SIMULATION_FREQUENCY))
             if num_iters == SIMULATION_FREQUENCY:
                 # Skip if settling takes longer than 1s.
                 dbprint(f"TableEnv.reset(seed={seed}): Failed to stabilize")
@@ -817,7 +824,7 @@ class TableEnv(PybulletEnv):
             and not self._is_any_object_touching_base()
             and not self._is_any_object_falling_off_parent()
         ):
-            self.robot.arm.update_torques()
+            self.robot.arm.update_torques(self._sim_time)
             self.robot.gripper.update_torques()
             self.step_simulation()
             num_iters += 1
@@ -984,84 +991,6 @@ class VariantTableEnv(VariantEnv, TableEnv):  # type: ignore
 
     def object_states(self) -> Dict[str, object_state.ObjectState]:
         return self.env.object_states()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
-        return self.env.wait_until_stable(min_iters, max_iters)
-
-    def step_simulation(self) -> None:
-        return self.env.step_simulation()
 
     def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3.0 / SIMULATION_TIME_STEP)) -> int:
         return self.env.wait_until_stable(min_iters, max_iters)

@@ -30,7 +30,7 @@ def main(env_config: str, seed: Optional[int] = None) -> None:
 
             # Sample action and step environment
             action = primitive.sample_action()
-            if isinstance(primitive, pybullet.table.primitives.Handover):
+            if isinstance(primitive, pybullet.table.primitives.StaticHandover):
                 action.pitch = -np.pi / 2
                 action.distance = 0.6
                 action.height = 0.3

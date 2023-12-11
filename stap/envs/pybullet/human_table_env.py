@@ -14,9 +14,10 @@ from stap.envs.pybullet.sim.human import Human
 from stap.envs.pybullet.sim.safe_arm import SafeArm
 from stap.envs.pybullet.table import object_state, utils
 from stap.envs.pybullet.table.primitives import Primitive
+from stap.envs.pybullet.table.utils import primitive_from_action_call
 from stap.envs.pybullet.table_env import TableEnv
 from stap.utils.animation_utils import load_human_animation_data
-from stap.utils.macros import SIMULATION_FREQUENCY, SIMULATION_TIME_STEP
+from stap.utils.macros import SIMULATION_TIME_STEP
 
 dbprint = lambda *args: None  # noqa
 # dbprint = print
@@ -110,7 +111,7 @@ class HumanTableEnv(TableEnv):
         policy_args: Optional[Any] = None,
     ) -> envs.Primitive:
         if action_call is not None:
-            return Primitive.from_action_call(action_call, self)
+            return primitive_from_action_call(action_call, self)
         elif idx_policy is not None and policy_args is not None:
             arg_indices = [
                 idx_obs - 1 if idx_obs > TableEnv.EE_OBSERVATION_IDX else idx_obs
@@ -120,7 +121,7 @@ class HumanTableEnv(TableEnv):
             object_names = list(self.objects.keys())
             args = ", ".join(object_names[idx_obj] for idx_obj in arg_indices)
             action_call = f"{self.primitives[idx_policy]}({args})"
-            return Primitive.from_action_call(action_call, self)
+            return primitive_from_action_call(action_call, self)
         else:
             raise ValueError("One of action_call or (idx_policy, policy_args) must not be None.")
 
@@ -180,34 +181,6 @@ class HumanTableEnv(TableEnv):
         if len(human_contact_points) > 0:
             stop = True
         return self._sim_time
-
-    def wait_until_stable(self, min_iters: int = 0, max_iters: int = int(3 * SIMULATION_FREQUENCY)) -> int:
-        IS_MOVING_KEY = "TableEnv.wait_until_stable"
-
-        def is_any_object_moving() -> bool:
-            return any(
-                not obj.is_static and utils.is_moving(obj, use_history=IS_MOVING_KEY) for obj in self.real_objects()
-            )
-
-        # Reset history for `utils.is_moving()`.
-        utils.TWIST_HISTORY[IS_MOVING_KEY].clear()
-
-        num_iters = 0
-        while (
-            num_iters == 0  # Need to step at least once to update collisions.
-            or num_iters < max_iters
-            and (num_iters < min_iters or is_any_object_moving())
-            and not self._is_any_object_below_table()
-            and not self._is_any_object_touching_base()
-            and not self._is_any_object_falling_off_parent()
-        ):
-            self.robot.arm.update_torques(self._sim_time)
-            self.robot.gripper.update_torques()
-            self.step_simulation()
-            num_iters += 1
-
-        # print("TableEnv.wait_until_stable: {num_iters}")
-        return num_iters
 
     def render(self) -> np.ndarray:  # type: ignore
         img = super().render()

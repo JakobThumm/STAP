@@ -5,7 +5,6 @@ from typing import Callable, Dict, List, NamedTuple, Optional, Type, Union
 
 import gym
 import numpy as np
-import symbolic
 from ctrlutils import eigen
 from scipy.spatial.transform import Rotation
 
@@ -215,21 +214,6 @@ class Primitive(envs.Primitive, abc.ABC):
             return False
 
         return did_non_args_move
-
-    @staticmethod
-    def from_action_call(action_call: str, env: envs.Env) -> "Primitive":
-        from stap.envs.pybullet.table_env import TableEnv
-
-        assert isinstance(env, TableEnv)
-
-        name, arg_names = symbolic.parse_proposition(action_call)
-        if len(arg_names) == 1 and arg_names[0] == "":
-            arg_names = []
-        arg_objects = [env.objects[obj_name] for obj_name in arg_names]
-
-        primitive_class = globals()[name.capitalize()]
-        idx_policy = env.primitives.index(name)
-        return primitive_class(env=env, idx_policy=idx_policy, arg_objects=arg_objects)
 
     def __eq__(self, other) -> bool:
         if isinstance(other, Primitive):
@@ -458,8 +442,9 @@ class Place(Primitive):
 class Handover(Primitive):
     """Handover primitive.
 
-    The action is two-dimensional, where the first dimension is the pitch angle of the end-effector and the second
-    dimension is the distance to the human hand.
+    The action is three-dimensional, where the first dimension is the pitch angle of the end-effector, the second
+    dimension is the distance to the human hand, and third dimension is the height at which the object should be handed
+    over. The distance hereby defines the distance in which we switch from a close handover to a far handover.
     The robot will always try to move to a position, such that the end-effector is pointing towards the human hand.
     E.g, pitch=0: e   pitch=pi/2: x <----- e
                   |                 |-----|
@@ -591,6 +576,137 @@ class Handover(Primitive):
         return math.Pose(command_pos, command_quat)
 
     def command_pose_far(
+        self,
+        action: primitive_actions.HandoverAction,
+        target: Object,
+        additional_offset: Optional[np.ndarray] = None,
+    ) -> math.Pose:
+        if additional_offset is None:
+            additional_offset = np.zeros(3)
+        # Get target pose.
+        target_pos = target.pose().pos
+        target_pos[2] = action.height
+        base_pos = self.env.robot.arm.base_pos + additional_offset
+        # The yaw angle is defined as the angle between the current end-effector position and the target position on the x-y plane.
+        yaw = np.arctan2(target_pos[1] - base_pos[1], target_pos[0] - base_pos[0])
+        pitch = action.pitch
+        height = min(target_pos[2] - base_pos[2], action.distance)
+        phi = np.arcsin(height / action.distance)
+        command_pos = base_pos + np.array(
+            [np.cos(phi) * action.distance * np.cos(yaw), np.cos(phi) * action.distance * np.sin(yaw), height]
+        )
+        rot = Rotation.from_euler("ZY", [yaw, pitch])  # type: ignore
+        command_quat = eigen.Quaterniond(rot.as_quat())
+        return math.Pose(command_pos, command_quat)
+
+    def termination_condition(
+        self, object: Object, target: Object, success_distance: float = 0.1, success_time: float = 0.5
+    ) -> bool:
+        """Checks if the human hand is within reach of the object for at least `success_time` seconds."""
+        target_pos = target.pose().pos
+        obj_pos = object.pose().pos
+        if np.linalg.norm(target_pos - obj_pos) < success_distance:
+            self.success_counter += 1
+        else:
+            self.success_counter = 0
+        if self.success_counter * SIMULATION_TIME_STEP >= success_time:
+            return True
+        else:
+            return False
+
+    def sample_action(self) -> primitive_actions.PrimitiveAction:
+        return self.Action.random()
+
+    @classmethod
+    def action(cls, action: np.ndarray) -> primitive_actions.PrimitiveAction:
+        return primitive_actions.PlaceAction(action)
+
+
+class StaticHandover(Primitive):
+    """Handover primitive that is not adapting to the human.
+
+    The action is three-dimensional, where the first dimension is the pitch angle of the end-effector, the second
+    dimension is the distance to the human hand, and third dimension is the height at which the object should be handed
+    over. The distance hereby defines the distance in which the EEF should be placed from the base.
+    The robot will always try to move to a position, such that the end-effector is pointing towards the human hand.
+    E.g, pitch=0: e   pitch=pi/2: x <----- e
+                  |                 |-----|
+                  v                   dist
+                  x
+    """
+
+    action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(3,))
+    action_scale = gym.spaces.Box(*primitive_actions.HandoverAction.range())
+    Action = primitive_actions.HandoverAction
+    ALLOW_COLLISIONS = False
+
+    def execute(self, action: np.ndarray, real_world: bool = False, verbose: bool = False) -> ExecutionResult:
+        from stap.envs.pybullet.human_table_env import HumanTableEnv
+
+        assert isinstance(self.env, HumanTableEnv)
+
+        SUCCESS_DISTANCE = 0.6
+        SUCCESS_TIME = 1.0
+        TIMEOUT = 10
+        ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
+        # Never update pos
+        UPDATE_POS_EVERY = int(SIMULATION_FREQUENCY * TIMEOUT)
+        PRECISION = 0.1
+
+        success = False
+        self.success_counter = 0
+        # Parse action.
+        a = primitive_actions.HandoverAction(self.scale_action(action))
+        dbprint(a)
+
+        obj, target = self.arg_objects
+        objects = self.env.objects
+        robot = self.env.robot
+        allow_collisions = self.ALLOW_COLLISIONS or real_world
+        if not allow_collisions:
+            did_non_args_move = self.create_object_movement_check(objects=objects)
+        try:
+            pose_fn = partial(self.calculate_command_pose, a, target, ADDITIONAL_OFFSET)
+            termination_fn = partial(self.termination_condition, obj, target, SUCCESS_DISTANCE, SUCCESS_TIME)
+            robot.arm.set_prior_to_home()
+            success = robot.goto_dynamic_pose(
+                pose_fn=pose_fn,
+                termination_fn=termination_fn,
+                update_pose_every=UPDATE_POS_EVERY,
+                timeout=TIMEOUT,
+                precision=PRECISION,
+                check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
+            )
+            if not success or (not allow_collisions and did_non_args_move()):
+                if verbose:
+                    print("Robot.goto_dynamic_pose() failed")
+                raise ControlException("Robot.goto_dynamic_pose() failed")
+
+            robot.grasp(0)
+            # Once the gripper is opened, we assume the handover was a success.
+            success = True
+            if not allow_collisions and did_non_args_move():
+                if verbose:
+                    print("Robot.grasp(0) collided")
+                raise ControlException("Robot.grasp(0) collided")
+
+            robot.goto_pose(self.env.robot.arm.home_pose.pos, self.env.robot.arm.home_pose.quat)
+            if not allow_collisions and did_non_args_move():
+                if verbose:
+                    print("Robot.goto_pose(pre_pos, command_quat) collided")
+                raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
+        except ControlException as e:
+            # If robot fails before grasp(0), object may still be grasped.
+            dbprint("Place.execute():\n", e)
+            if verbose:
+                print("Place.execute():\n", e)
+            return ExecutionResult(success=False, truncated=True)
+
+        self.env.wait_until_stable()
+
+        return ExecutionResult(success=success, truncated=False)
+
+    def calculate_command_pose(
         self,
         action: primitive_actions.HandoverAction,
         target: Object,
@@ -939,3 +1055,15 @@ class Stop(Primitive):
     def sample_action(self) -> primitive_actions.PrimitiveAction:
         return np.ones(1)
         return np.ones(1)
+
+
+PRIMITIVE_MATCHING = {
+    "pick": Pick,
+    "place": Place,
+    "pull": Pull,
+    "handover": Handover,
+    "static_handover": StaticHandover,
+    "push": Push,
+    "null": Null,
+    "stop": Stop,
+}

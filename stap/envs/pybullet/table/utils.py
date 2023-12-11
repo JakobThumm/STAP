@@ -4,13 +4,19 @@ from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pybullet as p
+import symbolic
 import yaml
 from ctrlutils import eigen
 from shapely.geometry import Polygon
 
+import stap.envs.base as envs
 from stap.envs.pybullet.sim import body, math
 from stap.envs.pybullet.table.objects import Object
-from stap.envs.pybullet.table.primitives import ACTION_CONSTRAINTS
+from stap.envs.pybullet.table.primitives import (
+    ACTION_CONSTRAINTS,
+    PRIMITIVE_MATCHING,
+    Primitive,
+)
 
 TABLE_CONSTRAINTS = {
     "table_z_max": 0.00,
@@ -27,6 +33,21 @@ TABLE_CONSTRAINTS = {
 
 
 EPSILONS = {"aabb": 0.05, "align": 0.99, "twist": 0.001, "tipping": 0.1}
+
+
+def primitive_from_action_call(action_call: str, env: envs.Env) -> Primitive:
+    from stap.envs.pybullet.table_env import TableEnv
+
+    assert isinstance(env, TableEnv)
+
+    name, arg_names = symbolic.parse_proposition(action_call)
+    if len(arg_names) == 1 and arg_names[0] == "":
+        arg_names = []
+    arg_objects = [env.objects[obj_name] for obj_name in arg_names]
+
+    primitive_class = PRIMITIVE_MATCHING[name]
+    idx_policy = env.primitives.index(name)
+    return primitive_class(env=env, idx_policy=idx_policy, arg_objects=arg_objects)
 
 
 def compute_margins(obj: Object, sim: bool = True) -> np.ndarray:

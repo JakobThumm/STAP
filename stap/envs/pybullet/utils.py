@@ -1,6 +1,6 @@
 import ctypes
-import sys
 import os
+import sys
 
 
 class RedirectStream(object):
