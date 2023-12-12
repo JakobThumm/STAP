@@ -1,4 +1,4 @@
-env: pybullet.TableEnv
+env: pybullet.HumanTableEnv
 env_kwargs:
   name: place
   gui: true
@@ -111,7 +111,7 @@ env_kwargs:
         - on(rack_box_4, rack)
         - ingripper(rack_hook)
 
-  robot_config: configs/pybullet/envs/robots/franka_panda_sim.yaml
+  robot_config: configs/pybullet/envs/robots/safe_franka_panda_sim.yaml
 
   object_groups:
     - name: boxes

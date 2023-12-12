@@ -99,6 +99,15 @@ def num_ingripper(state: Union[List[str], Set[str]]) -> int:
     return count
 
 
+def num_inhand(state: Union[List[str], Set[str]]) -> int:
+    """Count the number of objects in the human hand."""
+    count = 0
+    for predicate in state:
+        if "inhand" in predicate:
+            count += 1
+    return count
+
+
 def is_hook_on_rack(state: Union[List[str], Set[str]]) -> bool:
     """Return True if state has a hook on a rack."""
     for predicate in state:
@@ -122,7 +131,9 @@ def generate_symbolic_states(
     """
     movable_objects = [obj for obj, obj_type in object_types.items() if obj_type in MOVABLE_TYPES]
     unmovable_objects = [obj for obj, obj_type in object_types.items() if obj_type in UNMOVABLE_TYPES]
-    locations = ["nonexistent($movable)", "ingripper($movable)"] + [f"on($movable, {obj})" for obj in unmovable_objects]
+    locations = ["nonexistent($movable)", "ingripper($movable)", "inhand($movable)"] + [
+        f"on($movable, {obj})" for obj in unmovable_objects
+    ]
 
     # Store possible locations of objects.
     object_locations: Dict[str, List[Set[str]]] = defaultdict(list)
@@ -140,7 +151,7 @@ def generate_symbolic_states(
     symbolic_states: List[List[str]] = []
     for state in itertools.product(*object_locations.values()):
         state = set.union(*state)
-        if num_ingripper(state) > 1 or (not hook_on_rack and is_hook_on_rack(state)):
+        if num_ingripper(state) > 1 or (not hook_on_rack and is_hook_on_rack(state)) or num_inhand(state) > 1:
             continue
 
         # Filter out nonexistent predicates.

@@ -11,6 +11,7 @@
 	(:constants table - unmovable)
 	(:predicates
 		(ingripper ?a - movable)
+        (inhand ?a - movable)
 		(on ?a - movable ?b - unmovable)
 		(inworkspace ?a - physobj)
 		(beyondworkspace ?a - physobj)
@@ -23,9 +24,22 @@
 		:precondition (and
 			(exists (?b - unmovable) (on ?a ?b))
 			(forall (?b - movable) (not (ingripper ?b)))
+            (not (inhand ?a))
 		)
 		:effect (and
 			(ingripper ?a)
+			(forall (?b - unmovable) (not (on ?a ?b)))
+		)
+	)
+    (:action static_handover
+		:parameters (?a - movable ?b - receptacle)
+		:precondition (and
+			(ingripper ?a)
+			(forall (?c - movable) (not (inhand ?c)))
+		)
+		:effect (and
+			(not (ingripper ?a))
+            (inhand ?a)
 			(forall (?b - unmovable) (not (on ?a ?b)))
 		)
 	)
@@ -33,6 +47,7 @@
 		:parameters (?a - movable ?b - unmovable)
 		:precondition (and
 			(not (= ?a ?b))
+            (not (inhand ?a))
 			(ingripper ?a)
 		)
 		:effect (and
@@ -40,28 +55,4 @@
 			(on ?a ?b)
 		)
 	)
-	(:action pull
-		:parameters (?a - box ?b - tool)
-		:precondition (and
-			(not (= ?a ?b))
-			(ingripper ?b)
-			(on ?a table)
-		)
-		:effect (and
-			(inworkspace ?a)
-		)
-	)
-    (:action push
-        :parameters (?a - box ?b - tool ?c - receptacle)
-        :precondition (and
-            (ingripper ?b)
-            (on ?a table)
-            (not (under ?a ?c))
-			(beyondworkspace ?c)
-        )
-        :effect (and
-            (under ?a ?c)
-			(beyondworkspace ?a)
-        )
-    )
 )
