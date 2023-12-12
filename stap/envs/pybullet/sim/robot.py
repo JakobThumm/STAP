@@ -395,8 +395,8 @@ class Robot(body.Body):
         status = self.gripper.update_torques()
         while status == articulated_body.ControlStatus.IN_PROGRESS:
             self.arm.update_torques(time=self._sim_time)
-            self.step_simulation()
             status = self.gripper.update_torques()
+            self.step_simulation()
         # print("Robot.grasp:", command, status)
 
         if status == articulated_body.ControlStatus.ABORTED:
@@ -449,7 +449,8 @@ class Robot(body.Body):
             # Make sure fingers aren't fully closed.
             if status == articulated_body.ControlStatus.POS_CONVERGED:
                 return False
-
+        else:
+            self.grasp(1, pos_gains, timeout)
         # Lock the object in place with a grasp constraint.
         if not self.gripper.create_grasp_constraint(obj.body_id, realistic):
             return False

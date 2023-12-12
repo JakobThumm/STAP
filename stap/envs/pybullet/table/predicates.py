@@ -3,9 +3,9 @@ import random
 from typing import Dict, List, Optional, Sequence, Tuple, Type
 
 import numpy as np
-import pybullet as p
 import symbolic
 from ctrlutils import eigen
+from scipy.spatial.transform import Rotation
 from shapely.geometry import LineString, Polygon
 
 from stap.envs.pybullet.sim import math
@@ -586,6 +586,7 @@ class InOodZone(Predicate, TableBounds):
 
 class Ingripper(Predicate):
     MAX_GRASP_ATTEMPTS = 1
+    SAMPLE_OFFSET = np.array([0.0, 0.0, 0.0])
 
     def sample(self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]) -> bool:
         """Samples a geometric grounding of the InHand(a) predicate."""
@@ -600,19 +601,23 @@ class Ingripper(Predicate):
                 handlegrasp=f"handlegrasp({obj})" in state,
                 upperhandlegrasp=f"upperhandlegrasp({obj})" in state,
             )
+            ee_pose = robot.arm.ee_pose(update=True)
+            rot = Rotation.from_quat(ee_pose.quat)
             obj_pose = math.Pose.from_eigen(grasp_pose.to_eigen().inverse())
-            obj_pose.pos += robot.home_pose.pos
-
+            obj_pose.pos = ee_pose.pos - robot.arm.ee_offset + Ingripper.SAMPLE_OFFSET
+            rot_obj = Rotation.from_quat(obj_pose.quat)
+            obj_pose.quat = Rotation.as_quat(rot_obj * rot)
             # Use fake grasp.
+            obj.freeze()
             obj.disable_collisions()
             obj.set_pose(obj_pose)
-            robot.grasp_object(obj, realistic=False)
+            robot.grasp_object(obj, realistic=False, timeout=10)
             obj.enable_collisions()
 
             # Make sure object isn't touching gripper.
             obj.unfreeze()
-            p.stepSimulation(physicsClientId=robot.physics_id)
-            if not utils.is_touching(obj, robot):
+            robot.step_simulation()
+            if utils.is_touching(obj, robot):
                 break
             elif i + 1 == Ingripper.MAX_GRASP_ATTEMPTS:
                 dbprint(f"{self}.sample():", False, "- exceeded max grasp attempts")
@@ -725,6 +730,75 @@ class Ingripper(Predicate):
             return False
 
         return utils.is_ingripper(obj, sim=sim)
+
+
+class Inhand(Predicate):
+    def sample(self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]) -> bool:
+        """Samples a geometric grounding of the InHand(a) predicate."""
+        obj = self.get_arg_objects(objects)[0]
+        if obj.is_static:
+            return True
+        # TODO: Human cannot grasp objects as of now.
+        return True
+
+    def value(
+        self,
+        objects: Dict[str, Object],
+        robot: Optional[Robot] = None,
+        state: Optional[Sequence["Predicate"]] = None,
+        sim: bool = True,
+    ) -> bool:
+        super().value(objects=objects, robot=robot, state=state)
+        raise NotImplementedError("InHand.value() is not yet implemented.")
+        obj = self.get_arg_objects(objects)[0]
+        if obj.isinstance(Null):
+            return False
+
+        return utils.is_ingripper(obj, sim=sim)
+
+    def value_simple(
+        self,
+        objects: Dict[str, Object],
+        robot: Optional[Robot] = None,
+        state: Optional[Sequence["Predicate"]] = None,
+        sim: bool = False,
+    ) -> bool:
+        raise NotImplementedError("InHand.value() is not yet implemented.")
+        obj = self.get_arg_objects(objects)[0]
+        if obj.isinstance(Null):
+            return False
+
+        return utils.is_ingripper(obj, sim=sim)
+
+
+class Accepting(Predicate):
+    """A predicate that indicates if the actor is accepting objects."""
+
+    def sample(self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]) -> bool:
+        """Samples a geometric grounding of the InHand(a) predicate."""
+        return True
+
+    def value(
+        self,
+        objects: Dict[str, Object],
+        robot: Optional[Robot] = None,
+        state: Optional[Sequence["Predicate"]] = None,
+        sim: bool = True,
+    ) -> bool:
+        super().value(objects=objects, robot=robot, state=state)
+        for predicate in state:  # type: ignore
+            if isinstance(predicate, Inhand):
+                return False
+        return True
+
+    def value_simple(
+        self,
+        objects: Dict[str, Object],
+        robot: Optional[Robot] = None,
+        state: Optional[Sequence["Predicate"]] = None,
+        sim: bool = False,
+    ) -> bool:
+        return self.value(objects=objects, robot=robot, state=state, sim=sim)
 
 
 class Under(Predicate):

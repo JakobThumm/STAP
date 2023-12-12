@@ -7,17 +7,19 @@
 		tool - movable
 		box - movable
 		receptacle - unmovable
+        actor - physobj
 	)
 	(:constants table - unmovable)
 	(:predicates
 		(ingripper ?a - movable)
         (inhand ?a - movable)
 		(on ?a - movable ?b - unmovable)
+        (accepting ?a - actor)
 		(inworkspace ?a - physobj)
 		(beyondworkspace ?a - physobj)
 		(under ?a - movable ?b - receptacle)
 		(aligned ?a - physobj)
-		(poslimit ?a - physobj)
+	    (poslimit ?a - physobj)
 	)
 	(:action pick
 		:parameters (?a - movable)
@@ -32,15 +34,15 @@
 		)
 	)
     (:action static_handover
-		:parameters (?a - movable ?b - receptacle)
+		:parameters (?a - movable ?b - actor)
 		:precondition (and
 			(ingripper ?a)
-			(forall (?c - movable) (not (inhand ?c)))
+			(accepting ?b)
 		)
 		:effect (and
 			(not (ingripper ?a))
             (inhand ?a)
-			(forall (?b - unmovable) (not (on ?a ?b)))
+			(not (accepting ?b))
 		)
 	)
 	(:action place

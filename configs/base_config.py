@@ -97,12 +97,14 @@ class PolicyDatasetGenerationConfig:
     object_types: Dict[str, str] = dataclasses.field(
         default_factory=lambda: {
             "table": "unmovable",
-            "rack": "receptacle",
+            "right_hand": "actor",
+            "left_hand": "actor",
+            # "rack": "receptacle",
             "hook": "tool",
             "milk": "box",
-            # "yogurt": "box",
+            "yogurt": "box",
             "icecream": "box",
-            # "salt": "box",
+            "salt": "box",
         }
     )
 
@@ -110,7 +112,7 @@ class PolicyDatasetGenerationConfig:
     def pddl_config(self) -> PDDLConfig:
         if isinstance(self.pddl_handler, PDDLConfig):
             return self.pddl_handler
-        domain_file = f"template_{self.symbolic_action_type}_domain.pddl"
+        domain_file = f"template_human_{self.symbolic_action_type}_domain.pddl"
         self.pddl_handler = PDDLConfig(domain_file=domain_file)
         return self.pddl_handler
 

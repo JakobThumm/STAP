@@ -17,6 +17,7 @@ from scripts.train import train_agent
 
 MOVABLE_TYPES = {"box", "tool", "movable"}
 UNMOVABLE_TYPES = {"receptacle", "unmovable"}
+ACCEPTING_TYPES = {"actor"}
 
 
 def to_template_strings(function_call_strs: List[str]):
@@ -131,6 +132,7 @@ def generate_symbolic_states(
     """
     movable_objects = [obj for obj, obj_type in object_types.items() if obj_type in MOVABLE_TYPES]
     unmovable_objects = [obj for obj, obj_type in object_types.items() if obj_type in UNMOVABLE_TYPES]
+    accepting_objects = [obj for obj, obj_type in object_types.items() if obj_type in ACCEPTING_TYPES]
     locations = ["nonexistent($movable)", "ingripper($movable)", "inhand($movable)"] + [
         f"on($movable, {obj})" for obj in unmovable_objects
     ]
@@ -156,7 +158,11 @@ def generate_symbolic_states(
 
         # Filter out nonexistent predicates.
         state = [p for p in state if "nonexistent" not in p]
-        symbolic_states.append(utils.sort_propositions(state))
+        symbolic_state = utils.sort_propositions(state)
+        if len(symbolic_state) > 0:
+            for accepting_obj in accepting_objects:
+                symbolic_state.append(f"accepting({accepting_obj})")
+            symbolic_states.append(symbolic_state)
 
     return symbolic_states
 

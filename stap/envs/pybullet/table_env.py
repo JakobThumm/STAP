@@ -648,19 +648,19 @@ class TableEnv(PybulletEnv):
                 any(obj.isinstance(Null) for obj in primitive.arg_objects) for primitive in self.task.action_skeleton
             )
 
+            # Sample random robot pose.
+            for obj in self.real_objects():
+                obj.unfreeze()
+            if not initialize_robot_pose(self.robot):
+                dbprint(f"TableEnv.reset(seed={seed}): Failed to initialize robot")
+                continue
+
             # Sample initial state.
             if not all(
                 prop.sample(self.robot, self.objects, self.task.initial_state) for prop in self.task.initial_state
             ):
                 # Continue if a proposition failed after max_attempts.
                 dbprint(f"TableEnv.reset(seed={seed}): Failed to sample propositions")
-                continue
-
-            # Sample random robot pose.
-            for obj in self.real_objects():
-                obj.unfreeze()
-            if not initialize_robot_pose(self.robot):
-                dbprint(f"TableEnv.reset(seed={seed}): Failed to initialize robot")
                 continue
 
             # Check state again after objects have settled.
