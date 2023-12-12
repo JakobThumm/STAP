@@ -9,7 +9,7 @@
 	)
 	(:constants table - unmovable)
 	(:predicates
-		(inhand ?a - movable)
+		(ingripper ?a - movable)
 		(on ?a - movable ?b - physobj)
 		(inworkspace ?a - movable)
 	)
@@ -19,13 +19,13 @@
 			(on ?a ?b)
 			(forall (?c - movable)
 				(and
-					(not (inhand ?c))
+					(not (ingripper ?c))
 					; (not (on ?c ?a))
 				)
 			)
 		)
 		:effect (and
-			(inhand ?a)
+			(ingripper ?a)
 			(not (on ?a ?b))
 		)
 	)
@@ -33,10 +33,10 @@
 		:parameters (?a - movable ?b - unmovable)
 		:precondition (and
 			(not (= ?a ?b))
-			(inhand ?a)
+			(ingripper ?a)
 		)
 		:effect (and
-			(not (inhand ?a))
+			(not (ingripper ?a))
 			(on ?a ?b)
 		)
 	)
@@ -44,7 +44,7 @@
 		:parameters (?a - box ?b - tool)
 		:precondition (and
 			(not (= ?a ?b))
-			(inhand ?b)
+			(ingripper ?b)
 			(on ?a table)
 		)
 		:effect (and

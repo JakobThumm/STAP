@@ -9,7 +9,7 @@
 	)
 	(:constants table - physobj)
 	(:predicates
-		(inhand ?a - movable)
+		(ingripper ?a - movable)
 		(on ?a - movable ?b - physobj)
 		(inworkspace ?a - movable)
 	)
@@ -19,13 +19,13 @@
 			(on ?a ?b)  ; TODO: Remove
 			(forall (?b - movable)
 				(and
-					(not (inhand ?b))
+					(not (ingripper ?b))
 					(not (on ?b ?a))
 				)
 			)
 		)
 		:effect (and
-			(inhand ?a)
+			(ingripper ?a)
 			(forall (?b - physobj) (not (on ?a ?b)))
 		)
 	)
@@ -33,10 +33,10 @@
 		:parameters (?a - movable ?b - physobj)
 		:precondition (and
 			(not (= ?a ?b))
-			(inhand ?a)
+			(ingripper ?a)
 		)
 		:effect (and
-			(not (inhand ?a))
+			(not (ingripper ?a))
 			(on ?a ?b)
 		)
 	)
@@ -44,7 +44,7 @@
 		:parameters (?a - movable ?b - movable)
 		:precondition (and
 			(not (= ?a ?b))
-			(inhand ?b)
+			(ingripper ?b)
 			(on ?a table)
 		)
 		:effect (and

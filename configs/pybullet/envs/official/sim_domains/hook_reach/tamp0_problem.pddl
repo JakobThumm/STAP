@@ -9,6 +9,6 @@
 		(on red_box table)
 	)
 	(:goal (and
-		(inhand red_box)
+		(ingripper red_box)
 	))
 )

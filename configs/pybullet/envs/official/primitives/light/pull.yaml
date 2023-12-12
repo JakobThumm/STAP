@@ -22,7 +22,7 @@ env_kwargs:
         - on(rack_box_2, rack)
         - on(rack_box_3, rack)
         - on(rack_box_4, rack)
-        - inhand(hook)
+        - ingripper(hook)
     - action_skeleton:
         - pull(table_box_1, hook)
       initial_state:
@@ -39,7 +39,7 @@ env_kwargs:
         - on(rack_box_2, rack)
         - on(rack_box_3, rack)
         - on(rack_box_4, rack)
-        - inhand(hook)
+        - ingripper(hook)
 
   robot_config: configs/pybullet/envs/robots/franka_panda_sim.yaml
 

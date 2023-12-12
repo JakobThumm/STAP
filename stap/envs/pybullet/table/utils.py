@@ -164,7 +164,7 @@ def is_under(obj_a: Object, obj_b: Object, sim: bool = True) -> bool:
     return False
 
 
-def is_inhand(obj: Object) -> bool:
+def is_ingripper(obj: Object) -> bool:
     """Returns True if the object is in the gripper."""
     z_pos = obj.pose().pos[2]
     z_min = ACTION_CONSTRAINTS["max_lift_height"] - obj.size[2] * 2
@@ -176,14 +176,14 @@ def is_on(obj_a: Object, obj_b: Object, on_distance: float = 0.04, sim: bool = T
     if (
         is_above(obj_a, obj_b, sim=sim)
         and is_intersecting(obj_a, obj_b, sim=sim)
-        and not is_inhand(obj_a, sim=sim)
+        and not is_ingripper(obj_a, sim=sim)
         and abs(obj_a.aabb(sim=sim)[0, 2] - obj_b.aabb(sim=sim)[1, 2]) < on_distance
     ):
         return True
     return False
 
 
-def is_inhand(obj: Object, sim: bool = True) -> bool:
+def is_ingripper(obj: Object, sim: bool = True) -> bool:
     """Returns True if the object is in the gripper."""
     z_pos = obj.pose(sim=sim).pos[2]
     z_min = ACTION_CONSTRAINTS["max_lift_height"] - obj.size[2] * 0.5

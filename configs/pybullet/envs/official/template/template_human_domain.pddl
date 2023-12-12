@@ -7,27 +7,25 @@
 		tool - movable
 		box - movable
 		receptacle - unmovable
-        human - receptacle
 	)
 	(:constants table - unmovable)
 	(:predicates
-		(inhand ?a - movable)
+		(ingripper ?a - movable)
 		(on ?a - movable ?b - unmovable)
 		(inworkspace ?a - physobj)
 		(beyondworkspace ?a - physobj)
 		(under ?a - movable ?b - receptacle)
 		(aligned ?a - physobj)
 		(poslimit ?a - physobj)
-        (tpose ?a - human)
 	)
 	(:action pick
 		:parameters (?a - movable)
 		:precondition (and
 			(exists (?b - unmovable) (on ?a ?b))
-			(forall (?b - movable) (not (inhand ?b)))
+			(forall (?b - movable) (not (ingripper ?b)))
 		)
 		:effect (and
-			(inhand ?a)
+			(ingripper ?a)
 			(forall (?b - unmovable) (not (on ?a ?b)))
 		)
 	)
@@ -35,10 +33,10 @@
 		:parameters (?a - movable ?b - unmovable)
 		:precondition (and
 			(not (= ?a ?b))
-			(inhand ?a)
+			(ingripper ?a)
 		)
 		:effect (and
-			(not (inhand ?a))
+			(not (ingripper ?a))
 			(on ?a ?b)
 		)
 	)
@@ -46,7 +44,7 @@
 		:parameters (?a - box ?b - tool)
 		:precondition (and
 			(not (= ?a ?b))
-			(inhand ?b)
+			(ingripper ?b)
 			(on ?a table)
 		)
 		:effect (and
@@ -56,7 +54,7 @@
     (:action push
         :parameters (?a - box ?b - tool ?c - receptacle)
         :precondition (and
-            (inhand ?b)
+            (ingripper ?b)
             (on ?a table)
             (not (under ?a ?c))
 			(beyondworkspace ?c)

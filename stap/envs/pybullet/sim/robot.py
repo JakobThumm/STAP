@@ -1,5 +1,4 @@
 import copy
-import time as t
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
@@ -200,7 +199,6 @@ class Robot(body.Body):
         iter = 0
         while status == articulated_body.ControlStatus.IN_PROGRESS:
             self.step_simulation()
-            t.sleep(0.01)
             status = self.arm.update_torques(self._sim_time)
             self.gripper.update_torques()
             iter += 1
@@ -301,7 +299,6 @@ class Robot(body.Body):
                 return True
             self.gripper.update_torques()
             self.step_simulation()
-            t.sleep(0.01)
             iter += 1
 
             if isinstance(self.arm, real.arm.Arm):
@@ -359,7 +356,6 @@ class Robot(body.Body):
         status = articulated_body.ControlStatus.IN_PROGRESS
         while status != articulated_body.ControlStatus.TIMEOUT:
             self.step_simulation()
-            t.sleep(0.01)
             status = self.arm.update_torques(self._sim_time)
             self.gripper.update_torques()
             if termination_fn is not None and termination_fn():
@@ -449,7 +445,6 @@ class Robot(body.Body):
                 self.arm.update_torques(time=self._sim_time)
                 status = self.gripper.update_torques()
                 self.step_simulation()
-                t.sleep(0.01)
 
             # Make sure fingers aren't fully closed.
             if status == articulated_body.ControlStatus.POS_CONVERGED:

@@ -1,21 +1,19 @@
+import ast
+import itertools
+import os
+import re
+import shutil
+from collections import defaultdict
+from string import Template
 from typing import Any, Dict, List, Literal, Optional, Set, Union
 
-import os
-import ast
-import re
-import yaml
-import shutil
-import itertools
-from string import Template
-from collections import defaultdict
-
-import tyro
 import symbolic
+import tyro
+import yaml
 
 from configs.base_config import PDDLConfig, PolicyDatasetGenerationConfig
 from scripts.eval.task_gen import utils
 from scripts.train import train_agent
-
 
 MOVABLE_TYPES = {"box", "tool", "movable"}
 UNMOVABLE_TYPES = {"receptacle", "unmovable"}
@@ -92,11 +90,11 @@ def generate_pddl_problem(
     return problem
 
 
-def num_inhand(state: Union[List[str], Set[str]]) -> int:
+def num_ingripper(state: Union[List[str], Set[str]]) -> int:
     """Count the number of objects in the gripper."""
     count = 0
     for predicate in state:
-        if "inhand" in predicate:
+        if "ingripper" in predicate:
             count += 1
     return count
 
@@ -122,15 +120,9 @@ def generate_symbolic_states(
     Returns:
         symbolic_states: List of valid symbolic states.
     """
-    movable_objects = [
-        obj for obj, obj_type in object_types.items() if obj_type in MOVABLE_TYPES
-    ]
-    unmovable_objects = [
-        obj for obj, obj_type in object_types.items() if obj_type in UNMOVABLE_TYPES
-    ]
-    locations = ["nonexistent($movable)", "inhand($movable)"] + [
-        f"on($movable, {obj})" for obj in unmovable_objects
-    ]
+    movable_objects = [obj for obj, obj_type in object_types.items() if obj_type in MOVABLE_TYPES]
+    unmovable_objects = [obj for obj, obj_type in object_types.items() if obj_type in UNMOVABLE_TYPES]
+    locations = ["nonexistent($movable)", "ingripper($movable)"] + [f"on($movable, {obj})" for obj in unmovable_objects]
 
     # Store possible locations of objects.
     object_locations: Dict[str, List[Set[str]]] = defaultdict(list)
@@ -141,18 +133,14 @@ def generate_symbolic_states(
     # Rack predicates.
     if "rack" in unmovable_objects:
         rack_predicates = {f"{p}(rack)" for p in rack_properties}
-        rack_inworkspace = {"on(rack, table)", "inworkspace(rack)"}.union(
-            rack_predicates
-        )
-        rack_beyondworkspace = {"on(rack, table)", "beyondworkspace(rack)"}.union(
-            rack_predicates
-        )
+        rack_inworkspace = {"on(rack, table)", "inworkspace(rack)"}.union(rack_predicates)
+        rack_beyondworkspace = {"on(rack, table)", "beyondworkspace(rack)"}.union(rack_predicates)
         object_locations["rack"].extend([rack_inworkspace, rack_beyondworkspace])
 
     symbolic_states: List[List[str]] = []
     for state in itertools.product(*object_locations.values()):
         state = set.union(*state)
-        if num_inhand(state) > 1 or (not hook_on_rack and is_hook_on_rack(state)):
+        if num_ingripper(state) > 1 or (not hook_on_rack and is_hook_on_rack(state)):
             continue
 
         # Filter out nonexistent predicates.
@@ -181,13 +169,9 @@ def get_syntactically_valid_actions(
 
     for action_template_string in action_template_strings:
         placeholders = get_placeholders(action_template_string)
-        for object_name_combination in itertools.product(
-            object_names, repeat=len(placeholders)
-        ):
+        for object_name_combination in itertools.product(object_names, repeat=len(placeholders)):
             # Create dictionary mapping placeholders to object names.
-            placeholder_to_object_name = dict(
-                zip(placeholders, object_name_combination)
-            )
+            placeholder_to_object_name = dict(zip(placeholders, object_name_combination))
 
             # Create a template string.
             template = Template(action_template_string)
@@ -221,21 +205,15 @@ def get_symbolic_actions(
     return actions
 
 
-def get_state_object_types(
-    state: List[str], object_types: Dict[str, str]
-) -> Dict[str, str]:
+def get_state_object_types(state: List[str], object_types: Dict[str, str]) -> Dict[str, str]:
     """Return dictionary of objects to object types for objects in state."""
     state_objects = set()
     for prop in state:
         state_objects = state_objects.union(set(symbolic.parse_args(prop)))
-    return {
-        obj: obj_type for obj, obj_type in object_types.items() if obj in state_objects
-    }
+    return {obj: obj_type for obj, obj_type in object_types.items() if obj in state_objects}
 
 
-def get_states_to_primitives(
-    states_to_actions: Dict[str, List[str]], primitive: str
-) -> Dict[str, List[str]]:
+def get_states_to_primitives(states_to_actions: Dict[str, List[str]], primitive: str) -> Dict[str, List[str]]:
     """Get mapping from states to specified primitive actions."""
     states_to_primitives: Dict[str, List[str]] = {}
     for state, actions in states_to_actions.items():
@@ -308,9 +286,7 @@ def get_env_config(
 
     env_config["env_kwargs"]["tasks"] = tasks
     env_config["env_kwargs"]["gui"] = gui
-    env_config["env_kwargs"]["name"] = (
-        f"{primitive}_{seed}" if env_name is None else env_name
-    )
+    env_config["env_kwargs"]["name"] = f"{primitive}_{seed}" if env_name is None else env_name
     env_config["env_kwargs"]["primitives"] = [primitive]
 
     if save_env_config:
@@ -390,7 +366,7 @@ def main(config: PolicyDatasetGenerationConfig):
         device=config.device,
         seed=config.seed,
         gui=config.gui,
-        overwrite=True
+        overwrite=True,
     )
 
 

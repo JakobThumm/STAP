@@ -22,7 +22,7 @@ env_kwargs:
         - on(rack_box_2, rack)
         - on(rack_box_3, rack)
         - on(rack_box_4, rack)
-        - inhand(table_box_1)
+        - ingripper(table_box_1)
     - prob: 0.333
       action_skeleton:
         - place(rack_box_1, rack)
@@ -39,7 +39,7 @@ env_kwargs:
         - on(rack_box_2, rack)
         - on(rack_box_3, rack)
         - on(rack_box_4, rack)
-        - inhand(rack_box_1)
+        - ingripper(rack_box_1)
     - prob: 0.167
       action_skeleton:
         - place(hook, table)
@@ -55,7 +55,7 @@ env_kwargs:
         - on(rack_box_2, rack)
         - on(rack_box_3, rack)
         - on(rack_box_4, rack)
-        - inhand(hook)
+        - ingripper(hook)
     - prob: 0.167
       action_skeleton:
         - place(hook, table)
@@ -72,7 +72,7 @@ env_kwargs:
         - on(rack_box_2, rack)
         - on(rack_box_3, rack)
         - on(rack_box_4, rack)
-        - inhand(hook)
+        - ingripper(hook)
 
   robot_config: configs/pybullet/envs/robots/franka_panda_sim.yaml
 

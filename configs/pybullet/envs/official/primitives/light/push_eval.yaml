@@ -32,7 +32,7 @@ env_kwargs:
         - on(rack_box_2, rack)
         - on(rack_box_3, rack)
         - on(rack_box_4, rack)
-        - inhand(hook)
+        - ingripper(hook)
 
   robot_config: configs/pybullet/envs/robots/franka_panda_sim.yaml
 

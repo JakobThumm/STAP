@@ -72,7 +72,7 @@ class ProblemGenerationConfig:
     max_steps: int = 20
     overwrite: bool = False
     allow_box_on_any_obj: bool = False
-    allow_obj_inhand_in_goal: bool = False
+    allow_obj_ingripper_in_goal: bool = False
 
 
 @dataclass
@@ -91,7 +91,7 @@ class PolicyDatasetGenerationConfig:
     # Dataset generation configs.
     pddl_handler: Optional[PDDLConfig] = None
     template_env_yaml: str = "configs/pybullet/envs/official/template/human_template_env.yaml"
-    primitive: Literal["pick", "place", "push", "pull"] = "pick"
+    primitive: Literal["pick", "place", "push", "pull", "handover", "static_handover"] = "pick"
     symbolic_action_type: Literal["valid", "invalid"] = "valid"
     save_env_config: bool = False
     object_types: Dict[str, str] = dataclasses.field(

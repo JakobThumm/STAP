@@ -123,7 +123,7 @@ class Free(Predicate):
             return True
 
         for obj in objects.values():
-            if f"inhand({obj})" in state or obj.isinstance(Null) or obj == child_obj:
+            if f"ingripper({obj})" in state or obj.isinstance(Null) or obj == child_obj:
                 continue
             if utils.is_under(child_obj, obj):
                 dbprint(f"{self}.value():", False, f"{child_obj} under {obj}")
@@ -711,7 +711,7 @@ class Inhand(Predicate):
         if obj.isinstance(Null):
             return False
 
-        return utils.is_inhand(obj, sim=sim)
+        return utils.is_ingripper(obj, sim=sim)
 
     def value_simple(
         self,
@@ -724,7 +724,7 @@ class Inhand(Predicate):
         if obj.isinstance(Null):
             return False
 
-        return utils.is_inhand(obj, sim=sim)
+        return utils.is_ingripper(obj, sim=sim)
 
 
 class Under(Predicate):
@@ -1103,7 +1103,7 @@ UNARY_PREDICATES = {
     "inobstructionzone": InObstructionZone,
     "beyondworkspace": BeyondWorkspace,
     "inoodzone": InOodZone,
-    "inhand": Inhand,
+    "ingripper": Inhand,
 }
 
 
@@ -1132,7 +1132,7 @@ PREDICATE_HIERARCHY = [
     "infront",
     "nonblocking",
     "on",
-    "inhand",
+    "ingripper",
 ]
 
 
@@ -1142,6 +1142,6 @@ assert len(UNARY_PREDICATES) + len(BINARY_PREDICATES) == len(PREDICATE_HIERARCHY
 SUPPORTED_PREDICATES = {
     "under(a, b)": Under,
     "on(a, b)": On,
-    "inhand(a)": Inhand,
+    "ingripper(a)": Inhand,
     "tpose(a)": TPose,
 }

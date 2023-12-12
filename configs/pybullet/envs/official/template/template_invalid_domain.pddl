@@ -10,7 +10,7 @@
 	)
 	(:constants table - unmovable)
 	(:predicates
-		(inhand ?a - movable)
+		(ingripper ?a - movable)
 		(on ?a - movable ?b - unmovable)
 		(inworkspace ?a - physobj)
 		(beyondworkspace ?a - physobj)
@@ -22,14 +22,14 @@
 		:parameters (?a - physobj)
 		:precondition (and
             (or
-                ; 1) (state) Movable inhand, 
+                ; 1) (state) Movable ingripper, 
                 ; 1a)       (action) Pick physobj. 
-                (exists (?b - movable) (inhand ?b))
+                (exists (?b - movable) (ingripper ?b))
                 
-                ; 2) (state) Nothing inhand, 
+                ; 2) (state) Nothing ingripper, 
                 ; 2a)       (action) Pick unmovable.
                 (and 
-                    (forall (?b - movable) (not (inhand ?b)))
+                    (forall (?b - movable) (not (ingripper ?b)))
                     (exists (?b - unmovable) (= ?a ?b))
                 )
             )
@@ -41,15 +41,15 @@
 		:precondition (and
 			(not (= ?a ?b))
             (or
-                ; 1) (state) Movable inhand.
-                ; 1a)       (action) inhand(?a), place on another movable.
-                (and (inhand ?a) (exists (?c - movable) (= ?b ?c)))
-                ; 1b)       (action) (not (inhand ?a)), place on anything.
-                (exists (?c - movable) (and (inhand ?c) (not (= ?a ?c))))
+                ; 1) (state) Movable ingripper.
+                ; 1a)       (action) ingripper(?a), place on another movable.
+                (and (ingripper ?a) (exists (?c - movable) (= ?b ?c)))
+                ; 1b)       (action) (not (ingripper ?a)), place on anything.
+                (exists (?c - movable) (and (ingripper ?c) (not (= ?a ?c))))
 
-                ; 2) (state) Nothing inhand. 
+                ; 2) (state) Nothing ingripper. 
                 ; 2a)       (action) Place anything on anything.
-                (forall (?c - movable) (not (inhand ?c)))
+                (forall (?c - movable) (not (ingripper ?c)))
             )
 		)
 		:effect (and )
@@ -59,9 +59,9 @@
 		:precondition (and
 			(not (= ?a ?b))
             (or 
-                ; 1) (state) Movable inhand.
-                ; 1a)       (state) inhand(?b), b is a tool.
-                (and (inhand ?b) (exists (?c - tool) (= ?b ?c))
+                ; 1) (state) Movable ingripper.
+                ; 1a)       (state) ingripper(?b), b is a tool.
+                (and (ingripper ?b) (exists (?c - tool) (= ?b ?c))
                     (or
                 ; 1ax)              (action) Pull movable on rack with tool.
                         (and 
@@ -73,17 +73,17 @@
                     )
                 )
                 
-                ; 1b)       (state) inhand(?b), b is a box.
+                ; 1b)       (state) ingripper(?b), b is a box.
                 ; 1bx)              (action) Pull anything with box.
-                (and (inhand ?b) (exists (?c - box) (= ?b ?c)))
+                (and (ingripper ?b) (exists (?c - box) (= ?b ?c)))
 
-                ; 1c)       (state) (not (inhand ?b)), 
+                ; 1c)       (state) (not (ingripper ?b)), 
                 ; 1cx)              (action) Pull anything with anything.
-                (not (inhand ?b))
+                (not (ingripper ?b))
                 
-                ; 2) (state) Nothing inhand.
+                ; 2) (state) Nothing ingripper.
                 ; 2a)       (action) Pull anything with anything.
-                (forall (?c - movable) (not (inhand ?c)))
+                (forall (?c - movable) (not (ingripper ?c)))
             )
 		)
 		:effect (and )
@@ -95,9 +95,9 @@
             (not (= ?a ?c))
             (not (= ?b ?c))
             (or
-                ; 1) (state) Movable inhand
-                ; 1a)       (state) inhand(?b), b is a tool
-                (and (inhand ?b) (exists (?d - tool) (= ?b ?d))
+                ; 1) (state) Movable ingripper
+                ; 1a)       (state) ingripper(?b), b is a tool
+                (and (ingripper ?b) (exists (?d - tool) (= ?b ?d))
                     (or
                 ; 1ax)              (action) Push movable on rack with tool.
                         (and
@@ -108,17 +108,17 @@
                         (exists (?d - unmovable) (= ?a ?d))
                     )
                 )
-                ; 1b)       (state) inhand(?b), b is a box
+                ; 1b)       (state) ingripper(?b), b is a box
                 ; 1bx)              (action) Push anything with box.
-                (and (inhand ?b) (exists (?d - box) (= ?b ?d)))
+                (and (ingripper ?b) (exists (?d - box) (= ?b ?d)))
                 
-                ; 1c)       (state) (not (inhand ?b))
+                ; 1c)       (state) (not (ingripper ?b))
                 ; 1cx)              (action) Push anything with anything.
-                (not (inhand ?b))
+                (not (ingripper ?b))
 
-                ; 2) (state) Nothing inhand.
+                ; 2) (state) Nothing ingripper.
                 ; 2a)       (action) Push anything with anything.
-                (forall (?d - movable) (not (inhand ?d)))
+                (forall (?d - movable) (not (ingripper ?d)))
             )
         )
         :effect (and )
