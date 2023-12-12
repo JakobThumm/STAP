@@ -195,6 +195,7 @@ class TableBounds:
         bounds = parent_obj.aabb()[:, :2]
         xy_min, xy_max = bounds
         xy_min[0] = utils.TABLE_CONSTRAINTS["table_x_min"]
+        xy_max[0] = utils.TABLE_CONSTRAINTS["table_x_max"]
         xy_min += margin
         xy_max -= margin
 

@@ -19,7 +19,7 @@ dbprint = lambda *args: None  # noqa
 # dbprint = print
 
 
-ACTION_CONSTRAINTS = {"max_lift_height": 0.4, "max_lift_radius": 0.7}
+ACTION_CONSTRAINTS = {"max_lift_height": 0.35, "max_lift_radius": 0.7}
 
 
 def compute_top_down_orientation(
@@ -263,7 +263,7 @@ class Pick(Primitive):
             if not real_world and not utils.is_inworkspace(obj=obj):
                 raise ControlException(f"Object {obj} is beyond the robot workspace.")
 
-            robot.goto_pose(pre_pos, command_quat)
+            robot.goto_pose(pre_pos, command_quat, precision=0.01)
             if not allow_collisions and did_non_args_move():
                 raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
 
@@ -271,12 +271,13 @@ class Pick(Primitive):
                 command_pos,
                 command_quat,
                 check_collisions=[obj.body_id for obj in self.get_non_arg_objects(objects)],
+                precision=0.002,
             )
 
             if not robot.grasp_object(obj):
                 raise ControlException(f"Robot.grasp_object({obj}) failed")
 
-            robot.goto_pose(pre_pos, command_quat)
+            robot.goto_pose(pre_pos, command_quat, precision=0.02)
             if not allow_collisions and did_non_args_move():
                 raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
         except ControlException as e:
@@ -665,9 +666,11 @@ class StaticHandover(Primitive):
         try:
             robot.arm.set_prior_to_home()
             command_pose = self.calculate_command_pose(a, target, ADDITIONAL_OFFSET)
+            command_pos = command_pose.pos
+            command_quat = command_pose.quat
             success = robot.goto_pose(
-                command_pose.pos,
-                command_pose.quat,
+                command_pos,
+                command_quat,
                 check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
                 timeout=FIRST_MOVEMENT_TIMEOUT,
                 precision=0.02,

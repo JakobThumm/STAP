@@ -21,6 +21,7 @@ from stap.envs.pybullet.table.primitives import (
 TABLE_CONSTRAINTS = {
     "table_z_max": 0.00,
     "table_x_min": 0.32,
+    "table_x_max": 0.7,
     "table_y_min": -0.45,
     "table_y_max": 0.45,
     "workspace_x_min": 0.40,
