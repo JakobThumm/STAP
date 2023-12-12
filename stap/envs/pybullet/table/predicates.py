@@ -123,7 +123,7 @@ class Free(Predicate):
             return True
 
         for obj in objects.values():
-            if f"ingripper({obj})" in state or obj.isinstance(Null) or obj == child_obj:
+            if f"ingripper({obj})" in state or f"inhand({obj})" in state or obj.isinstance(Null) or obj == child_obj:
                 continue
             if utils.is_under(child_obj, obj):
                 dbprint(f"{self}.value():", False, f"{child_obj} under {obj}")
@@ -584,7 +584,7 @@ class InOodZone(Predicate, TableBounds):
         return bounds, margin
 
 
-class Inhand(Predicate):
+class Ingripper(Predicate):
     MAX_GRASP_ATTEMPTS = 1
 
     def sample(self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]) -> bool:
@@ -594,7 +594,7 @@ class Inhand(Predicate):
             return True
 
         # Generate grasp pose.
-        for i in range(Inhand.MAX_GRASP_ATTEMPTS):
+        for i in range(Ingripper.MAX_GRASP_ATTEMPTS):
             grasp_pose = self.generate_grasp_pose(
                 obj,
                 handlegrasp=f"handlegrasp({obj})" in state,
@@ -614,7 +614,7 @@ class Inhand(Predicate):
             p.stepSimulation(physicsClientId=robot.physics_id)
             if not utils.is_touching(obj, robot):
                 break
-            elif i + 1 == Inhand.MAX_GRASP_ATTEMPTS:
+            elif i + 1 == Ingripper.MAX_GRASP_ATTEMPTS:
                 dbprint(f"{self}.sample():", False, "- exceeded max grasp attempts")
                 return False
 
@@ -1103,7 +1103,7 @@ UNARY_PREDICATES = {
     "inobstructionzone": InObstructionZone,
     "beyondworkspace": BeyondWorkspace,
     "inoodzone": InOodZone,
-    "ingripper": Inhand,
+    "ingripper": Ingripper,
 }
 
 
@@ -1142,6 +1142,6 @@ assert len(UNARY_PREDICATES) + len(BINARY_PREDICATES) == len(PREDICATE_HIERARCHY
 SUPPORTED_PREDICATES = {
     "under(a, b)": Under,
     "on(a, b)": On,
-    "ingripper(a)": Inhand,
+    "ingripper(a)": Ingripper,
     "tpose(a)": TPose,
 }
