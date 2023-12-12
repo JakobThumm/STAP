@@ -647,12 +647,9 @@ class StaticHandover(Primitive):
 
         SUCCESS_DISTANCE = 0.6
         SUCCESS_TIME = 1.0
-        TIMEOUT = 10
+        FIRST_MOVEMENT_TIMEOUT = 2.0
+        WAIT_TIMEOUT = 10
         ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
-        # Never update pos
-        UPDATE_POS_EVERY = int(SIMULATION_FREQUENCY * TIMEOUT)
-        PRECISION = 0.1
-
         success = False
         self.success_counter = 0
         # Parse action.
@@ -666,40 +663,35 @@ class StaticHandover(Primitive):
         if not allow_collisions:
             did_non_args_move = self.create_object_movement_check(objects=objects)
         try:
-            pose_fn = partial(self.calculate_command_pose, a, target, ADDITIONAL_OFFSET)
-            termination_fn = partial(self.termination_condition, obj, target, SUCCESS_DISTANCE, SUCCESS_TIME)
             robot.arm.set_prior_to_home()
-            success = robot.goto_dynamic_pose(
-                pose_fn=pose_fn,
-                termination_fn=termination_fn,
-                update_pose_every=UPDATE_POS_EVERY,
-                timeout=TIMEOUT,
-                precision=PRECISION,
+            command_pose = self.calculate_command_pose(a, target, ADDITIONAL_OFFSET)
+            success = robot.goto_pose(
+                command_pose.pos,
+                command_pose.quat,
                 check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
+                timeout=FIRST_MOVEMENT_TIMEOUT,
+                precision=0.02,
             )
-            if not success or (not allow_collisions and did_non_args_move()):
-                if verbose:
-                    print("Robot.goto_dynamic_pose() failed")
-                raise ControlException("Robot.goto_dynamic_pose() failed")
-
+            if not success:
+                raise ControlException("Moving to handover pose failed")
+            termination_fn = partial(self.termination_condition, obj, target, SUCCESS_DISTANCE, SUCCESS_TIME)
+            success = robot.wait_for_termination(termination_fn=termination_fn, timeout=WAIT_TIMEOUT)
+            if not success:
+                raise ControlException("Handover failed: Human hand not within reach")
             robot.grasp(0)
             # Once the gripper is opened, we assume the handover was a success.
             success = True
             if not allow_collisions and did_non_args_move():
-                if verbose:
-                    print("Robot.grasp(0) collided")
                 raise ControlException("Robot.grasp(0) collided")
 
             robot.goto_pose(self.env.robot.arm.home_pose.pos, self.env.robot.arm.home_pose.quat)
             if not allow_collisions and did_non_args_move():
-                if verbose:
-                    print("Robot.goto_pose(pre_pos, command_quat) collided")
-                raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
+                raise ControlException("Robot.goto_pose() collided")
         except ControlException as e:
             # If robot fails before grasp(0), object may still be grasped.
-            dbprint("Place.execute():\n", e)
+            dbprint("StaticHandover.execute():\n", e)
             if verbose:
-                print("Place.execute():\n", e)
+                print("StaticHandover.execute():\n", e)
             return ExecutionResult(success=False, truncated=True)
 
         self.env.wait_until_stable()

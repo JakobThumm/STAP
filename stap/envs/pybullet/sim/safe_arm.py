@@ -12,7 +12,6 @@ from stap.controllers.joint_space_control import joint_space_control  # noqa: F4
 from stap.envs.pybullet.sim import articulated_body
 from stap.envs.pybullet.sim.arm import Arm
 from stap.envs.pybullet.sim.math import Pose
-from stap.utils.macros import SIMULATION_TIME_STEP
 
 
 class SafeArm(Arm):
@@ -119,9 +118,7 @@ class SafeArm(Arm):
             self.reset_shield(time)
         else:
             self._shield.set_goal(q)
-            if timeout is None:
-                timeout = self.timeout
-            self._arm_state.iter_timeout = int(timeout / SIMULATION_TIME_STEP)
+            self.set_timeout(timeout)
             self._arm_state.torque_control = True
 
     def set_pose_goal(
@@ -166,9 +163,7 @@ class SafeArm(Arm):
         self._prior = desired_q_pos
         # Set the desired joint position as new goal for sara-shield
         self._shield.set_goal(desired_q_pos)
-        if timeout is None:
-            timeout = self.timeout
-        self._arm_state.iter_timeout = int(timeout / SIMULATION_TIME_STEP)
+        self.set_timeout(timeout)
         self._arm_state.torque_control = True
         return True
 
@@ -209,15 +204,14 @@ class SafeArm(Arm):
 
         # Check if goal joint position is reached
         self.ab.q, self.ab.dq = self.get_joint_state(self.torque_joints)
+        # Only count safe steps towards timeout.# Get current orientation.
+        if self._shield.get_safety():
+            self._arm_state.iter_timeout -= 1
         if (
             np.linalg.norm(self.ab.q - self._shield.goal_qpos) < self._joint_pos_threshold
             and np.linalg.norm(self.ab.q - qpos_desired) < 2e-2
         ):
             return articulated_body.ControlStatus.POS_CONVERGED
-
-        # Only count safe steps towards timeout.# Get current orientation.
-        if self._shield.get_safety():
-            self._arm_state.iter_timeout -= 1
 
         return articulated_body.ControlStatus.IN_PROGRESS
 

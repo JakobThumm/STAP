@@ -346,6 +346,26 @@ class Robot(body.Body):
             articulated_body.ControlStatus.VEL_CONVERGED,
         )
 
+    def wait_for_termination(self, termination_fn: Optional[Callable] = None, timeout: float = 10.0) -> bool:
+        """Wait in the current configuration for the termination function to succeed.
+
+        Args:
+            termination_fn: Function that checks if the termination condition is met.
+            timeout: Timeout in seconds. If timeout is None, default of self.arm.timeout will be used!
+        Returns:
+            True if the termination function succeeds, false if the timeout is reached.
+        """
+        self.arm.set_timeout(timeout)
+        status = articulated_body.ControlStatus.IN_PROGRESS
+        while status != articulated_body.ControlStatus.TIMEOUT:
+            self.step_simulation()
+            t.sleep(0.01)
+            status = self.arm.update_torques(self._sim_time)
+            self.gripper.update_torques()
+            if termination_fn is not None and termination_fn():
+                return True
+        return False
+
     def grasp(
         self,
         command: float,
@@ -445,18 +465,4 @@ class Robot(body.Body):
         T_obj_to_ee = T_ee_to_world.inverse() * T_obj_to_world
         self.set_load(obj.inertia * T_obj_to_ee)
 
-        return True
-        return True
-        return True
-        return True
-        return True
-        return True
-        return True
-        return True
-        return True
-        return True
-        return True
-        return True
-        return True
-        return True
         return True

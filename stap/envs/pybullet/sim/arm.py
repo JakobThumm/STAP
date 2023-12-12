@@ -160,14 +160,12 @@ class Arm(articulated_body.ArticulatedBody):
                 quat = eigen.Quaterniond(quat)
             quat = quat * self.quat_home.inverse()
             self._arm_state.quat_des = quat.coeffs
-        if timeout is None:
-            timeout = self.timeout
         self._arm_state.pos_gains = self.pos_gains if pos_gains is None else pos_gains
         self._arm_state.ori_gains = self.ori_gains if ori_gains is None else ori_gains
 
         self._arm_state.dx_avg = 1.0
         self._arm_state.w_avg = 1.0
-        self._arm_state.iter_timeout = int(timeout / SIMULATION_TIME_STEP)
+        self.set_timeout(timeout)
         self._arm_state.torque_control = True
         return True
 
@@ -333,6 +331,14 @@ class Arm(articulated_body.ArticulatedBody):
         if not close_enough:
             return desired_q_pos, False
         return desired_q_pos, self.check_joint_limits(desired_q_pos, ignore_last_half_rotation)
+
+    def set_timeout(self, timeout: Optional[float] = None) -> None:
+        """Sets the timeout for the arm.
+        If the timeout is None, choose self.timeout.
+        """
+        if timeout is None:
+            timeout = self.timeout
+        self._arm_state.iter_timeout = int(timeout / SIMULATION_TIME_STEP)
 
     def update_torques(self, time: Optional[float] = None) -> articulated_body.ControlStatus:
         """Computes and applies the torques to control the articulated body to the goal set with `Arm.set_pose_goal().

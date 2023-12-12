@@ -249,9 +249,9 @@ class PushAction(PrimitiveAction):
 
 class HandoverAction(PrimitiveAction):
     RANGES = {
-        "pitch": (-np.pi, 0),
-        "distance": (0.2, 1.0),
-        "height": (0.1, 0.5),
+        "pitch": (-2.0, 0),
+        "distance": (0.4, 0.9),
+        "height": (0.2, 0.7),
     }
 
     def __init__(
