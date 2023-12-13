@@ -295,7 +295,7 @@ class HandoverAction(PrimitiveAction):
 
     def __repr__(self) -> str:
         return (
-            "Place {\n"
+            "Handover {\n"
             f"    pitch: {self.pitch},\n"
             f"    distance: {self.distance},\n"
             f"    distance: {self.height},\n"

@@ -88,6 +88,7 @@ class HumanTableEnv(TableEnv):
         self._sim_time = 0.0
         obs, info = super().reset(seed=seed, options=options, max_samples_per_trial=max_samples_per_trial)
         self.human.enable_animation()
+        self.human.animate(self._sim_time)
         return obs, info
 
     def set_primitive(
