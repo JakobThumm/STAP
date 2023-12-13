@@ -51,16 +51,13 @@ TRAIN_SEEDS=($(seq 0 15))
 VALIDATION_SEEDS=($(seq 16 19))
 GUI=false
 
+PRIMITIVE="static_handover"
+run_data_generation
+
 PRIMITIVE="pick"
 run_data_generation
 
 PRIMITIVE="place"
-run_data_generation
-
-PRIMITIVE="pull"
-run_data_generation
-
-PRIMITIVE="push"
 run_data_generation
 
 # Out-of-distribution (symbolically invalid) data generation.
@@ -69,14 +66,11 @@ SYMBOLIC_ACTION_TYPE="invalid"
 TRAIN_SEEDS=("0")
 VALIDATION_SEEDS=()
 
+PRIMITIVE="static_handover"
+run_data_generation
+
 PRIMITIVE="pick"
 run_data_generation
 
 PRIMITIVE="place"
-run_data_generation
-
-PRIMITIVE="pull"
-run_data_generation
-
-PRIMITIVE="push"
 run_data_generation
