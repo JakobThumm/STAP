@@ -2,12 +2,12 @@ trainer: PrimitiveDatasetGenerator
 trainer_kwargs:
   dataset_class: ReplayBuffer
   dataset_kwargs:
-    capacity: 10000
+    capacity: 50000
     batch_size: 128
     sample_strategy: uniform
     save_frequency: 1000
 
-  dataset_size: 10000
+  dataset_size: 50000
   collection_strategy: uniform
   simulate: false
 
