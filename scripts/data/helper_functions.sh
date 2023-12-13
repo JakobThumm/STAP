@@ -30,8 +30,13 @@ function generate_splits {
     N_JOBS_TRAIN=$(printf "%.0f" "$N_JOBS_TRAIN")
     N_JOBS_VALIDATION=$(printf "%.0f" "$N_JOBS_VALIDATION")
     LC_NUMERIC= # Resetting back to the original locale
+    # If N_JOBS_VALIDATION is 0, we set it to 1 and N_JOBS_TRAIN to N_JOBS-1.
+    if [[ $N_JOBS_VALIDATION -eq 0 ]]; then
+        N_JOBS_VALIDATION=1
+        N_JOBS_TRAIN=$(($N_JOBS-$N_JOBS_VALIDATION))
+    fi
     echo "N_JOBS_TRAIN: ${N_JOBS_TRAIN}, N_JOBS_VALIDATION: ${N_JOBS_VALIDATION}"
-    CPUS=($(seq 0 $(($N_JOBS-1))))
+    CPUS=($(seq $CPU_OFFSET $(($N_JOBS+$CPU_OFFSET-1))))
     SEEDS=($(seq $SEED_OFFSET $(($SEED_OFFSET+$N_JOBS-1))))
     TRAIN_IDS=($(seq 0 $(($N_JOBS_TRAIN-1))))
     VALIDATION_IDS=($(seq $N_JOBS_TRAIN $(($N_JOBS-1))))
@@ -40,16 +45,55 @@ function generate_splits {
 function run_data_generation {
     generate_splits
     SPLIT="train"
-    for idx in "${!TRAIN_IDS[@]}"; do
-        SEED="${SEEDS[${idx}]}"
-        CPU="${CPUS[${idx}]}"
+    for train_idx in "${TRAIN_IDS[@]}"; do
+        SEED="${SEEDS[${train_idx}]}"
+        CPU="${CPUS[${train_idx}]}"
         generate_data
     done
     
     SPLIT="validation"
-    for idx in "${!VALIDATION_IDS[@]}"; do
-        SEED="${SEEDS[${idx}]}"
-        CPU="${CPUS[${idx}]}"
+    for validation_idx in "${VALIDATION_IDS[@]}"; do
+        SEED="${SEEDS[${validation_idx}]}"
+        CPU="${CPUS[${validation_idx}]}"
         generate_data
     done
+}
+
+function generate_full_split() {
+    # One generation is one primitive and one symbolic action type.
+    # We have to generate N_GENERATIONS = N_Primitives * N_Symbolic_Action_Types generations.
+    # We have N_JOBS_PER_GENERATION = N_JOBS/N_GENERATIONS jobs per generation.
+    # The SEED_OFFSET should increase by N_JOBS_PER_GENERATION for each generation.
+    # The CPU_OFFSET should increase by N_JOBS_PER_GENERATION for each generation.
+    # This function sets N_JOBS to N_JOBS_PER_GENERATION and SEED_OFFSETS and CPU_OFFSETS to the correct values.
+
+    # Length of list PRIMITIVES * Length of list SYMBOLIC_ACTION_TYPES
+    N_GENERATIONS=$(echo "${#PRIMITIVES[@]} * ${#SYMBOLIC_ACTION_TYPES[@]}" | bc)
+    echo "N_GENERATIONS: ${N_GENERATIONS}"
+    N_JOBS_PER_GENERATION=$(echo "scale=1; $N_JOBS/$N_GENERATIONS" | bc)
+    LC_NUMERIC=C
+    N_JOBS_PER_GENERATION=$(printf "%.0f" "$N_JOBS_PER_GENERATION")
+    LC_NUMERIC= # Resetting back to the original locale
+    echo "N_JOBS_PER_GENERATION: ${N_JOBS_PER_GENERATION}"
+    # SEED_OFFSETS=SEED_OFFSET:N_JOBS_PER_GENERATION:SEED_OFFSET+N_JOBS_PER_GENERATION*N_GENERATIONS
+    SEED_OFFSETS=($(seq $SEED_OFFSET $N_JOBS_PER_GENERATION $(($SEED_OFFSET+$N_JOBS_PER_GENERATION*$N_GENERATIONS-1))))
+    CPU_OFFSETS=($(seq $CPU_OFFSET $N_JOBS_PER_GENERATION $(($CPU_OFFSET+$N_JOBS_PER_GENERATION*$N_GENERATIONS-1))))
+    N_JOBS=$N_JOBS_PER_GENERATION
+}
+
+# Function to run the existing data generation with different splits and primitives.
+function run_variants {
+  local counter=0
+  generate_full_split
+  for action_type in "${SYMBOLIC_ACTION_TYPES[@]}"; do
+    for primitive in "${PRIMITIVES[@]}"; do
+      SYMBOLIC_ACTION_TYPE=$action_type
+      PRIMITIVE=$primitive
+      SEED_OFFSET=${SEED_OFFSETS[${counter}]}
+      CPU_OFFSET=${CPU_OFFSETS[${counter}]}
+      echo "Running data generation for ${PRIMITIVE} with ${SYMBOLIC_ACTION_TYPE} symbolic action type with seed offset ${SEED_OFFSET} and cpu offset ${CPU_OFFSET}."
+      run_data_generation
+      counter=$((counter+1))
+    done
+  done
 }
