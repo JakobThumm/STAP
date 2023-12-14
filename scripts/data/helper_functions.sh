@@ -9,6 +9,7 @@ N_JOBS=12
 SEED_OFFSET=0
 CPU_OFFSET=0
 TRAIN_VALIDATION_SPLIT=0.8
+user=root
 
 function run_cmd_tmux {
     path_mod="./scripts/train:./scripts/eval:/.configs"
@@ -23,12 +24,26 @@ function run_cmd_docker {
     path_mod="./scripts/train:./scripts/eval:/.configs"
     docker_name="STAP_${USER}_${SPLIT}_${PRIMITIVE}_${SEED}_${CPU}"
     echo "Executing ${PYTHON_CMD} in docker session ${docker_name}."
-    docker run -d --rm \
-        --name="${docker_name}" \
-        --net=host \
-        --volume="$(pwd)/models/:/home/$USER/models/" \
-        --shm-size=10.24gb \
-        stap-train/$USER:v2 "${PYTHON_CMD}"
+    if [ "$user" = "root" ]
+    then
+        docker run -d --rm \
+            --name="${docker_name}" \
+            --net=host \
+            --volume="$(pwd)/models/:/root/models/" \
+            --shm-size=10.24gb \
+            stap-train/root:v2 "${PYTHON_CMD}"
+    elif [ "$user" = "user" ]
+    then
+        docker run -d --rm \
+            --name="${docker_name}" \
+            --net=host \
+            --volume="$(pwd)/models/:/home/$USER/models/" \
+            --shm-size=10.24gb \
+            stap-train/$USER:v2 "${PYTHON_CMD}"
+    else
+    echo "User mode unkown. Please choose user, root, or leave it out for default user"
+    fi
+    
 }
 
 function generate_data {

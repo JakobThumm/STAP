@@ -3,6 +3,7 @@ set -e
 
 source scripts/data/helper_functions.sh
 N_JOBS=$1
+user=${2:-user}
 
 # Experiments.
 DOCKER=true
