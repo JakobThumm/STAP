@@ -1,12 +1,34 @@
 #!/bin/bash
 
-function run_cmd {
+$DOCKER=0
+DEVICE="cpu"
+EXP_NAME="datasets"
+SYMBOLIC_ACTION_TYPE="valid"
+PRIMITIVE="pick"
+N_JOBS=12
+SEED_OFFSET=0
+CPU_OFFSET=0
+TRAIN_VALIDATION_SPLIT=0.8
+
+function run_cmd_tmux {
     path_mod="./scripts/train:./scripts/eval:/.configs"
     tmux_name="${SPLIT}_${PRIMITIVE}_${SEED}_${CPU}"
     echo "Executing ${PYTHON_CMD} in tmux session ${tmux_name}."
     tmux new-session -d -s "${tmux_name}"
     tmux send-keys -t "${tmux_name}" "export PYTHONPATH=${path_mod}:${PYTHONPATH}" Enter
     tmux send-keys -t "${tmux_name}" "taskset -c ${CPU} ${PYTHON_CMD}" Enter
+}
+
+function run_cmd_docker {
+    path_mod="./scripts/train:./scripts/eval:/.configs"
+    docker_name="STAP_${USER}_${SPLIT}_${PRIMITIVE}_${SEED}_${CPU}"
+    echo "Executing ${PYTHON_CMD} in docker session ${docker_name}."
+    docker run -d --rm \
+        --name="${docker_name}" \
+        --net=host \
+        --volume="$(pwd)/models/:/home/$USER/models/" \
+        --shm-size=10.24gb \
+        stap-train/$USER:v2 "${PYTHON_CMD}"
 }
 
 function generate_data {
@@ -20,7 +42,11 @@ function generate_data {
     args="${args} --config.device ${DEVICE}"
     
     PYTHON_CMD="python generate_primitive_dataset.py ${args}"
-    run_cmd
+    if [ "$DOCKER" = true ]; then
+        run_cmd_docker
+    else
+        run_cmd_tmux
+    fi
 }
 
 function generate_splits {

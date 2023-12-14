@@ -7,13 +7,11 @@
 user=${1:-user}
 bash_command="/bin/bash"
 docker_command="docker run -it"
-# bash_command="~/scripts/data/generate_all_datasets_tmux.sh 12"
-# docker_command="docker run --rm"
 
 if [ -n "$2" ]
 then
     bash_command="${2}"
-    docker_command="docker run"
+    docker_command="docker run -d"
 fi
 
 command="${bash_command}"
