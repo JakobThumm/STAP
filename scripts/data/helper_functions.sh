@@ -1,6 +1,6 @@
 #!/bin/bash
 
-$DOCKER=0
+DOCKER=false
 DEVICE="cpu"
 EXP_NAME="datasets"
 SYMBOLIC_ACTION_TYPE="valid"
