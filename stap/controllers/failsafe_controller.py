@@ -82,7 +82,7 @@ class FailsafeController:
             trajectory_config_file=(
                 f"{dir_path}/../../configs/pybullet/shield/trajectory_parameters_{robot_name}.yaml"
             ),
-            robot_config_file=f"{dir_path}/../../third_party/sara-shield/safety_shield/config/robot_parameters_{robot_name}.yaml",
+            robot_config_file=f"{dir_path}/../../configs/pybullet/shield/robot_parameters_{robot_name}.yaml",
             mocap_config_file=dir_path + "/../../configs/pybullet/shield/pybullet_mocap.yaml",
             init_x=base_pos[0],
             init_y=base_pos[1],
@@ -94,7 +94,7 @@ class FailsafeController:
             shield_type=self.shield_type,
         )
         trajectory_config = load_config(
-            f"{dir_path}/../../third_party/sara-shield/safety_shield/config/trajectory_parameters_{robot_name}.yaml"
+            f"{dir_path}/../../configs/pybullet/shield/trajectory_parameters_{robot_name}.yaml"
         )
         self._a_max_allowed = np.array(trajectory_config["a_max_allowed"])
         self.desired_motion = self.safety_shield.step(0.0)

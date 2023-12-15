@@ -5,11 +5,7 @@ set -e
 function run_cmd {
     echo ""
     echo "${CMD}"
-    if [[ `hostname` == "sc.stanford.edu" ]] || [[ `hostname` == juno* ]]; then
-        sbatch "${SBATCH_SLURM}" "${CMD}"
-    else
-        ${CMD}
-    fi
+    ${CMD}
 }
 
 function train_value {
@@ -62,14 +58,10 @@ function run_value {
 # Setup.
 SBATCH_SLURM="scripts/train/train_juno.sh"
 DEBUG=0
+ENV_KWARGS="--gui 0"
 
 input_path="models"
 output_path="models"
-
-# Pybullet experiments.
-if [[ `hostname` == *stanford.edu ]] || [[ `hostname` == juno* ]]; then
-    ENV_KWARGS="--gui 0"
-fi
 
 # Train critic library.
 exp_name="value_fns_irl"
@@ -95,11 +87,5 @@ run_value
 # Details: 1M episodes, MSE loss for Q-networks, ensemble of 8 Q-networks.
 TRAINER_CONFIG="configs/pybullet/trainers/value/value_iter-3M.yaml"
 AGENT_CONFIG="configs/pybullet/agents/multi_stage/value/sac_ens_value_mse.yaml"
-PRIMITIVE="pull"
-run_value
-
-# Details: 1M episodes, MSE loss for Q-networks, ensemble of 8 Q-networks.
-TRAINER_CONFIG="configs/pybullet/trainers/value/value_iter-3M.yaml"
-AGENT_CONFIG="configs/pybullet/agents/multi_stage/value/sac_ens_value_mse.yaml"
-PRIMITIVE="push"
+PRIMITIVE="static_handover"
 run_value
