@@ -82,9 +82,7 @@ class FailsafeController:
 
         self.safety_shield = SafetyShield(
             sample_time=SIMULATION_TIME_STEP,
-            trajectory_config_file=(
-                f"{dir_path}/../../configs/pybullet/shield/trajectory_parameters_{robot_name}.yaml"
-            ),
+            trajectory_config_file=(f"{dir_path}/configs/pybullet/shield/trajectory_parameters_{robot_name}.yaml"),
             robot_config_file=f"{dir_path}/configs/pybullet/shield/robot_parameters_{robot_name}.yaml",
             mocap_config_file=dir_path + "/configs/pybullet/shield/pybullet_mocap.yaml",
             init_x=base_pos[0],
