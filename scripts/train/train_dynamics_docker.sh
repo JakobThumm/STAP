@@ -80,14 +80,14 @@ DEBUG=0
 user=${1:-user}
 gpu=${2:-cpu}
 
-input_path="models"
-output_path="models"
+input_path="${STAP_PATH}/models"
+output_path="${STAP_PATH}/models"
 ENV_KWARGS="--gui 0"
 
 
 # Train dynamics.
-DYNAMICS_CONFIG="configs/pybullet/dynamics/table_env.yaml"
-TRAINER_CONFIG="configs/pybullet/trainers/dynamics/dynamics_iter-0.75M.yaml"
+DYNAMICS_CONFIG="${STAP_PATH}/configs/pybullet/dynamics/table_env.yaml"
+TRAINER_CONFIG="${STAP_PATH}/configs/pybullet/trainers/dynamics/dynamics_iter-0.75M.yaml"
 PRIMITIVES=("pick" "place" "static_handover")
 
 # Uncomment to train dynamics for RL agents (scripts/train/train_agents.sh).

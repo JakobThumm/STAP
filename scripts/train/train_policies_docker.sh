@@ -64,7 +64,7 @@ function train_policy {
 }
 
 function run_policy {
-    ENV_CONFIG="configs/pybullet/envs/official/primitives/heavy/${PRIMITIVE}_eval.yaml"
+    ENV_CONFIG="${STAP_PATH}/configs/pybullet/envs/official/primitives/heavy/${PRIMITIVE}_eval.yaml"
 
     TRAIN_DATA_CHECKPOINTS=""
     for seed in "${TRAIN_SEEDS[@]}"; do
@@ -89,8 +89,8 @@ user=${1:-user}
 gpu=${2:-cpu}
 ENV_KWARGS="--gui 0"
 
-input_path="models"
-output_path="models"
+input_path="${STAP_PATH}/models"
+output_path="${STAP_PATH}/models"
 plots_path="plots"
 
 # Train policy library.
@@ -103,8 +103,8 @@ TRAIN_SEEDS=($(seq 0 15))
 VALIDATION_SEEDS=($(seq 16 19))
 DATA_CHECKPOINT_PATH="${input_path}/datasets"
 
-AGENT_CONFIG="configs/pybullet/agents/multi_stage/policy/sac_policy.yaml"
-TRAINER_CONFIG="configs/pybullet/trainers/policy/policy.yaml"
+AGENT_CONFIG="${STAP_PATH}/configs/pybullet/agents/multi_stage/policy/sac_policy.yaml"
+TRAINER_CONFIG="${STAP_PATH}/configs/pybullet/trainers/policy/policy.yaml"
 
 CRITIC_CHECKPOINT_PATH="${input_path}/value_fns_irl"
 CHECKPOINT="final_model"

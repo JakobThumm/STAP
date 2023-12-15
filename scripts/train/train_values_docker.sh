@@ -63,7 +63,7 @@ function train_value {
 }
 
 function run_value {
-    ENV_CONFIG="configs/pybullet/envs/official/primitives/heavy/${PRIMITIVE}.yaml"
+    ENV_CONFIG="${STAP_PATH}/configs/pybullet/envs/official/primitives/heavy/${PRIMITIVE}.yaml"
 
     TRAIN_DATA_CHECKPOINTS=""
     for seed in "${TRAIN_SEEDS[@]}"; do
@@ -86,8 +86,8 @@ DEBUG=0
 user=${1:-user}
 gpu=${2:-cpu}
 
-input_path="models"
-output_path="models"
+input_path="${STAP_PATH}/models"
+output_path="${STAP_PATH}/models"
 
 ENV_KWARGS="--gui 0"
 
@@ -101,19 +101,19 @@ VALIDATION_SEEDS=($(seq 16 19))
 DATA_CHECKPOINT_PATH="${input_path}/datasets"
 
 # Details: 1M episodes, Logistic Regression loss for Q-networks, ensemble of 8 Q-networks.
-TRAINER_CONFIG="configs/pybullet/trainers/value/value_iter-3M.yaml"
-AGENT_CONFIG="configs/pybullet/agents/multi_stage/value/sac_ens_value_mse.yaml"
+TRAINER_CONFIG="${STAP_PATH}/configs/pybullet/trainers/value/value_iter-3M.yaml"
+AGENT_CONFIG="${STAP_PATH}/configs/pybullet/agents/multi_stage/value/sac_ens_value_mse.yaml"
 PRIMITIVE="pick"
 run_value
 
 # Details: 1M episodes, MSE loss for Q-networks, ensemble of 8 Q-networks.
-TRAINER_CONFIG="configs/pybullet/trainers/value/value_iter-3M.yaml"
-AGENT_CONFIG="configs/pybullet/agents/multi_stage/value/sac_ens_value_mse.yaml"
+TRAINER_CONFIG="${STAP_PATH}/configs/pybullet/trainers/value/value_iter-3M.yaml"
+AGENT_CONFIG="${STAP_PATH}/configs/pybullet/agents/multi_stage/value/sac_ens_value_mse.yaml"
 PRIMITIVE="place"
 run_value
 
 # Details: 1M episodes, MSE loss for Q-networks, ensemble of 8 Q-networks.
-TRAINER_CONFIG="configs/pybullet/trainers/value/value_iter-3M.yaml"
-AGENT_CONFIG="configs/pybullet/agents/multi_stage/value/sac_ens_value_mse.yaml"
+TRAINER_CONFIG="${STAP_PATH}/configs/pybullet/trainers/value/value_iter-3M.yaml"
+AGENT_CONFIG="${STAP_PATH}/configs/pybullet/agents/multi_stage/value/sac_ens_value_mse.yaml"
 PRIMITIVE="static_handover"
 run_value
