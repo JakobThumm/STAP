@@ -72,15 +72,15 @@ TRAINER_CONFIG="configs/pybullet/trainers/dynamics/dynamics_iter-0.75M.yaml"
 PRIMITIVES=("pick" "place" "pull" "push")
 
 # Uncomment to train dynamics for RL agents (scripts/train/train_agents.sh).
-exp_name="dynamics_rl"
-DYNAMICS_OUTPUT_PATH="${output_path}/${exp_name}"
-POLICY_INPUT_PATH="${input_path}/agents_rl"
-POLICY_CHECKPOINT="final_model"
-run_dynamics
-
-# Uncomment to train dynamics for inverse RL policies (scripts/train/train_policies.sh).
-# exp_name="dynamics_irl"
+# exp_name="dynamics_rl"
 # DYNAMICS_OUTPUT_PATH="${output_path}/${exp_name}"
-# POLICY_INPUT_PATH="${input_path}/policies_irl"
+# POLICY_INPUT_PATH="${input_path}/agents_rl"
 # POLICY_CHECKPOINT="final_model"
 # run_dynamics
+
+# Uncomment to train dynamics for inverse RL policies (scripts/train/train_policies.sh).
+exp_name="dynamics_irl"
+DYNAMICS_OUTPUT_PATH="${output_path}/${exp_name}"
+POLICY_INPUT_PATH="${input_path}/policies_irl"
+POLICY_CHECKPOINT="final_model"
+run_dynamics
