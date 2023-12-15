@@ -3,13 +3,34 @@
 set -e
 
 function run_cmd {
-    echo ""
-    echo "${CMD}"
-    if [[ `hostname` == "sc.stanford.edu" ]] || [[ `hostname` == juno* ]]; then
-        sbatch "${SBATCH_SLURM}" "${CMD}"
-    else
-        ${CMD}
+    docker_command="docker run -d --rm "
+    options="--net=host --shm-size=10.24gb"
+    image="stap-train"
+
+    if [ "$gpu" = "gpu" ]
+    then
+        options="${options} --gpus all"
+        image="${image}-gpu"
     fi
+
+    if [ "$user" = "root" ]
+        then
+        options="${options} --volume="$(pwd)/models/:/root/models/""
+        image="${image}/root:v2"
+    elif [ "$user" = "user" ]
+        then
+        options="${options} --volume="$(pwd)/models/:/home/$USER/models/" --user=$USER"
+        image="${image}/$USER:v2"
+    else
+        echo "User mode unknown. Please choose user, root, or leave out for default user"
+    fi
+
+    echo "Running docker command: ${docker_command} ${options} ${image} ${CMD}"
+
+    ${docker_command} \
+        ${options} \
+        ${image} \
+        ${CMD}
 }
 
 function train_policy {
@@ -63,15 +84,14 @@ function run_policy {
 }
 
 # Setup.
-SBATCH_SLURM="scripts/train/train_juno.sh"
 DEBUG=0
+user=${1:-user}
+gpu=${2:-cpu}
+ENV_KWARGS="--gui 0"
 
 input_path="models"
 output_path="models"
 plots_path="plots"
-
-# Pybullet experiments.
-ENV_KWARGS="--gui 0"
 
 # Train policy library.
 exp_name="policies_irl"

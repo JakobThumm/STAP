@@ -3,23 +3,34 @@
 set -e
 
 function run_cmd {
-    echo ""
-    echo "${CMD}"
+    docker_command="docker run -d --rm "
+    options="--net=host --shm-size=10.24gb"
+    image="stap-train"
+
+    if [ "$gpu" = "gpu" ]
+    then
+        options="${options} --gpus all"
+        image="${image}-gpu"
+    fi
+
     if [ "$user" = "root" ]
-    then
-        docker run -d --rm \
-            --net=host \
-            --volume="$(pwd)/models/:/root/models/" \
-            --shm-size=10.24gb \
-            stap-train/root:v2 "${CMD}"
+        then
+        options="${options} --volume="$(pwd)/models/:/root/models/""
+        image="${image}/root:v2"
     elif [ "$user" = "user" ]
-    then
-        docker run -d --rm \
-            --net=host \
-            --volume="$(pwd)/models/:/home/$USER/models/" \
-            --shm-size=10.24gb \
-            stap-train/$USER:v2 "${CMD}"
+        then
+        options="${options} --volume="$(pwd)/models/:/home/$USER/models/" --user=$USER"
+        image="${image}/$USER:v2"
     else
+        echo "User mode unknown. Please choose user, root, or leave out for default user"
+    fi
+
+    echo "Running docker command: ${docker_command} ${options} ${image} ${CMD}"
+
+    ${docker_command} \
+        ${options} \
+        ${image} \
+        ${CMD}
 }
 
 function train_value {
@@ -73,6 +84,7 @@ function run_value {
 SBATCH_SLURM="scripts/train/train_juno.sh"
 DEBUG=0
 user=${1:-user}
+gpu=${2:-cpu}
 
 input_path="models"
 output_path="models"

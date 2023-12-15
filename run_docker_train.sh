@@ -5,32 +5,43 @@
 # to store training results outside the docker.
 
 user=${1:-user}
+gpu=${2:-cpu}
 bash_command="/bin/bash"
 docker_command="docker run -it"
 
-if [ -n "$2" ]
+if [ -n "$3" ]
 then
-    bash_command="${2}"
+    bash_command="${3}"
     docker_command="docker run -d"
 fi
 
 command="${bash_command}"
 
-echo "Chosen mode: $user"
+echo "Chosen mode: $user, chosen gpu: $gpu, chosen command: $command"
+options="--net=host --shm-size=10.24gb"
+image="stap-train"
+
+if [ "$gpu" = "gpu" ]
+then
+    options="${options} --gpus all"
+    image="${image}-gpu"
+fi
+
 if [ "$user" = "root" ]
-then
-    ${docker_command} \
-    --net=host \
-    --volume="$(pwd)/models/:/root/models/" \
-    --shm-size=10.24gb \
-    stap-train/root:v2 "${command}"
+    then
+    options="${options} --volume="$(pwd)/models/:/root/models/""
+    image="${image}/root:v2"
 elif [ "$user" = "user" ]
-then
-    ${docker_command} \
-        --net=host \
-        --volume="$(pwd)/models/:/home/$USER/models/" \
-        --shm-size=10.24gb \
-        stap-train/$USER:v2 "${command}"
+    then
+    options="${options} --volume="$(pwd)/models/:/home/$USER/models/" --user=$USER"
+    image="${image}/$USER:v2"
 else
     echo "User mode unknown. Please choose user, root, or leave out for default user"
 fi
+
+echo "Running docker command: ${docker_command} ${options} ${image} ${command}"
+
+${docker_command} \
+    ${options} \
+    ${image} \
+    ${command}

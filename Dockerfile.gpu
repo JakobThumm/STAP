@@ -1,0 +1,142 @@
+ARG MODE=root
+
+# We use the if else method as described here: https://stackoverflow.com/a/60820156/13397059
+FROM nvidia/cuda:12.0.1-base-ubuntu20.04 as base
+ARG DEBIAN_FRONTEND=noninteractive
+
+SHELL ["/bin/bash", "--login", "-c"]
+
+# setup environment
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+
+RUN apt-get update --fix-missing && \
+    apt-get install --no-install-recommends -y \
+        tzdata \
+        dirmngr \
+        gnupg2 \
+        psmisc \
+        python3 \
+        python3-pip \
+        python-is-python3 \
+        mpich \
+        python3-tk \
+        python3-dev \
+        libosmesa6-dev \
+        libgl1-mesa-glx \
+        libglfw3 \
+        apt-utils dialog 2>&1 \
+        git \
+        iproute2 \
+        procps \
+        lsb-release \
+        nano \
+        libopenmpi-dev \
+        swig \
+        wget \
+        ca-certificates \
+        curl \
+        git \
+        bzip2 \
+        sudo \
+        cmake \
+        build-essential \
+        tar \
+        unzip \
+        curl \
+        g++ \
+        gcc-9 \
+        clang \
+        libgtest-dev \
+        libgmock-dev \
+        bc \
+        tmux
+
+RUN apt-get upgrade libstdc++6 -y
+RUN apt-get dist-upgrade
+
+RUN apt-get autoremove -y && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV DEBIAN_FRONTEND=dialog
+
+# Install python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# Pull and install eigen
+RUN curl -LJO https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.bz2 && \
+    tar -xvf eigen-3.4.0.tar.bz2 && \
+    rm eigen-3.4.0.tar.bz2
+
+WORKDIR /eigen-3.4.0/build
+RUN cmake .. && make install
+
+#-------------------------------------------------------------------------------------------------------------
+# User docker
+#-------------------------------------------------------------------------------------------------------------
+FROM base as branch-user
+
+ARG USERNAME=robot
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+RUN groupadd --gid $USER_GID $USERNAME && \
+    useradd --create-home --no-log-init --uid $USER_UID --gid $USER_GID $USERNAME
+
+# ARG is scoped -> has to be set as environment variable
+ENV HOME_PATH=/home/$USERNAME
+USER $USERNAME
+
+#-------------------------------------------------------------------------------------------------------------
+# Root docker
+#-------------------------------------------------------------------------------------------------------------
+FROM base as branch-root
+
+ARG USERNAME=root
+ENV HOME_PATH=/root
+
+#-------------------------------------------------------------------------------------------------------------
+# Final docker
+#-------------------------------------------------------------------------------------------------------------
+FROM branch-${MODE} AS final
+
+WORKDIR $HOME_PATH
+
+ARG USERNAME=root
+
+WORKDIR $HOME_PATH
+
+# Copy all required folders
+COPY --chown=$USERNAME Pipfile Pipfile.lock pyproject.toml setup.cfg generate_primitive_dataset.py $HOME_PATH/
+COPY --chown=$USERNAME configs/ $HOME_PATH/configs/
+COPY --chown=$USERNAME scripts/ $HOME_PATH/scripts/
+COPY --chown=$USERNAME stap/ $HOME_PATH/stap/
+COPY --chown=$USERNAME third_party/ $HOME_PATH/third_party/
+
+# Install python packages with root privileges
+USER root
+# Build SaRA shield
+ENV CONDA_PREFIX="/usr/"
+WORKDIR $HOME_PATH/third_party/sara-shield
+RUN rm -rf build && \
+    rm -rf safety_shield/build
+RUN export EIGEN3_INCLUDE_DIR="/eigen-3.4.0" && \
+    python setup.py install
+
+WORKDIR $HOME_PATH
+RUN pip install .
+
+WORKDIR $HOME_PATH/third_party/scod-regression
+RUN rm -rf scod-regression.egg-info && \
+    rm -rf build
+RUN pip install .
+WORKDIR $HOME_PATH
+# Switch back to USER mode
+USER $USERNAME
+
+SHELL ["/bin/bash", "-c"]
+
+ENTRYPOINT ["/bin/bash", "-c"]
+CMD ["/bin/bash"]

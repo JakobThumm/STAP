@@ -3,24 +3,37 @@
 # Root mode creates a "classic" root user in docker.
 
 user=${1:-user}
-echo "Chosen mode: $user"
+gpu=${2:-cpu}
+echo "Chosen mode: $user, chosen gpu: $gpu"
+
+command="docker build"
+options=""
+dockerfile="Dockerfile"
+image="stap-train"
+
+if [ "$gpu" = "gpu" ]
+then
+    image="${image}-gpu"
+    dockerfile="${dockerfile}.gpu"
+else
+    dockerfile="${dockerfile}.train"
+fi
 
 if [ "$user" = "root" ]
-then
-    DOCKER_BUILDKIT=1 docker build \
-        -f Dockerfile.train \
-        --build-arg MODE=root \
-        -t stap-train/root:v2 .
+    then
+    options="${options} --build-arg MODE=root"
+    image="${image}/root:v2"
 elif [ "$user" = "user" ]
-then
-    DOCKER_BUILDKIT=1 docker build \
-        -f Dockerfile.train \
-        --progress=plain \
-        --build-arg MODE=user \
+    then
+    options="${options} --build-arg MODE=user \
         --build-arg USER_UID=$(id -u) \
         --build-arg USER_GID=$(id -g) \
-        --build-arg USERNAME=$USER \
-        -t stap-train/$USER:v2 .
+        --build-arg USERNAME=$USER"
+    image="${image}/$USER:v2"
 else
-  echo "User mode unkown. Please choose user, root, or leave it out for default user"
+    echo "User mode unknown. Please choose user, root, or leave out for default user"
 fi
+
+echo "Running docker command: ${command} ${options} -f ${dockerfile} -t ${image} ."
+DOCKER_BUILDKIT=1
+${command} ${options} -f ${dockerfile} -t ${image} .
