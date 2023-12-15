@@ -223,7 +223,7 @@ def is_beyondworkspace(
     if distance is None:
         distance = float(np.linalg.norm(obj_pos))
 
-    if distance < TABLE_CONSTRAINTS["workspace_radius"]:
+    if distance < TABLE_CONSTRAINTS["workspace_max_radius"]:
         return False
 
     return True

@@ -66,8 +66,8 @@ class HumanTableEnv(TableEnv):
     def _create_objects(self, object_kwargs: Optional[List[Dict[str, Any]]] = None) -> None:
         super()._create_objects(object_kwargs=object_kwargs)
         self.human = Human(self.physics_id, **self._human_kwargs)
-        human_hands = self.human.get_hand_objects()
-        self._objects.update(human_hands)
+        self.human_hands = self.human.get_hand_objects()
+        self._objects.update(self.human_hands)
 
     def reset(  # type: ignore
         self,
@@ -154,7 +154,12 @@ class HumanTableEnv(TableEnv):
 
         The first item in the dict corresponds to the end-effector pose.
         """
-        return super().object_states()
+        object_states = super().object_states()
+        # Remove the human hands from the object states.
+        # for hand_name in self.human_hands.keys():
+        #     if hand_name in object_states:
+        #         object_states.pop(hand_name)
+        return object_states
 
     def step(
         self, action: np.ndarray, custom_recording_text: Optional[Dict[str, str]] = None

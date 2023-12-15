@@ -345,7 +345,7 @@ class InWorkspace(Predicate, TableBounds):
         bounds = parent_obj.aabb()[:, :2]
         xy_min, xy_max = bounds
         xy_min[0] = utils.TABLE_CONSTRAINTS["workspace_x_min"]
-        xy_max[0] = utils.TABLE_CONSTRAINTS["workspace_radius"]
+        xy_max[0] = utils.TABLE_CONSTRAINTS["workspace_max_radius"]
         xy_min += margin
         xy_max -= margin
 
@@ -372,7 +372,7 @@ class InCollisionZone(Predicate, TableBounds):
         distance = float(np.linalg.norm(obj_pos))
         if not (
             utils.TABLE_CONSTRAINTS["workspace_x_min"] <= obj_pos[0] < utils.TABLE_CONSTRAINTS["operational_x_min"]
-            and distance < utils.TABLE_CONSTRAINTS["workspace_radius"]
+            and distance < utils.TABLE_CONSTRAINTS["workspace_max_radius"]
         ):
             dbprint(f"{self}.value():", False, "- pos:", obj_pos, "distance:", distance)
             return False
@@ -419,7 +419,7 @@ class InOperationalZone(Predicate, TableBounds):
         distance = float(np.linalg.norm(obj_pos))
         if not (
             utils.TABLE_CONSTRAINTS["operational_x_min"] <= obj_pos[0] < utils.TABLE_CONSTRAINTS["operational_x_max"]
-            and distance < utils.TABLE_CONSTRAINTS["workspace_radius"]
+            and distance < utils.TABLE_CONSTRAINTS["workspace_max_radius"]
         ):
             dbprint(f"{self}.value():", False, "- pos:", obj_pos, "distance:", distance)
             return False
@@ -466,7 +466,7 @@ class InObstructionZone(Predicate, TableBounds):
         distance = float(np.linalg.norm(obj_pos))
         if not (
             obj_pos[0] >= utils.TABLE_CONSTRAINTS["obstruction_x_min"]
-            and distance < utils.TABLE_CONSTRAINTS["workspace_radius"]
+            and distance < utils.TABLE_CONSTRAINTS["workspace_max_radius"]
         ):
             dbprint(f"{self}.value():", False, "- pos:", obj_pos, "distance:", distance)
             return False
@@ -486,7 +486,7 @@ class InObstructionZone(Predicate, TableBounds):
         bounds = parent_obj.aabb()[:, :2]
         xy_min, xy_max = bounds
         xy_min[0] = utils.TABLE_CONSTRAINTS["obstruction_x_min"]
-        xy_max[0] = utils.TABLE_CONSTRAINTS["workspace_radius"]
+        xy_max[0] = utils.TABLE_CONSTRAINTS["workspace_max_radius"]
         xy_min += margin
         xy_max -= margin
 
@@ -538,7 +538,7 @@ class BeyondWorkspace(Predicate, TableBounds):
 
         bounds = parent_obj.aabb()[:, :2]
         xy_min, xy_max = bounds
-        r = utils.TABLE_CONSTRAINTS["workspace_radius"]
+        r = utils.TABLE_CONSTRAINTS["workspace_max_radius"]
         xy_min[0] = r * np.cos(np.arcsin(0.5 * (xy_max[1] - xy_min[1]) / r))
         xy_min += margin
         xy_max -= margin

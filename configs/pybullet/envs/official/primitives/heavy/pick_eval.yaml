@@ -81,6 +81,10 @@ env_kwargs:
         - on(rack_box_4, rack)
 
   robot_config: configs/pybullet/envs/robots/safe_franka_panda_sim.yaml
+  human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
+  animation_type: HumanRobotHandover
+  animation_frequency: 100
+  visualize_shield: false
 
   object_groups:
     - name: boxes
