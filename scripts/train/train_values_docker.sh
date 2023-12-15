@@ -106,12 +106,16 @@ AGENT_CONFIG="${STAP_PATH}/configs/pybullet/agents/multi_stage/value/sac_ens_val
 PRIMITIVE="pick"
 run_value
 
+TRAIN_SEEDS=($(seq 20 35))
+VALIDATION_SEEDS=($(seq 36 39))
 # Details: 1M episodes, MSE loss for Q-networks, ensemble of 8 Q-networks.
 TRAINER_CONFIG="${STAP_PATH}/configs/pybullet/trainers/value/value_iter-3M.yaml"
 AGENT_CONFIG="${STAP_PATH}/configs/pybullet/agents/multi_stage/value/sac_ens_value_mse.yaml"
 PRIMITIVE="place"
 run_value
 
+TRAIN_SEEDS=($(seq 40 55))
+VALIDATION_SEEDS=($(seq 56 59))
 # Details: 1M episodes, MSE loss for Q-networks, ensemble of 8 Q-networks.
 TRAINER_CONFIG="${STAP_PATH}/configs/pybullet/trainers/value/value_iter-3M.yaml"
 AGENT_CONFIG="${STAP_PATH}/configs/pybullet/agents/multi_stage/value/sac_ens_value_mse.yaml"

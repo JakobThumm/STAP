@@ -113,10 +113,14 @@ CHECKPOINT="final_model"
 PRIMITIVE="pick"
 run_policy
 
+TRAIN_SEEDS=($(seq 20 35))
+VALIDATION_SEEDS=($(seq 36 39))
 # Details: 1M episodes, MSE loss for Q-networks, ensemble of 8 Q-networks.
 PRIMITIVE="place"
 run_policy
 
+TRAIN_SEEDS=($(seq 40 55))
+VALIDATION_SEEDS=($(seq 56 59))
 # Details: 1M episodes, MSE loss for Q-networks, ensemble of 8 Q-networks.
 PRIMITIVE="static_handover"
 run_policy
