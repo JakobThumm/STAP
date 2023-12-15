@@ -115,6 +115,7 @@ COPY --chown=$USERNAME scripts/ $HOME_PATH/scripts/
 COPY --chown=$USERNAME stap/ $HOME_PATH/stap/
 COPY --chown=$USERNAME third_party/ $HOME_PATH/third_party/
 
+ENV STAP_PATH=$HOME_PATH
 # Install python packages with root privileges
 USER root
 # Build SaRA shield

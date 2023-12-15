@@ -63,7 +63,10 @@ class FailsafeController:
         self.kp = kp
         self.kd = 2 * np.sqrt(self.kp) * damping_ratio
         # Control dimension
-        dir_path = os.path.dirname(os.path.realpath(__file__))
+        if "STAP_PATH" in os.environ:
+            dir_path = os.environ["STAP_PATH"]
+        else:
+            dir_path = os.path.dirname(os.path.realpath(__file__)) + "/../.."
         rot = Rotation.from_quat(
             [
                 base_orientation[0],
@@ -82,8 +85,8 @@ class FailsafeController:
             trajectory_config_file=(
                 f"{dir_path}/../../configs/pybullet/shield/trajectory_parameters_{robot_name}.yaml"
             ),
-            robot_config_file=f"{dir_path}/../../configs/pybullet/shield/robot_parameters_{robot_name}.yaml",
-            mocap_config_file=dir_path + "/../../configs/pybullet/shield/pybullet_mocap.yaml",
+            robot_config_file=f"{dir_path}/configs/pybullet/shield/robot_parameters_{robot_name}.yaml",
+            mocap_config_file=dir_path + "/configs/pybullet/shield/pybullet_mocap.yaml",
             init_x=base_pos[0],
             init_y=base_pos[1],
             init_z=base_pos[2],
@@ -93,9 +96,7 @@ class FailsafeController:
             init_qpos=init_qpos,
             shield_type=self.shield_type,
         )
-        trajectory_config = load_config(
-            f"{dir_path}/../../configs/pybullet/shield/trajectory_parameters_{robot_name}.yaml"
-        )
+        trajectory_config = load_config(f"{dir_path}/configs/pybullet/shield/trajectory_parameters_{robot_name}.yaml")
         self._a_max_allowed = np.array(trajectory_config["a_max_allowed"])
         self.desired_motion = self.safety_shield.step(0.0)
         # Place holder for dynamic variables
