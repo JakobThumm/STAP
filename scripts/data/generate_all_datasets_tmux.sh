@@ -1,9 +1,8 @@
 #!/bin/bash
-N_JOBS=$1
 set -e
 
 source scripts/data/helper_functions.sh
-
+N_JOBS=$1
 # Experiments.
 DEVICE="cpu"
 EXP_NAME="datasets"
