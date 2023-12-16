@@ -14,7 +14,8 @@ image="stap-train"
 if [ "$gpu" = "gpu" ]
 then
     image="${image}-gpu"
-    dockerfile="${dockerfile}.gpu"
+    # dockerfile="${dockerfile}121.gpu"
+    dockerfile="${dockerfile}118.gpu"
 else
     dockerfile="${dockerfile}.train"
 fi

@@ -1,7 +1,7 @@
 ARG MODE=root
 
 # We use the if else method as described here: https://stackoverflow.com/a/60820156/13397059
-FROM ubuntu:20.04 as base
+FROM nvidia/cuda:12.1.1-base-ubuntu20.04 as base
 ARG DEBIAN_FRONTEND=noninteractive
 
 SHELL ["/bin/bash", "--login", "-c"]
@@ -63,6 +63,7 @@ ENV DEBIAN_FRONTEND=dialog
 
 # Install python dependencies
 COPY requirements.txt .
+RUN pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu121
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 

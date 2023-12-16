@@ -22,7 +22,6 @@ dependencies = [
   # Computing
   "numpy",
   "scipy",
-  "torch>=1.11",
   # Image processing
   "imageio",
   "pillow",
@@ -39,9 +38,9 @@ dependencies = [
   "ctrlutils==1.4.1",
   "pysymbolic @ git+https://github.com/kevin-thankyou-lin/symbolic",
   "spatialdyn==1.4.4",
-  "functorch==0.2.1",
-  "torchvision==0.13.1",
-  "torchaudio==0.12.1",
+  "torch==2.1.0",
+  "torchvision==0.16.0",
+  "torchaudio==2.1.0",
   "tyro",
   "opencv-python",
   "atomicwrites",
