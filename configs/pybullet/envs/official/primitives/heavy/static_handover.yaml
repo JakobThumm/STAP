@@ -7,9 +7,9 @@ env_kwargs:
     - static_handover
 
   tasks:
-    - prob: 0.5
+    - prob: 0.25
       action_skeleton:
-        - static_handover(table_box_1)
+        - static_handover(table_box_1, left_hand)
       initial_state:
         - aligned(rack)
         - poslimit(rack)
@@ -26,7 +26,24 @@ env_kwargs:
         - ingripper(table_box_1)
     - prob: 0.25
       action_skeleton:
-        - static_handover(table_hook)
+        - static_handover(table_box_1, right_hand)
+      initial_state:
+        - aligned(rack)
+        - poslimit(rack)
+        - on(rack, table)
+        - on(rack_hook, rack)
+        - on(table_hook, table)
+        - on(table_box_2, table)
+        - on(table_box_3, table)
+        - on(table_box_4, table)
+        - on(rack_box_1, rack)
+        - on(rack_box_2, rack)
+        - on(rack_box_3, rack)
+        - on(rack_box_4, rack)
+        - ingripper(table_box_1)
+    - prob: 0.125
+      action_skeleton:
+        - static_handover(table_hook, left_hand)
       initial_state:
         - aligned(rack)
         - poslimit(rack)
@@ -40,9 +57,42 @@ env_kwargs:
         - on(rack_box_3, rack)
         - on(rack_box_4, rack)
         - ingripper(table_hook)
-    - prob: 0.25
+    - prob: 0.125
       action_skeleton:
-        - static_handover(table_hook)
+        - static_handover(table_hook, right_hand)
+      initial_state:
+        - aligned(rack)
+        - poslimit(rack)
+        - on(rack, table)
+        - on(table_box_1, table)
+        - on(table_box_2, table)
+        - on(table_box_3, table)
+        - on(table_box_4, table)
+        - on(rack_box_1, rack)
+        - on(rack_box_2, rack)
+        - on(rack_box_3, rack)
+        - on(rack_box_4, rack)
+        - ingripper(table_hook)
+    - prob: 0.125
+      action_skeleton:
+        - static_handover(table_hook, left_hand)
+      initial_state:
+        - handlegrasp(table_hook)
+        - aligned(rack)
+        - poslimit(rack)
+        - on(rack, table)
+        - on(table_box_1, table)
+        - on(table_box_2, table)
+        - on(table_box_3, table)
+        - on(table_box_4, table)
+        - on(rack_box_1, rack)
+        - on(rack_box_2, rack)
+        - on(rack_box_3, rack)
+        - on(rack_box_4, rack)
+        - ingripper(table_hook)
+    - prob: 0.125
+      action_skeleton:
+        - static_handover(table_hook, right_hand)
       initial_state:
         - handlegrasp(table_hook)
         - aligned(rack)
