@@ -8,6 +8,16 @@ python scripts/train/train_agent.py --trainer-config configs/pybullet/trainers/v
         --path models/value_fns_irl \
         --overwrite \
         --gui 0
+# Train values full path
+python scripts/train/train_agent.py --trainer-config /home/thummj/configs/pybullet/trainers/value/value_iter-1K.yaml \
+        --agent-config /home/thummj/configs/pybullet/agents/multi_stage/value/sac_ens_value_logistics.yaml \
+        --env-config /home/thummj/configs/pybullet/envs/official/primitives/heavy/pick.yaml \
+        --seed 0 \
+        --train-data-checkpoints /home/thummj/models/datasets/train_valid_pick_0/train_data \
+        --eval-data-checkpoints /home/thummj/models/datasets/train_valid_pick_0/train_data \
+        --path /home/thummj/models/value_fns_irl \
+        --overwrite \
+        --gui 0
 # Train policies
 python scripts/train/train_agent.py  \
         --trainer-config configs/pybullet/trainers/policy/policy-10K.yaml \

@@ -30,7 +30,7 @@ function run_cmd {
     ${docker_command} \
         ${options} \
         ${image} \
-        ${CMD}
+        "${CMD}"
 }
 
 function train_policy {
@@ -88,6 +88,15 @@ DEBUG=0
 user=${1:-user}
 gpu=${2:-cpu}
 ENV_KWARGS="--gui 0"
+if [ "$user" = "root" ]
+    then
+    STAP_PATH="/root"
+elif [ "$user" = "user" ]
+    then
+    STAP_PATH="/home/$USER"
+else
+    echo "User mode unknown. Please choose user, root, or leave out for default user"
+fi
 
 input_path="${STAP_PATH}/models"
 output_path="${STAP_PATH}/models"
