@@ -41,3 +41,16 @@ python scripts/train/train_dynamics.py  \
     --name pick_dynamics \
     --path models/dynamics_rl \
     --gui 0
+
+# Eval planners
+python scripts/eval/eval_planners.py \
+    --planner-config configs/pybullet/planners/policy_cem.yaml \
+    --env-config configs/pybullet/envs/official/sim_domains/hook_handover/task0.yaml \
+    --policy-checkpoints models/agents_rl/pick/official_model.pt models/agents_rl/place/official_model.pt models/agents_rl/static_handover/official_model.pt \
+    --dynamics-checkpoint models/dynamics_rl/pick_place_static_handover_dynamics/official_model.pt \
+    --seed 0 \
+    --gui 1 \
+    --closed-loop 1 \
+    --num-eval 100 \
+    --path plots/planning/hook_handover/task0 \
+    --verbose 1

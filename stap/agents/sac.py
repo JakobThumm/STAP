@@ -1,13 +1,14 @@
 import pathlib
-from typing import Any, Dict, Optional, Tuple, Type, Union, List, OrderedDict
-
-import torch
-import numpy as np
 from copy import deepcopy
+from typing import Any, Dict, List, Optional, OrderedDict, Tuple, Type, Union
 
+import numpy as np
+import torch
+from gym.spaces import Box
+
+from stap import encoders, envs, networks
 from stap.agents import base as agents
 from stap.agents import rl
-from stap import encoders, envs, networks
 from stap.utils import configs
 from stap.utils.typing import Batch
 
@@ -30,9 +31,7 @@ class SAC(rl.RLAgent):
         actor_kwargs: Dict[str, Any],
         critic_class: Union[str, Type[networks.critics.Critic]],
         critic_kwargs: Dict[str, Any],
-        encoder_class: Union[
-            str, Type[networks.encoders.Encoder]
-        ] = networks.encoders.NormalizeObservation,
+        encoder_class: Union[str, Type[networks.encoders.Encoder]] = networks.encoders.NormalizeObservation,
         encoder_kwargs: Dict[str, Any] = {},
         actor: Optional[networks.actors.Actor] = None,
         critic: Optional[networks.critics.Critic] = None,
@@ -84,12 +83,8 @@ class SAC(rl.RLAgent):
                     kwargs[key] = configs.get_class(kwargs[key], torch.nn)
 
         if encoder is None:
-            encoder = encoders.Encoder(
-                env, encoder_class, agent_kwargs["encoder"], device
-            )
-            target_encoder = encoders.Encoder(
-                env, encoder_class, agent_kwargs["encoder"], device
-            )
+            encoder = encoders.Encoder(env, encoder_class, agent_kwargs["encoder"], device)
+            target_encoder = encoders.Encoder(env, encoder_class, agent_kwargs["encoder"], device)
             target_encoder.network.load_state_dict(encoder.network.state_dict())
         else:
             target_encoder = encoder
@@ -97,34 +92,38 @@ class SAC(rl.RLAgent):
         for param in target_encoder.network.parameters():
             param.requires_grad = False
         target_encoder.eval_mode()
-
+        if "action_space" in agent_kwargs["actor"]:
+            assert agent_kwargs["actor"]["action_space"]["type"] == "Box"
+            action_space = Box(
+                low=np.array(agent_kwargs["actor"]["action_space"]["low"]),
+                high=np.array(agent_kwargs["actor"]["action_space"]["high"]),
+            )
+            agent_kwargs["actor"].pop("action_space")
+        else:
+            action_space = env.action_space
         actor_class = configs.get_class(actor_class, networks)
         if actor is None:
-            actor = actor_class(encoder.state_space, env.action_space, **agent_kwargs["actor"])  # type: ignore
+            actor = actor_class(encoder.state_space, action_space, **agent_kwargs["actor"])  # type: ignore
 
         critic_class = configs.get_class(critic_class, networks)
         if critic is None:
-            critic = critic_class(encoder.state_space, env.action_space, **agent_kwargs["critic"])  # type: ignore
+            critic = critic_class(encoder.state_space, action_space, **agent_kwargs["critic"])  # type: ignore
 
         target_critic = critic_class(  # type: ignore
-            target_encoder.state_space, env.action_space, **agent_kwargs["critic"]
+            target_encoder.state_space, action_space, **agent_kwargs["critic"]
         )
         target_critic.load_state_dict(critic.state_dict())
         for param in target_critic.parameters():
             param.requires_grad = False
         target_critic.eval()
 
-        self._log_alpha = torch.tensor(
-            np.log(initial_temperature), dtype=torch.float, requires_grad=True
-        )
+        self._log_alpha = torch.tensor(np.log(initial_temperature), dtype=torch.float, requires_grad=True)
         self._target_critic = target_critic
         self._target_encoder = target_encoder
 
         if isinstance(bce_weight, list):
             if len(bce_weight) != 2 or any(w <= 0 for w in bce_weight):
-                raise ValueError(
-                    "Require non-negative weight for positive and negative classes."
-                )
+                raise ValueError("Require non-negative weight for positive and negative classes.")
             self.bce_weight = torch.tensor(bce_weight).float() / sum(bce_weight)
         else:
             self.bce_weight = None
@@ -136,6 +135,7 @@ class SAC(rl.RLAgent):
             encoder=encoder,
             checkpoint=checkpoint,
             device=device,
+            action_space=action_space,
         )
 
         self.target_entropy = -np.prod(self.action_space.shape)
@@ -166,9 +166,7 @@ class SAC(rl.RLAgent):
         """Target encoder."""
         return self._target_encoder
 
-    def load_state_dict(
-        self, state_dict: Dict[str, OrderedDict[str, torch.Tensor]], strict: bool = True
-    ) -> None:
+    def load_state_dict(self, state_dict: Dict[str, OrderedDict[str, torch.Tensor]], strict: bool = True) -> None:
         """Loads the agent state dict.
 
         Args:
@@ -229,15 +227,8 @@ class SAC(rl.RLAgent):
         if self.use_bce:
             if len(target_q) != (target_q == 0.0).sum() + (target_q == 1.0).sum():
                 raise ValueError("Logistics regression requires [0, 1] targets.")
-            weight = (
-                get_bce_weight(target_q, self.bce_weight)
-                if isinstance(self.bce_weight, torch.Tensor)
-                else None
-            )
-            q_losses = [
-                torch.nn.functional.binary_cross_entropy(q, target_q, weight=weight)
-                for q in qs
-            ]
+            weight = get_bce_weight(target_q, self.bce_weight) if isinstance(self.bce_weight, torch.Tensor) else None
+            q_losses = [torch.nn.functional.binary_cross_entropy(q, target_q, weight=weight) for q in qs]
         else:
             q_losses = [torch.nn.functional.mse_loss(q, target_q) for q in qs]
         q_loss = sum(q_losses) / len(q_losses)
@@ -276,9 +267,7 @@ class SAC(rl.RLAgent):
         elif self.q_actor_update == "median":
             q = q.median(dim=0).values
         else:
-            raise ValueError(
-                f"Q-actor update type {self.q_actor_update} is not supported."
-            )
+            raise ValueError(f"Q-actor update type {self.q_actor_update} is not supported.")
         actor_loss = (self.alpha.detach() * log_prob - q).mean()
         alpha_loss = (self.alpha * (-log_prob - self.target_entropy).detach()).mean()
 
@@ -309,12 +298,8 @@ class SAC(rl.RLAgent):
             Dict of optimizers for all trainable networks.
         """
         keys = ["actor", "critic", "log_alpha"]
-        if any(k not in optimizer_kwargs for k in keys) and any(
-            k in optimizer_kwargs for k in keys
-        ):
-            raise ValueError(
-                f"Must supply general optimizer_kwargs or optimizer_kwargs for each of {keys}"
-            )
+        if any(k not in optimizer_kwargs for k in keys) and any(k in optimizer_kwargs for k in keys):
+            raise ValueError(f"Must supply general optimizer_kwargs or optimizer_kwargs for each of {keys}")
 
         optimizers = {}
         for key in keys:
@@ -359,28 +344,14 @@ class SAC(rl.RLAgent):
         assert isinstance(batch["observation"], torch.Tensor)
         assert isinstance(batch["next_observation"], torch.Tensor)
 
-        updating_critic = (
-            False
-            if self.critic_update_freq == 0
-            else step % self.critic_update_freq == 0
-        )
-        updating_actor = (
-            False if self.actor_update_freq == 0 else step % self.actor_update_freq == 0
-        )
-        updating_target = (
-            False
-            if self.target_update_freq == 0
-            else step % self.target_update_freq == 0
-        )
+        updating_critic = False if self.critic_update_freq == 0 else step % self.critic_update_freq == 0
+        updating_actor = False if self.actor_update_freq == 0 else step % self.actor_update_freq == 0
+        updating_target = False if self.target_update_freq == 0 else step % self.target_update_freq == 0
 
         if updating_actor or updating_critic:
             with torch.no_grad():
-                batch["observation"] = self.encoder.encode(
-                    batch["observation"], batch["policy_args"]
-                )
-                batch["next_observation"] = self.target_encoder.encode(
-                    batch["next_observation"], batch["policy_args"]
-                )
+                batch["observation"] = self.encoder.encode(batch["observation"], batch["policy_args"])
+                batch["next_observation"] = self.target_encoder.encode(batch["next_observation"], batch["policy_args"])
 
         metrics = {}
         if updating_critic:
@@ -394,9 +365,7 @@ class SAC(rl.RLAgent):
             metrics.update(critic_metrics)
 
         if updating_actor:
-            actor_loss, alpha_loss, actor_metrics = self.compute_actor_and_alpha_loss(
-                batch["observation"]
-            )
+            actor_loss, alpha_loss, actor_metrics = self.compute_actor_and_alpha_loss(batch["observation"])
 
             optimizers["actor"].zero_grad(set_to_none=True)
             actor_loss.backward()
@@ -412,9 +381,7 @@ class SAC(rl.RLAgent):
 
         if updating_target:
             with torch.no_grad():
-                _update_params(
-                    source=self.critic, target=self.target_critic, tau=self.tau
-                )
+                _update_params(source=self.critic, target=self.target_critic, tau=self.tau)
 
         return metrics
 
@@ -435,12 +402,8 @@ class SAC(rl.RLAgent):
 
         if evaluating_critic or evaluating_actor:
             with torch.no_grad():
-                batch["observation"] = self.encoder.encode(
-                    batch["observation"], batch["policy_args"]
-                )
-                batch["next_observation"] = self.target_encoder.encode(
-                    batch["next_observation"], batch["policy_args"]
-                )
+                batch["observation"] = self.encoder.encode(batch["observation"], batch["policy_args"])
+                batch["next_observation"] = self.target_encoder.encode(batch["next_observation"], batch["policy_args"])
 
         metrics = {}
         if self.critic_update_freq > 0:
@@ -448,17 +411,13 @@ class SAC(rl.RLAgent):
             metrics.update(critic_metrics)
 
         if self.actor_update_freq > 0:
-            _, _, actor_metrics = self.compute_actor_and_alpha_loss(
-                batch["observation"]
-            )
+            _, _, actor_metrics = self.compute_actor_and_alpha_loss(batch["observation"])
             metrics.update(actor_metrics)
 
         return metrics
 
 
-def _update_params(
-    source: torch.nn.Module, target: torch.nn.Module, tau: float
-) -> None:
+def _update_params(source: torch.nn.Module, target: torch.nn.Module, tau: float) -> None:
     """Updates the target parameters towards the source parameters.
 
     Args:
@@ -468,6 +427,4 @@ def _update_params(
             source, and tau=0.0 performs no update.
     """
     for source_params, target_params in zip(source.parameters(), target.parameters()):
-        target_params.data.copy_(
-            tau * source_params.data + (1 - tau) * target_params.data
-        )
+        target_params.data.copy_(tau * source_params.data + (1 - tau) * target_params.data)

@@ -2,6 +2,7 @@ import pathlib
 from typing import Dict, Optional, OrderedDict, Union
 
 import torch
+from gym.spaces import Space
 
 from stap import encoders, envs, networks
 from stap.agents.base import Agent
@@ -19,6 +20,9 @@ class RLAgent(Agent, Model[Batch]):
         encoder: encoders.Encoder,
         checkpoint: Optional[Union[str, pathlib.Path]] = None,
         device: str = "auto",
+        state_space: Optional[Space] = None,
+        action_space: Optional[Space] = None,
+        observation_space: Optional[Space] = None,
     ):
         """Sets up the agent and loads from checkpoint if available.
 
@@ -30,10 +34,16 @@ class RLAgent(Agent, Model[Batch]):
             checkpoint: Policy checkpoint.
             device: Torch device.
         """
+        if state_space is None:
+            state_space = encoder.state_space
+        if action_space is None:
+            action_space = env.action_space
+        if observation_space is None:
+            observation_space = env.observation_space
         super().__init__(
-            state_space=encoder.state_space,
-            action_space=env.action_space,
-            observation_space=env.observation_space,
+            state_space=state_space,
+            action_space=action_space,
+            observation_space=observation_space,
             actor=actor,
             critic=critic,
             encoder=encoder,
@@ -50,9 +60,7 @@ class RLAgent(Agent, Model[Batch]):
         """Agent environment."""
         return self._env
 
-    def load_state_dict(
-        self, state_dict: Dict[str, OrderedDict[str, torch.Tensor]], strict: bool = True
-    ) -> None:
+    def load_state_dict(self, state_dict: Dict[str, OrderedDict[str, torch.Tensor]], strict: bool = True) -> None:
         """Loads the agent state dict.
 
         Args:
