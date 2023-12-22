@@ -619,7 +619,7 @@ class TableEnv(PybulletEnv):
                         for {self._task}: failed to sample task \
                         propositions after {max_samples_per_trial} trials."
                     )
-                self._task = self.tasks.tasks[0]  # self.tasks.sample()
+                self._task = self.tasks.sample()
                 self.set_primitive(self.task.action_skeleton[0])
 
             self.robot.reset(time=self._sim_time)
