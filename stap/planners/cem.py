@@ -7,7 +7,7 @@ import torch
 from stap import agents, dynamics, envs, networks
 from stap.planners import base as planners
 from stap.planners import utils
-from stap.utils import spaces, tensors
+from stap.utils import spaces
 
 
 class CEMPlanner(planners.Planner):
@@ -107,16 +107,20 @@ class CEMPlanner(planners.Planner):
 
         # Roll out a trajectory.
         _, actions = self.dynamics.rollout(observation, action_skeleton, self.policies)
-        mean = actions
 
         # Scale the standard deviations by the action spaces.
         std = spaces.null_tensor(self.dynamics.action_space, (T,))
+        mean = spaces.null_tensor(self.dynamics.action_space, (T,))
         for t, primitive in enumerate(action_skeleton):
             a = self.policies[primitive.idx_policy].action_space
             action_range = torch.from_numpy(a.high - a.low)
-            std[t] = self.standard_deviation * 0.5 * action_range
+            std[t, : action_range.shape[0]] = self.standard_deviation * 0.5 * action_range
+            mean[t, : action_range.shape[0]] = actions[t, : action_range.shape[0]]
+            # if std.shape[1] > action_range.shape[0]:
+            #     std[t, action_range.shape[0] :] = 1
+            #     mean[t, action_range.shape[0] :] = 0
 
-        return mean, std.to(self.device)
+        return mean.to(self.device), std.to(self.device)
 
     def plan(
         self,
@@ -144,13 +148,8 @@ class CEMPlanner(planners.Planner):
             p_visited_success_list = []
             visited_values_list = []
 
-        value_fns = [
-            self.policies[primitive.idx_policy].critic for primitive in action_skeleton
-        ]
-        decode_fns = [
-            functools.partial(self.dynamics.decode, primitive=primitive)
-            for primitive in action_skeleton
-        ]
+        value_fns = [self.policies[primitive.idx_policy].critic for primitive in action_skeleton]
+        decode_fns = [functools.partial(self.dynamics.decode, primitive=primitive) for primitive in action_skeleton]
 
         with torch.no_grad():
             # Prepare action spaces.
@@ -174,12 +173,8 @@ class CEMPlanner(planners.Planner):
             t_observation = torch.from_numpy(observation).to(self.dynamics.device)
 
             # Initialize distribution.
-            mean, std = self._compute_initial_distribution(
-                t_observation, action_skeleton
-            )
-            elites = torch.empty(
-                (0, *mean.shape), dtype=torch.float32, device=self.device
-            )
+            mean, std = self._compute_initial_distribution(t_observation, action_skeleton)
+            elites = torch.empty((0, *mean.shape), dtype=torch.float32, device=self.device)
 
             # Prepare constant agents for rollouts.
             policies = [
@@ -196,14 +191,12 @@ class CEMPlanner(planners.Planner):
 
             for idx_iter in range(self.num_iterations):
                 # Sample from distribution.
-                samples = torch.distributions.Normal(mean, std).sample((num_samples,))
+                samples = self.sample_from_nan(mean, std, torch.Size((num_samples,)))
                 samples = torch.clip(samples, actions_low, actions_high)
 
                 # Include the best elites from the previous iteration.
                 if idx_iter > 0:
-                    samples[: self.num_elites_to_keep] = elites[
-                        : self.num_elites_to_keep
-                    ]
+                    samples[: self.num_elites_to_keep] = elites[: self.num_elites_to_keep]
 
                 # Also include the mean.
                 samples[self.num_elites_to_keep] = mean
@@ -242,7 +235,9 @@ class CEMPlanner(planners.Planner):
 
                 # Update distribution.
                 mean = self.momentum * mean + (1 - self.momentum) * elites.mean(dim=0)
+                # mean = torch.nan_to_num(mean, nan=0.0)
                 std = self.momentum * std + (1 - self.momentum) * elites.std(dim=0)
+                # std = torch.nan_to_num(std, nan=1.0)
                 std = torch.clip(std, 1e-4)
 
                 # Decay population size.
@@ -285,3 +280,18 @@ class CEMPlanner(planners.Planner):
             p_visited_success=p_visited_success,
             visited_values=visited_values,
         )
+
+    def sample_from_nan(self, mean: torch.Tensor, std: torch.Tensor, n_samples: torch.Size):
+        """Sample n samples from a torch normal distribution, where some of the entries of mean and std can be nan.
+        Replaces nan in mean with 0 and in std with 1.
+
+        Args:
+            mean: torch tensor of shape [T, dim_actions]
+            std: torch tensor of shape [T, dim_actions]
+            n_samples: int
+        Returns:
+            samples: torch tensor of shape [n_samples, T, dim_actions]
+        """
+        mean = torch.nan_to_num(mean, nan=0.0)
+        std = torch.nan_to_num(std, nan=1.0)
+        return torch.distributions.Normal(mean, std).sample(n_samples)
