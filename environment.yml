@@ -28,7 +28,7 @@ dependencies:
     - gym>=0.25
     - pybullet
     - ctrlutils==1.4.1
-    - pysymbolic @ git+https://github.com/kevin-thankyou-lin/symbolic
+    # -> now in third party: - pysymbolic @ git+https://github.com/kevin-thankyou-lin/symbolic
     - spatialdyn==1.4.4
     - tyro
     - opencv-python
