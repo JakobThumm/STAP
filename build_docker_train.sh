@@ -4,6 +4,7 @@
 
 user=${1:-user}
 gpu=${2:-cpu}
+cache=${3:-cache}
 echo "Chosen mode: $user, chosen gpu: $gpu"
 
 command="docker build"
@@ -33,6 +34,11 @@ elif [ "$user" = "user" ]
     image="${image}/$USER:v2"
 else
     echo "User mode unknown. Please choose user, root, or leave out for default user"
+fi
+
+if [ "$cache" = "nocache" ]
+    then
+    options="${options} --no-cache"
 fi
 
 echo "Running docker command: ${command} ${options} -f ${dockerfile} -t ${image} ."

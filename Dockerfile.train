@@ -106,11 +106,16 @@ WORKDIR $HOME_PATH
 
 ARG USERNAME=root
 
-ENV STAP_PATH=$HOME_PATH
-
-# INSTALL SARA SHIELD
 WORKDIR $HOME_PATH
+
+# Copy all required folders
+COPY --chown=$USERNAME Pipfile pyproject.toml setup.cfg generate_primitive_dataset.py $HOME_PATH/
+COPY --chown=$USERNAME configs/ $HOME_PATH/configs/
+COPY --chown=$USERNAME scripts/ $HOME_PATH/scripts/
+COPY --chown=$USERNAME stap/ $HOME_PATH/stap/
 COPY --chown=$USERNAME third_party/ $HOME_PATH/third_party/
+
+ENV STAP_PATH=$HOME_PATH
 # Install python packages with root privileges
 USER root
 # Build SaRA shield
@@ -120,31 +125,17 @@ RUN rm -rf build && \
     rm -rf safety_shield/build
 RUN export EIGEN3_INCLUDE_DIR="/eigen-3.4.0" && \
     python setup.py install
-# INSTALL SCOD REGRESSION
+
+WORKDIR $HOME_PATH
+RUN pip install .
+
 WORKDIR $HOME_PATH/third_party/scod-regression
 RUN rm -rf scod-regression.egg-info && \
     rm -rf build
 RUN pip install .
-WORKDIR $HOME_PATH/third_party/symbolic
-RUN rm -rf pysymbolic.egg-info && \
-    rm -rf build
-RUN pip install .
-USER $USERNAME
-
-WORKDIR $HOME_PATH
-# Copy all required folders for stap
-COPY --chown=$USERNAME Pipfile pyproject.toml setup.cfg generate_primitive_dataset.py $HOME_PATH/
-COPY --chown=$USERNAME stap/ $HOME_PATH/stap/
-# Install python packages with root privileges
-USER root
-WORKDIR $HOME_PATH
-RUN pip install .
 WORKDIR $HOME_PATH
 # Switch back to USER mode
 USER $USERNAME
-
-COPY --chown=$USERNAME configs/ $HOME_PATH/configs/
-COPY --chown=$USERNAME scripts/ $HOME_PATH/scripts/
 
 SHELL ["/bin/bash", "-c"]
 

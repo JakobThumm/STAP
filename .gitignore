@@ -1,5 +1,6 @@
 .vscode
 # STAP outputs
+models.zip
 juno
 models/
 plots/
