@@ -128,6 +128,7 @@ VALIDATION_SEEDS=($(seq 36 39))
 PRIMITIVE="place"
 run_policy
 
+AGENT_CONFIG="${STAP_PATH}/configs/pybullet/agents/multi_stage/policy/sac_policy_static_handover.yaml"
 TRAIN_SEEDS=($(seq 40 55))
 VALIDATION_SEEDS=($(seq 56 59))
 # Details: 1M episodes, MSE loss for Q-networks, ensemble of 8 Q-networks.
