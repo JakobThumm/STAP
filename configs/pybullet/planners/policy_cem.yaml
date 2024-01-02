@@ -13,3 +13,7 @@ agent_configs:
   - "{AGENT_CONFIG}"
 
 dynamics_config: "{DYNAMICS_CONFIG}"
+
+custom_fns:
+  - null
+  - "HandoverOrientationFn"

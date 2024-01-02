@@ -1,6 +1,6 @@
 import abc
 import dataclasses
-from typing import Optional, Sequence, Union
+from typing import Callable, Optional, Sequence, Union
 
 import numpy as np
 import torch
@@ -29,6 +29,9 @@ class Planner(abc.ABC):
         self,
         policies: Sequence[agents.Agent],
         dynamics: dynamics.Dynamics,
+        custom_fns: Optional[
+            Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]
+        ] = None,
         device: str = "auto",
     ):
         """Constructs the planner.
@@ -36,10 +39,12 @@ class Planner(abc.ABC):
         Args:
             policies: Ordered list of policies.
             dynamics: Dynamics model.
+            custom_fns: Custom value function to apply at the trajectory evaluation stage (utils.evaluate_trajectory)
             device: Torch device.
         """
         self._policies = policies
         self._dynamics = dynamics
+        self._custom_fns = custom_fns
         self.to(device)
 
     @property
@@ -51,6 +56,13 @@ class Planner(abc.ABC):
     def dynamics(self) -> dynamics.Dynamics:
         """Dynamics model."""
         return self._dynamics
+
+    @property
+    def custom_fns(
+        self,
+    ) -> Optional[Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]]:
+        """Custom functions."""
+        return self._custom_fns
 
     @property
     def device(self) -> torch.device:

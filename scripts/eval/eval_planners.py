@@ -55,9 +55,7 @@ def scale_actions(
     scaled_actions = actions.copy()
     for t, primitive in enumerate(action_skeleton):
         action_dims = primitive.action_space.shape[0]
-        scaled_actions[..., t, :action_dims] = primitive.scale_action(
-            actions[..., t, :action_dims]
-        )
+        scaled_actions[..., t, :action_dims] = primitive.scale_action(actions[..., t, :action_dims])
 
     return scaled_actions
 
@@ -73,15 +71,9 @@ def evaluate_plan(
 ) -> Dict[str, Any]:
     recorder = recording.Recorder()
     recorder.start()
-    for primitive, predicted_state, action in zip(
-        env.action_skeleton, plan.states[1:], plan.actions
-    ):
+    for primitive, predicted_state, action in zip(env.action_skeleton, plan.states[1:], plan.actions):
         env.set_primitive(primitive)
-        env._recording_text = (
-            "Action: ["
-            + ", ".join([f"{a:.2f}" for a in primitive.scale_action(action)])
-            + "]"
-        )
+        env._recording_text = "Action: [" + ", ".join([f"{a:.2f}" for a in primitive.scale_action(action)]) + "]"
 
         recorder.add_frame(frame=env.render())
         env.set_observation(predicted_state)
@@ -128,9 +120,7 @@ def evaluate_planners(
     path.mkdir(parents=True, exist_ok=True)
 
     num_success = 0
-    pbar = tqdm.tqdm(
-        seed_generator(num_eval, load_path), f"Evaluate {path.name}", dynamic_ncols=True
-    )
+    pbar = tqdm.tqdm(seed_generator(num_eval, load_path), f"Evaluate {path.name}", dynamic_ncols=True)
     for idx_iter, (seed, loaded_plan) in enumerate(pbar):
         if isinstance(planner.dynamics, dynamics.OracleDynamics):
             planner.dynamics.reset_cache()
@@ -154,9 +144,7 @@ def evaluate_planners(
                 gif_path=path / f"planning_{idx_iter}.gif",
             )
         else:
-            if closed_loop and not isinstance(
-                planner.dynamics, dynamics.OracleDynamics
-            ):
+            if closed_loop and not isinstance(planner.dynamics, dynamics.OracleDynamics):
                 planning_fn = planners.run_closed_loop_planning
                 print("Planning closed loop")
             else:
@@ -196,19 +184,13 @@ def evaluate_planners(
                 if isinstance(primitive, table_primitives.Primitive):
                     primitive_action = str(primitive.Action(action))
                     primitive_action = primitive_action.replace("\n", "\n  ")
-                    print(
-                        "-", primitive, primitive_action[primitive_action.find("{") :]
-                    )
+                    print("-", primitive, primitive_action[primitive_action.find("{") :])
                 else:
                     print("-", primitive, action)
             print("time:", t_planner)
 
-        if not closed_loop and not isinstance(
-            planner.dynamics, dynamics.OracleDynamics
-        ):
-            eval_results = evaluate_plan(
-                idx_iter, env, planner, plan, rewards, path, grid_resolution
-            )
+        if not closed_loop and not isinstance(planner.dynamics, dynamics.OracleDynamics):
+            eval_results = evaluate_plan(idx_iter, env, planner, plan, rewards, path, grid_resolution)
         else:
             eval_results = {}
 
@@ -260,24 +242,16 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config", "--planner-config", "--planner", "-c", help="Path to planner config"
-    )
+    parser.add_argument("--config", "--planner-config", "--planner", "-c", help="Path to planner config")
     parser.add_argument("--env-config", "--env", "-e", help="Path to env config")
-    parser.add_argument(
-        "--policy-checkpoints", "-p", nargs="+", help="Policy checkpoints"
-    )
+    parser.add_argument("--policy-checkpoints", "-p", nargs="+", help="Policy checkpoints")
     parser.add_argument("--scod-checkpoints", "-s", nargs="+", help="SCOD checkpoints")
     parser.add_argument("--dynamics-checkpoint", "-d", help="Dynamics checkpoint")
     parser.add_argument("--device", default="auto", help="Torch device")
-    parser.add_argument(
-        "--num-eval", "-n", type=int, default=1, help="Number of eval iterations"
-    )
+    parser.add_argument("--num-eval", "-n", type=int, default=1, help="Number of eval iterations")
     parser.add_argument("--path", default="plots", help="Path for output plots")
     parser.add_argument("--load-path", help="Load already generated planning results")
-    parser.add_argument(
-        "--closed-loop", default=1, type=int, help="Run closed-loop planning"
-    )
+    parser.add_argument("--closed-loop", default=1, type=int, help="Run closed-loop planning")
     parser.add_argument("--seed", type=int, help="Random seed")
     parser.add_argument("--gui", type=int, help="Show pybullet gui")
     parser.add_argument(

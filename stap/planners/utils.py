@@ -1,15 +1,15 @@
 import pathlib
 from typing import (
     Any,
+    Callable,
     Dict,
-    Literal,
-    Optional,
     Iterable,
     List,
+    Literal,
+    Optional,
     Sequence,
     Tuple,
     Union,
-    Callable,
 )
 
 import numpy as np
@@ -17,9 +17,11 @@ import torch
 import yaml
 
 from stap import agents, dynamics, envs, networks, planners
-from stap.dynamics import Dynamics, LatentDynamics, load as load_dynamics
-from stap.utils import configs, spaces, tensors, timing, recording
+from stap.dynamics import Dynamics, LatentDynamics
+from stap.dynamics import load as load_dynamics
 from stap.envs.pybullet.table.primitives import Null
+from stap.planners.custom_fns import CUSTOM_FNS
+from stap.utils import configs, recording, spaces, tensors, timing
 
 
 class PlannerFactory(configs.Factory):
@@ -29,9 +31,7 @@ class PlannerFactory(configs.Factory):
         self,
         config: Union[str, pathlib.Path, Dict[str, Any]],
         env: envs.Env,
-        policy_checkpoints: Optional[
-            Sequence[Optional[Union[str, pathlib.Path]]]
-        ] = None,
+        policy_checkpoints: Optional[Sequence[Optional[Union[str, pathlib.Path]]]] = None,
         policies: Optional[Sequence[agents.Agent]] = None,
         scod_checkpoints: Optional[Sequence[Optional[Union[str, pathlib.Path]]]] = None,
         dynamics_checkpoint: Optional[Union[str, pathlib.Path]] = None,
@@ -67,18 +67,14 @@ class PlannerFactory(configs.Factory):
         if policy_checkpoints is None:
             policy_checkpoints = [None] * len(self.config["agent_configs"])
         else:
-            assert len(scod_checkpoints) == len(
-                policy_checkpoints
-            ), "All policies must have SCOD checkpoints"
+            assert len(scod_checkpoints) == len(policy_checkpoints), "All policies must have SCOD checkpoints"
             for idx_policy, (policy_checkpoint, scod_checkpoint) in enumerate(
                 zip(policy_checkpoints, scod_checkpoints)
             ):
                 # Get policy config from checkpoint
                 if policy_checkpoint is None:
                     continue
-                agent_config = str(
-                    pathlib.Path(policy_checkpoint).parent / "agent_config.yaml"
-                )
+                agent_config = str(pathlib.Path(policy_checkpoint).parent / "agent_config.yaml")
                 self.config["agent_configs"][idx_policy] = replace_config(
                     self.config["agent_configs"][idx_policy],
                     "{AGENT_CONFIG}",
@@ -87,9 +83,7 @@ class PlannerFactory(configs.Factory):
                 # Optionally get scod config from checkpoint
                 if scod_checkpoint is None:
                     continue
-                scod_config = str(
-                    pathlib.Path(scod_checkpoint).parent / "scod_config.yaml"
-                )
+                scod_config = str(pathlib.Path(scod_checkpoint).parent / "scod_config.yaml")
                 self.config["agent_configs"][idx_policy] = replace_config(
                     self.config["agent_configs"][idx_policy],
                     "{SCOD_CONFIG}",
@@ -98,16 +92,12 @@ class PlannerFactory(configs.Factory):
 
         # Get dynamics config from checkpoint.
         if dynamics_checkpoint is not None:
-            dynamics_config = str(
-                pathlib.Path(dynamics_checkpoint).parent / "dynamics_config.yaml"
-            )
+            dynamics_config = str(pathlib.Path(dynamics_checkpoint).parent / "dynamics_config.yaml")
             self.config["dynamics_config"] = replace_config(
                 self.config["dynamics_config"], "{DYNAMICS_CONFIG}", dynamics_config
             )
 
-        maybe_policies = (
-            [None] * len(self.config["agent_configs"]) if policies is None else policies
-        )
+        maybe_policies = [None] * len(self.config["agent_configs"]) if policies is None else policies
         policies = [
             agents.load(
                 config=agent_config,
@@ -142,11 +132,22 @@ class PlannerFactory(configs.Factory):
                 env=env,
                 device=device,
             )
+        # Custom fns
+        if "custom_fns" in self.config:
+            custom_fns = []
+            for fn_name in self.config["custom_fns"]:
+                if fn_name is not None and fn_name in CUSTOM_FNS:
+                    custom_fns.append(CUSTOM_FNS[fn_name])
+                else:
+                    custom_fns.append(None)
+        else:
+            custom_fns = None
 
         self.kwargs["policies"] = policies
         self.kwargs["dynamics"] = dynamics
         if isinstance(dynamics, LatentDynamics):
             dynamics.plan_mode()
+        self.kwargs["custom_fns"] = custom_fns
         self.kwargs["device"] = device
 
 
@@ -191,17 +192,16 @@ def load(
 # TODO: states.ndim isn't necessarily 2.
 @tensors.batch(dims=2)
 def evaluate_trajectory(
-    value_fns: Iterable[
-        Union[networks.critics.Critic, networks.critics.ProbabilisticCritic]
-    ],
+    value_fns: Iterable[Union[networks.critics.Critic, networks.critics.ProbabilisticCritic]],
     decode_fns: Iterable[Callable[[torch.Tensor], torch.Tensor]],
     states: torch.Tensor,
     actions: Optional[torch.Tensor] = None,
     q_value: bool = True,
     clip_success: bool = True,
     unc_metric: Optional[str] = None,
+    custom_fns: Optional[Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Evaluates probability of success for the given trajectory.
+    r"""Evaluates probability of success for the given trajectory.
 
     Args:
         value_fns: List of T value functions.
@@ -211,6 +211,14 @@ def evaluate_trajectory(
         q_value: Whether to use state-action values (True) or state values (False).
         clip_success: Whether to clip successes between [0, 1].
         unc_metric: Uncertainty metric if value_fn outputs a distribution.
+        custom_fns: Custom functions to apply to the value function output.
+            Function n corresponds to the custom function after executing action n.
+            In: [
+                [batch_dims, state_dims]: state at time n
+                [batch_dims, action_dims]: action n
+                [batch_dims, state_dims]: state at time n+1
+            ]
+            Out: [batch_dims]: custom value of the state at time t \in [1, T+1]
 
     Returns:
         (Trajectory success probabilities [batch_size],
@@ -236,9 +244,7 @@ def evaluate_trajectory(
             # Value functions that output a torch distribution.
             elif isinstance(value_fn, networks.critics.ProbabilisticCritic):
                 if unc_metric is None:
-                    raise ValueError(
-                        "Must specify unc_metric if value_fn outputs a distribution."
-                    )
+                    raise ValueError("Must specify unc_metric if value_fn outputs a distribution.")
                 p_distribution = value_fn.forward(policy_state, action)
                 p_successes[:, t] = p_distribution.mean
                 p_successes_unc[:, t] = getattr(p_distribution, unc_metric)
@@ -246,6 +252,8 @@ def evaluate_trajectory(
             # Ensemble OOD detector critics with a detect property.
             if isinstance(value_fn, networks.critics.EnsembleDetectorCritic):
                 p_successes_unc[:, t] = value_fn.detect
+            if custom_fns is not None and custom_fns[t] is not None:
+                p_successes[:, t] = p_successes[:, t] * custom_fns[t](states[:, t], action, states[:, t + 1])  # type: ignore
     else:
         raise NotImplementedError
 
@@ -300,9 +308,7 @@ def evaluate_plan(
     return rewards
 
 
-def get_printable_object_relationships_str(
-    obj_rels: List[str], max_row_length: int = 60
-) -> None:
+def get_printable_object_relationships_str(obj_rels: List[str], max_row_length: int = 60) -> None:
     """
     Get printable object relationships string.
     """
@@ -333,16 +339,12 @@ def vizualize_predicted_plan(
     """Visualize the predicted trajectory of a task and motion plan."""
     import pybullet as p
 
-    assert isinstance(
-        env, envs.pybullet.TableEnv
-    ), "vizualize_predicted_plan only supports pybullet.TableEnv"
+    assert isinstance(env, envs.pybullet.TableEnv), "vizualize_predicted_plan only supports pybullet.TableEnv"
     state_id: int = p.saveState()
     recorder = recording.Recorder()
     recorder.start()
 
-    for i, (primitive, predicted_state, action) in enumerate(
-        zip(action_skeleton, plan.states[:-1], plan.actions)
-    ):
+    for i, (primitive, predicted_state, action) in enumerate(zip(action_skeleton, plan.states[:-1], plan.actions)):
         env.set_primitive(primitive)
         if custom_recording_text is not None:
             if isinstance(custom_recording_text, list):
@@ -350,16 +352,10 @@ def vizualize_predicted_plan(
             else:
                 env._recording_text = custom_recording_text
         else:
-            env._recording_text = (
-                "Action: ["
-                + ", ".join([f"{a:.2f}" for a in primitive.scale_action(action)])
-                + "]"
-            )
+            env._recording_text = "Action: [" + ", ".join([f"{a:.2f}" for a in primitive.scale_action(action)]) + "]"
 
         if object_relationships_list is not None:
-            env._recording_text += "\n" + get_printable_object_relationships_str(
-                object_relationships_list[i]
-            )
+            env._recording_text += "\n" + get_printable_object_relationships_str(object_relationships_list[i])
 
         env.set_observation(predicted_state)
         recorder.add_frame(frame=env.render())
@@ -373,9 +369,7 @@ def vizualize_predicted_plan(
         else:
             env._recording_text = custom_recording_text
     if object_relationships_list is not None:
-        env._recording_text += "\n" + get_printable_object_relationships_str(
-            object_relationships_list[-1]
-        )
+        env._recording_text += "\n" + get_printable_object_relationships_str(object_relationships_list[-1])
     env.set_observation(plan.states[-1])
     recorder.add_frame(frame=env.render())
 
@@ -445,9 +439,7 @@ def run_closed_loop_planning(
         Rewards received at each timestep.
     """
     if isinstance(planner.dynamics, dynamics.OracleDynamics):
-        raise ValueError(
-            "Do not run closed-loop planning with OracleDynamics! Open-loop gets the same results."
-        )
+        raise ValueError("Do not run closed-loop planning with OracleDynamics! Open-loop gets the same results.")
 
     if gif_path is not None:
         env.record_start()
@@ -475,9 +467,7 @@ def run_closed_loop_planning(
             t_planner.append(timer.toc("planner"))
 
         # Execute first action.
-        observation, reward, _, _, _ = env.step(
-            plan.actions[0, : env.action_space.shape[0]]
-        )
+        observation, reward, _, _, _ = env.step(plan.actions[0, : env.action_space.shape[0]])
 
         rewards[t] = reward
         visited_actions[t, t:] = plan.actions
