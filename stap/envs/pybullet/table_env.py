@@ -9,6 +9,7 @@ from typing import Any, Dict, Generator, List, Optional, Sequence, Tuple, Union
 import gym
 import numpy as np
 import pybullet as p  # Import after envs.pybullet.base to avoid print statement.
+import torch
 from PIL import Image, ImageDraw, ImageFont
 
 from stap.envs import base as envs
@@ -397,6 +398,82 @@ class TableEnv(PybulletEnv):
     def real_objects(self) -> Generator[Object, None, None]:
         """Returns an iterator over the non-null objects."""
         return (obj for obj in self.objects.values() if not obj.isinstance(Null))
+
+    def get_object_state_from_observation(self, observation: np.ndarray, identifier: str) -> object_state.ObjectState:
+        """Returns the object state from the observation matrix."""
+        assert identifier in self.objects
+        idx = list(self.objects.keys()).index(identifier)
+        return object_state.ObjectState(observation[idx])
+
+    def get_object_position_from_observation(self, observation: torch.Tensor, identifier: str) -> torch.Tensor:
+        """Returns the object position from the observation.
+
+        Args:
+            observation (torch.Tensor [batch_size, state_dim])
+            identifier: object name
+        Returns:
+            object position in x, y, z [batch_size, 3]
+        """
+        assert identifier in self.objects
+        idx = list(self.objects.keys()).index(identifier)
+        idxx = list(object_state.ObjectState.RANGES.keys()).index("x")
+        idxy = list(object_state.ObjectState.RANGES.keys()).index("y")
+        idxz = list(object_state.ObjectState.RANGES.keys()).index("z")
+        if len(observation.shape) == 3:
+            # Batch size exists
+            orientation = torch.zeros([observation.shape[0], 3])
+            orientation[:, 0] = observation[:, idx, idxx]
+            orientation[:, 1] = observation[:, idx, idxy]
+            orientation[:, 2] = observation[:, idx, idxz]
+            return orientation
+        elif len(observation.shape) == 2:
+            # Batch size does not exist
+            orientation = torch.zeros([3])
+            orientation[0] = observation[idx, idxx]
+            orientation[1] = observation[idx, idxy]
+            orientation[2] = observation[idx, idxz]
+            return orientation
+        else:
+            raise ValueError(
+                "Expected observation.shape to be either of dim 2 or 3 but found dim of {}".format(
+                    len(observation.shape)
+                )
+            )
+
+    def get_object_orientation_from_observation(self, observation: torch.Tensor, identifier: str) -> torch.Tensor:
+        """Returns the object orientation from the observation.
+
+        Args:
+            observation (torch.Tensor [batch_size, state_dim])
+            identifier: object name
+        Returns:
+            object orientation in wx, wy, wz [batch_size, 3]
+        """
+        assert identifier in self.objects
+        idx = list(self.objects.keys()).index(identifier)
+        idxwx = list(object_state.ObjectState.RANGES.keys()).index("wx")
+        idxwy = list(object_state.ObjectState.RANGES.keys()).index("wy")
+        idxwz = list(object_state.ObjectState.RANGES.keys()).index("wz")
+        if len(observation.shape) == 3:
+            # Batch size exists
+            orientation = torch.zeros([observation.shape[0], 3])
+            orientation[:, 0] = observation[:, idx, idxwx]
+            orientation[:, 1] = observation[:, idx, idxwy]
+            orientation[:, 2] = observation[:, idx, idxwz]
+            return orientation
+        elif len(observation.shape) == 2:
+            # Batch size does not exist
+            orientation = torch.zeros([3])
+            orientation[0] = observation[idx, idxwx]
+            orientation[1] = observation[idx, idxwy]
+            orientation[2] = observation[idx, idxwz]
+            return orientation
+        else:
+            raise ValueError(
+                "Expected observation.shape to be either of dim 2 or 3 but found dim of {}".format(
+                    len(observation.shape)
+                )
+            )
 
     @property
     def object_groups(self) -> Dict[str, ObjectGroup]:

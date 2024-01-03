@@ -20,6 +20,7 @@ class CEMPlanner(planners.Planner):
         custom_fns: Optional[
             Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]
         ] = None,
+        env: Optional[envs.Env] = None,
         num_iterations: int = 8,
         num_samples: int = 128,
         num_elites: int = 16,
@@ -35,6 +36,7 @@ class CEMPlanner(planners.Planner):
             policies: Policies used to evaluate trajecotries.
             dynamics: Dynamics model.
             custom_fns: Custom value function to apply at the trajectory evaluation stage (utils.evaluate_trajectory)
+            env: Optional environment to use for planning
             num_iterations: Number of CEM iterations.
             num_samples: Number of samples to generate per CEM iteration.
             num_elites: Number of elites to select from population.
@@ -45,7 +47,7 @@ class CEMPlanner(planners.Planner):
             momentum: Momentum of distribution updates.
             device: Torch device.
         """
-        super().__init__(policies=policies, dynamics=dynamics, custom_fns=custom_fns, device=device)
+        super().__init__(policies=policies, dynamics=dynamics, custom_fns=custom_fns, env=env, device=device)
         self._num_iterations = num_iterations
         self._num_samples = num_samples
         self._num_elites = max(2, min(num_elites, self.num_samples // 2))
@@ -220,7 +222,12 @@ class CEMPlanner(planners.Planner):
 
                 # Evaluate trajectories.
                 p_success, values, values_unc = utils.evaluate_trajectory(
-                    value_fns, decode_fns, states, actions=samples, custom_fns=self.custom_fns
+                    value_fns=value_fns,
+                    decode_fns=decode_fns,
+                    states=states,
+                    actions=samples,
+                    custom_fns=self.custom_fns,
+                    env=self.env,
                 )
 
                 # Select the top trajectories.

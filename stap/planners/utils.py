@@ -148,6 +148,7 @@ class PlannerFactory(configs.Factory):
         if isinstance(dynamics, LatentDynamics):
             dynamics.plan_mode()
         self.kwargs["custom_fns"] = custom_fns
+        self.kwargs["env"] = env
         self.kwargs["device"] = device
 
 
@@ -200,6 +201,7 @@ def evaluate_trajectory(
     clip_success: bool = True,
     unc_metric: Optional[str] = None,
     custom_fns: Optional[Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]] = None,
+    env: Optional[envs.Env] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     r"""Evaluates probability of success for the given trajectory.
 
@@ -253,7 +255,7 @@ def evaluate_trajectory(
             if isinstance(value_fn, networks.critics.EnsembleDetectorCritic):
                 p_successes_unc[:, t] = value_fn.detect
             if custom_fns is not None and custom_fns[t] is not None:
-                p_successes[:, t] = p_successes[:, t] * custom_fns[t](states[:, t], action, states[:, t + 1])  # type: ignore
+                p_successes[:, t] = p_successes[:, t] * custom_fns[t](states[:, t], action, states[:, t + 1], env)  # type: ignore
     else:
         raise NotImplementedError
 

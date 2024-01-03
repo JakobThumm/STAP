@@ -32,6 +32,7 @@ class Planner(abc.ABC):
         custom_fns: Optional[
             Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]
         ] = None,
+        env: Optional[envs.Env] = None,
         device: str = "auto",
     ):
         """Constructs the planner.
@@ -45,6 +46,7 @@ class Planner(abc.ABC):
         self._policies = policies
         self._dynamics = dynamics
         self._custom_fns = custom_fns
+        self._env = env
         self.to(device)
 
     @property
@@ -63,6 +65,11 @@ class Planner(abc.ABC):
     ) -> Optional[Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]]:
         """Custom functions."""
         return self._custom_fns
+
+    @property
+    def env(self) -> Optional[envs.Env]:
+        """Environment."""
+        return self._env
 
     @property
     def device(self) -> torch.device:

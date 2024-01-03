@@ -1,7 +1,7 @@
-from typing import Optional, Union, List
+from typing import List, Optional, Union
 
-from ctrlutils import eigen
 import numpy as np
+from ctrlutils import eigen
 
 from stap.envs.pybullet.sim import math
 
@@ -10,7 +10,7 @@ class ObjectState:
     RANGES = {
         "x": (-0.3, 0.9),
         "y": (-0.5, 0.5),
-        "z": (-0.1, 0.5),
+        "z": (-0.1, 1.0),
         "wx": (-np.pi, np.pi),
         "wy": (-np.pi, np.pi),
         "wz": (-np.pi, np.pi),
