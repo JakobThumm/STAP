@@ -161,6 +161,30 @@ When the models have finished training, evaluate them with:
 bash scripts/eval/eval_daf.sh
 ```
 
+## Current server workflow
+```
+./build_docker_train.sh user gpu
+```
+### Generate data
+```
+./run_docker_train.sh user gpu
+./scripts/data/generate_all_datasets_tmux.sh 120
+```
+Remove docker container.
+### Train Q-Functions
+Not inside docker
+```
+./scripts/train/train_values_docker.sh user gpu
+```
+### Train Policies
+```
+./scripts/train/train_policies_docker.sh user gpu
+```
+### Train Dynamics
+```
+./scripts/train/train_dynamics_docker.sh user gpu
+```
+
 ---
 ## Citation
 Sequencing Task-Agnostic Policies is offered under the [MIT License](https://github.com/agiachris/STAP/blob/main/LICENSE) agreement. 
