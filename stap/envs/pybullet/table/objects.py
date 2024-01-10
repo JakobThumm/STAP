@@ -569,7 +569,7 @@ class BodyPart(Object):
 
     def state(self) -> object_state.ObjectState:
         # Null object state is a zero vector.
-        return self._state
+        return super().state()
 
     def disable_collisions(self) -> None:
         # NotImplemented

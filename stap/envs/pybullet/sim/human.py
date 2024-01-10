@@ -227,4 +227,3 @@ class Human(body.Body):
     @property
     def name(self) -> str:
         return self._name
-        return self._name

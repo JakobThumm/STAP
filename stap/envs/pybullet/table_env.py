@@ -540,14 +540,37 @@ class TableEnv(PybulletEnv):
         of the low-dimensional object state. The first row corresponds to the
         pose of the end-effector, and the following rows correspond to the
         states of all the objects in order. Any remaining rows are zero.
+
+        The observation space is designed as follows:
+            1. EEF pose
+            2. Primitive arg objects
+            3. Other objects (up to MAX_NUM_OBJECTS - 3)
+            4. Human hand pose
         """
         if image:
             raise NotImplementedError
 
         obj_states = self.object_states()
         observation = np.zeros(self.observation_space.shape, dtype=self.observation_space.dtype)
-        for i, obj_state in enumerate(obj_states.values()):
-            observation[i] = obj_state.vector
+        arg_object_names = [obj.name for obj in self.get_primitive().arg_objects]
+        arg_object_length = len(arg_object_names)
+        counter = 0
+        arg_obj_counter = 0
+        for obj_state in obj_states:
+            if obj_state == "TableEnv.robot.arm.ee_pose":
+                observation[0] = obj_states[obj_state].vector
+            elif obj_state in arg_object_names:
+                observation[arg_obj_counter + 1] = obj_states[obj_state].vector
+                arg_obj_counter += 1
+            elif obj_state == "table":
+                continue
+            elif obj_state == "left_hand":
+                observation[-2] = obj_states[obj_state].vector
+            elif obj_state == "right_hand":
+                observation[-1] = obj_states[obj_state].vector
+            else:
+                observation[arg_object_length + counter + 1] = obj_states[obj_state].vector
+                counter += 1
         return observation
 
     def set_observation(self, observation: np.ndarray) -> None:
