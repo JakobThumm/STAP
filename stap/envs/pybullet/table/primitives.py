@@ -681,6 +681,7 @@ class StaticHandover(Primitive):
             success = robot.wait_for_termination(termination_fn=termination_fn, timeout=WAIT_TIMEOUT)
             if not success:
                 raise ControlException("Handover failed: Human hand not within reach")
+            obj.freeze()
             robot.grasp(0)
             # Once the gripper is opened, we assume the handover was a success.
             success = True
