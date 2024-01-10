@@ -305,6 +305,7 @@ class Pick(Primitive):
                 random_y = np.random.uniform(*action_range[:, 1])
                 pos = np.array([pos_head[0], random_y, 0])
                 theta = np.pi / 2
+            pos[2] += 0.015
         elif obj.isinstance(Box):
             pos = np.array([0.0, 0.0, 0.0])
             theta = 0.0  # if random.random() <= 0.5 else np.pi / 2
