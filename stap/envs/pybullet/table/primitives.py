@@ -145,29 +145,12 @@ class Primitive(envs.Primitive, abc.ABC):
         from stap.envs.pybullet.table_env import TableEnv
 
         assert isinstance(self.env, TableEnv)
-
+        # This should always be the case.
+        assert TableEnv.EE_OBSERVATION_IDX == 0
         # Add end-effector index first.
-        observation_indices = [TableEnv.EE_OBSERVATION_IDX]
-
-        # Get an ordered list of all other indices besides the end-effector.
-        object_to_observation_indices = [i for i in range(TableEnv.MAX_NUM_OBJECTS) if i != TableEnv.EE_OBSERVATION_IDX]
-        object_indices = {
-            obj: object_to_observation_indices[idx_object] for idx_object, obj in enumerate(self.env.real_objects())
-        }
-
-        # Add primitive args next.
-        observation_indices += [object_indices[obj] for obj in self.arg_objects]
-        idx_shuffle_start = len(observation_indices)
-
-        # Add non-null objects next.
-        observation_indices += [idx_object for obj, idx_object in object_indices.items() if obj not in self.arg_objects]
-        idx_shuffle_end = len(observation_indices)
-
-        # Add all remaining indices in sequential order.
-        other_indices: List[Optional[int]] = list(range(TableEnv.MAX_NUM_OBJECTS))
-        for i in observation_indices:
-            other_indices[i] = None
-        observation_indices += [i for i in other_indices if i is not None]
+        observation_indices = list(range(TableEnv.MAX_NUM_OBJECTS))
+        idx_shuffle_start = 1 + len(self.arg_objects)
+        idx_shuffle_end = TableEnv.MAX_NUM_OBJECTS - 2
 
         return {
             "observation_indices": observation_indices,

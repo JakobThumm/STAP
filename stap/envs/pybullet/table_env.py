@@ -558,7 +558,7 @@ class TableEnv(PybulletEnv):
         arg_obj_counter = 0
         for obj_state in obj_states:
             if obj_state == "TableEnv.robot.arm.ee_pose":
-                observation[0] = obj_states[obj_state].vector
+                observation[TableEnv.EE_OBSERVATION_IDX] = obj_states[obj_state].vector
             elif obj_state in arg_object_names:
                 observation[arg_obj_counter + 1] = obj_states[obj_state].vector
                 arg_obj_counter += 1
