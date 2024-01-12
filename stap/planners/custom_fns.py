@@ -8,12 +8,32 @@ from typing import Optional
 
 import torch
 
-from stap import envs
-from stap.envs.pybullet.table_env import TableEnv
+from stap.envs.base import Primitive
+from stap.envs.pybullet.table import object_state
+
+
+def get_object_orientation(observation: torch.Tensor, id: int) -> torch.Tensor:
+    r"""Returns the orientation of the object.
+
+    Args:
+        observation [batch_size, state_dim]: Current state.
+        id: ID of the object.
+
+    Returns:
+        Orientation of the object [batch_size, 3].
+    """
+    idxwx = list(object_state.ObjectState.RANGES.keys()).index("wx")
+    idxwy = list(object_state.ObjectState.RANGES.keys()).index("wy")
+    idxwz = list(object_state.ObjectState.RANGES.keys()).index("wz")
+    object_orientation = torch.zeros([observation.shape[0], 3])
+    object_orientation[:, 0] = observation[:, id, idxwx]
+    object_orientation[:, 1] = observation[:, id, idxwy]
+    object_orientation[:, 2] = observation[:, id, idxwz]
+    return object_orientation
 
 
 def HookHandoverOrientationFn(
-    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, env: Optional[envs.Env] = None
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
     r"""Evaluates the orientation of the hook handover.
 
@@ -21,14 +41,15 @@ def HookHandoverOrientationFn(
         state [batch_size, state_dim]: Current state.
         action [batch_size, action_dim]: Action.
         next_state [batch_size, state_dim]: Next state.
-        env: optional environment to call functions
+        primitive: optional primitive to receive the object orientation from
 
     Returns:
         Evaluation of the performed handover [batch_size] \in [0, 1].
     """
-    assert env is not None
-    assert isinstance(env, TableEnv)
-    object_orientation = env.get_object_orientation_from_observation(next_state, "hook")
+    assert primitive is not None and isinstance(primitive, Primitive)
+    arg_object_ids = primitive.get_policy_args_ids()
+    idx = arg_object_ids[0]
+    object_orientation = get_object_orientation(next_state, idx)
     MIN_VALUE = 0.5
     MAX_VALUE = 1.0
     OPTIMAL_ORIENTATION = torch.pi / 2

@@ -227,7 +227,7 @@ class CEMPlanner(planners.Planner):
                     states=states,
                     actions=samples,
                     custom_fns=self.custom_fns,
-                    env=self.env,
+                    action_skeleton=action_skeleton,
                 )
 
                 # Select the top trajectories.

@@ -19,6 +19,7 @@ import yaml
 from stap import agents, dynamics, envs, networks, planners
 from stap.dynamics import Dynamics, LatentDynamics
 from stap.dynamics import load as load_dynamics
+from stap.envs.base import Primitive
 from stap.envs.pybullet.table.primitives import Null
 from stap.planners.custom_fns import CUSTOM_FNS
 from stap.utils import configs, recording, spaces, tensors, timing
@@ -200,8 +201,10 @@ def evaluate_trajectory(
     q_value: bool = True,
     clip_success: bool = True,
     unc_metric: Optional[str] = None,
-    custom_fns: Optional[Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]] = None,
-    env: Optional[envs.Env] = None,
+    custom_fns: Optional[
+        Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor, Primitive], torch.Tensor]]]
+    ] = None,
+    action_skeleton: Optional[Sequence[Primitive]] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     r"""Evaluates probability of success for the given trajectory.
 
@@ -219,6 +222,7 @@ def evaluate_trajectory(
                 [batch_dims, state_dims]: state at time n
                 [batch_dims, action_dims]: action n
                 [batch_dims, state_dims]: state at time n+1
+                primitive: primitive at time n
             ]
             Out: [batch_dims]: custom value of the state at time t \in [1, T+1]
 
@@ -254,8 +258,10 @@ def evaluate_trajectory(
             # Ensemble OOD detector critics with a detect property.
             if isinstance(value_fn, networks.critics.EnsembleDetectorCritic):
                 p_successes_unc[:, t] = value_fn.detect
-            if custom_fns is not None and custom_fns[t] is not None:
-                p_successes[:, t] = p_successes[:, t] * custom_fns[t](states[:, t], action, states[:, t + 1], env)  # type: ignore
+            if custom_fns is not None and custom_fns[t] is not None and action_skeleton is not None:
+                p_successes[:, t] = p_successes[:, t] * custom_fns[t](
+                    states[:, t], action, states[:, t + 1], action_skeleton[t]
+                )  # type: ignore
     else:
         raise NotImplementedError
 

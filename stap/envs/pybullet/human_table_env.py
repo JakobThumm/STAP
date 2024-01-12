@@ -10,10 +10,10 @@ import numpy as np
 import pybullet as p
 
 from stap.envs import base as envs
+from stap.envs.base import Primitive
 from stap.envs.pybullet.sim.human import Human
 from stap.envs.pybullet.sim.safe_arm import SafeArm
 from stap.envs.pybullet.table import object_state, utils
-from stap.envs.pybullet.table.primitives import Primitive
 from stap.envs.pybullet.table.utils import primitive_from_action_call
 from stap.envs.pybullet.table_env import TableEnv
 from stap.utils.animation_utils import load_human_animation_data

@@ -134,7 +134,7 @@ class Primitive(envs.Primitive, abc.ABC):
 
         The first index is the end-effector, the following indices are the
         primitive arguments (in order), and the remaining indices are for the
-        rest of the objects.
+        rest of the objects. The last two objects are reserved for the human hands.
 
         The non-arg objects can be shuffled randomly for training. This method
         also returns the start and end indices of the non-arg objects.
@@ -142,6 +142,7 @@ class Primitive(envs.Primitive, abc.ABC):
         Returns:
             Dict with `observation_indices` and `shuffle_range` keys.
         """
+        from stap.envs.pybullet.human_table_env import HumanTableEnv
         from stap.envs.pybullet.table_env import TableEnv
 
         assert isinstance(self.env, TableEnv)
@@ -150,13 +151,20 @@ class Primitive(envs.Primitive, abc.ABC):
         # Add end-effector index first.
         observation_indices = list(range(TableEnv.MAX_NUM_OBJECTS))
         idx_shuffle_start = 1 + len(self.arg_objects)
-        idx_shuffle_end = TableEnv.MAX_NUM_OBJECTS - 2
+        if isinstance(self.env, HumanTableEnv):
+            idx_shuffle_end = TableEnv.MAX_NUM_OBJECTS - 2
+        else:
+            idx_shuffle_end = TableEnv.MAX_NUM_OBJECTS
 
         return {
             "observation_indices": observation_indices,
             "shuffle_range": [idx_shuffle_start, idx_shuffle_end],
         }
         # return self.env.get_policy_args(self)
+
+    def get_policy_args_ids(self) -> List[int]:
+        """Return the index of the policy args in the observation vector."""
+        return list(range(1, len(self.arg_objects) + 1))
 
     def get_non_arg_objects(self, objects: Dict[str, Object]) -> List[Object]:
         """Gets the non-primitive argument objects."""

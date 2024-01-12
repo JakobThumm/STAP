@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import gym
 import numpy as np
 
-
 from stap.utils import spaces
 
 
@@ -28,17 +27,17 @@ class Primitive:
         """Gets auxiliary policy args for the current primitive."""
         return None
 
+    def get_policy_args_ids(self) -> List[int]:
+        """Return the index of the policy args in the observation vector."""
+        raise NotImplementedError()
+
     @classmethod
     def scale_action(cls, action: np.ndarray) -> np.ndarray:
-        return spaces.transform(
-            action, from_space=cls.action_space, to_space=cls.action_scale
-        )
+        return spaces.transform(action, from_space=cls.action_space, to_space=cls.action_scale)
 
     @classmethod
     def normalize_action(cls, action: np.ndarray) -> np.ndarray:
-        return spaces.transform(
-            action, from_space=cls.action_scale, to_space=cls.action_space
-        )
+        return spaces.transform(action, from_space=cls.action_scale, to_space=cls.action_space)
 
     def sample(self, uniform: bool = False) -> np.ndarray:
         return self.action_space.sample()
@@ -117,9 +116,7 @@ class Env(gym.Env[np.ndarray, np.ndarray]):
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, bool, dict]:
         raise NotImplementedError
 
-    def reset(
-        self, *, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> Tuple[np.ndarray, dict]:
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple[np.ndarray, dict]:
         pass
 
     def render(self) -> np.ndarray:  # type: ignore
@@ -232,9 +229,7 @@ class PrimitiveEnv(Env):
         with PrimitiveEnv.Scope(self):
             return self._env.get_observation(image)
 
-    def reset(
-        self, *, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> Tuple[np.ndarray, dict]:
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple[np.ndarray, dict]:
         with PrimitiveEnv.Scope(self):
             return self._env.reset(
                 seed=seed,
