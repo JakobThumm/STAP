@@ -31,12 +31,8 @@ class TableEnvEncoder(Encoder):
         )
         super().__init__(env, state_space)
 
-        self.observation_mid = torch.from_numpy(
-            (observation_space.low[0] + observation_space.high[0]) / 2
-        )
-        self.observation_range = torch.from_numpy(
-            observation_space.high[0] - observation_space.low[0]
-        )
+        self.observation_mid = torch.from_numpy((observation_space.low[0] + observation_space.high[0]) / 2)
+        self.observation_range = torch.from_numpy(observation_space.high[0] - observation_space.low[0])
 
     def _apply(self, fn):
         """Ensures members get transferred with TableEnvEncoder.to(device)."""
@@ -47,9 +43,7 @@ class TableEnvEncoder(Encoder):
 
     @staticmethod
     @tensors.vmap(dims=0)
-    def _get_observation_indices(
-        policy_args: Dict[str, List[int]], randomize: bool
-    ) -> np.ndarray:
+    def _get_observation_indices(policy_args: Dict[str, List[int]], randomize: bool) -> np.ndarray:
         """Gets the observation indices from the policy_args dict and shuffles
         the indices inside the shuffle range."""
         observation_indices = np.array(policy_args["observation_indices"])
@@ -76,25 +70,17 @@ class TableEnvEncoder(Encoder):
         Returns:
             Observation with rearranged objects.
         """
-        observation_indices = TableEnvEncoder._get_observation_indices(
-            policy_args, randomize=randomize
-        )
+        observation_indices = TableEnvEncoder._get_observation_indices(policy_args, randomize=randomize)
 
         # [num_objects] or [B, num_objects].
-        t_observation_indices = torch.from_numpy(observation_indices).to(
-            observation.device
-        )
+        t_observation_indices = torch.from_numpy(observation_indices).to(observation.device)
         if t_observation_indices.dim() == 1:
             # [num_objects] => [B, num_objects].
-            t_observation_indices = t_observation_indices.expand(
-                observation.shape[0], -1
-            )
+            t_observation_indices = t_observation_indices.expand(observation.shape[0], -1)
         # [B, num_objects] => [B, num_objects, 1].
         t_observation_indices = t_observation_indices.unsqueeze(-1)
         # [B, num_objects, 1] => [B, num_objects, object_state_size].
-        t_observation_indices = t_observation_indices.expand(
-            -1, -1, observation.shape[-1]
-        )
+        t_observation_indices = t_observation_indices.expand(-1, -1, observation.shape[-1])
 
         # [B, num_objects, object_state_size].
         observation = torch.gather(observation, dim=1, index=t_observation_indices)
@@ -127,9 +113,9 @@ class TableEnvEncoder(Encoder):
         if observation.shape[0] == 0:
             return torch.reshape(observation, (-1, self.state_space.shape[0]))
 
-        observation = TableEnvEncoder.rearrange_observation(
-            observation, policy_args, randomize
-        )
+        # observation = TableEnvEncoder.rearrange_observation(
+        #     observation, policy_args, randomize
+        # )
 
         # print("encoded:", observation)
         observation = (observation - self.observation_mid) / self.observation_range
