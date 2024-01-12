@@ -193,6 +193,47 @@ class SAC(rl.RLAgent):
             self.bce_weight.to(self.device)
         return self
 
+    def compute_simplified_critic_loss(
+        self,
+        observation: torch.Tensor,
+        action: torch.Tensor,
+        reward: torch.Tensor,
+        next_observation: torch.Tensor,
+        discount: torch.Tensor,
+        policy_args: np.ndarray,
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """Computes the critic loss.
+
+        Args:
+            observation: Batch observation.
+            action: Batch action.
+            reward: Batch reward.
+            next_observation: Batch next observation.
+            discount: Batch discount.
+
+        Returns:
+            2-tuple (critic loss, loss metrics).
+        """
+        qs = self.critic(observation, action)
+        if self.use_bce:
+            if len(reward) != (reward == 0.0).sum() + (reward == 1.0).sum():
+                raise ValueError("Logistics regression requires [0, 1] targets.")
+            weight = get_bce_weight(reward, self.bce_weight) if isinstance(self.bce_weight, torch.Tensor) else None
+            q_losses = [torch.nn.functional.binary_cross_entropy(q, reward, weight=weight) for q in qs]
+        else:
+            q_losses = [torch.nn.functional.mse_loss(q, reward) for q in qs]
+        q_loss = sum(q_losses) / len(q_losses)
+
+        metrics = {f"q{i}_loss": q.item() for i, q in enumerate(q_losses)}
+        metrics.update(
+            {
+                "q_loss": q_loss.item(),
+                "target_q": reward.mean().item(),
+            }
+        )
+
+        return q_loss, metrics
+
     def compute_critic_loss(
         self,
         observation: torch.Tensor,
@@ -343,19 +384,24 @@ class SAC(rl.RLAgent):
         """
         assert isinstance(batch["observation"], torch.Tensor)
         assert isinstance(batch["next_observation"], torch.Tensor)
+        assert isinstance(batch["discount"], torch.Tensor)
 
         updating_critic = False if self.critic_update_freq == 0 else step % self.critic_update_freq == 0
         updating_actor = False if self.actor_update_freq == 0 else step % self.actor_update_freq == 0
         updating_target = False if self.target_update_freq == 0 else step % self.target_update_freq == 0
-
+        use_simplified_critic_loss = False
         if updating_actor or updating_critic:
             with torch.no_grad():
                 batch["observation"] = self.encoder.encode(batch["observation"], batch["policy_args"])
                 batch["next_observation"] = self.target_encoder.encode(batch["next_observation"], batch["policy_args"])
+                use_simplified_critic_loss = torch.sum(batch["discount"]) == 0.0
 
         metrics = {}
         if updating_critic:
-            q_loss, critic_metrics = self.compute_critic_loss(**batch)  # type: ignore
+            if use_simplified_critic_loss:
+                q_loss, critic_metrics = self.compute_simplified_critic_loss(**batch)  # type: ignore
+            else:
+                q_loss, critic_metrics = self.compute_critic_loss(**batch)  # type: ignore
 
             optimizers["critic"].zero_grad(set_to_none=True)
             q_loss.backward()
@@ -397,17 +443,26 @@ class SAC(rl.RLAgent):
         Returns:
             Dict of loggable validation metrics.
         """
+        assert isinstance(batch["observation"], torch.Tensor)
+        assert isinstance(batch["next_observation"], torch.Tensor)
+        assert isinstance(batch["discount"], torch.Tensor)
+
         evaluating_critic = self.critic_update_freq > 0
         evaluating_actor = self.actor_update_freq > 0
 
+        use_simplified_critic_loss = False
         if evaluating_critic or evaluating_actor:
             with torch.no_grad():
                 batch["observation"] = self.encoder.encode(batch["observation"], batch["policy_args"])
                 batch["next_observation"] = self.target_encoder.encode(batch["next_observation"], batch["policy_args"])
+                use_simplified_critic_loss = torch.sum(batch["discount"]) == 0.0
 
         metrics = {}
         if self.critic_update_freq > 0:
-            _, critic_metrics = self.compute_critic_loss(**batch)  # type: ignore
+            if use_simplified_critic_loss:
+                _, critic_metrics = self.compute_simplified_critic_loss(**batch)  # type: ignore
+            else:
+                _, critic_metrics = self.compute_critic_loss(**batch)  # type: ignore
             metrics.update(critic_metrics)
 
         if self.actor_update_freq > 0:
