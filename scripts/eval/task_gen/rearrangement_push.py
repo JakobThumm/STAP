@@ -1,10 +1,9 @@
-from typing import Any, List, Dict
-
 import argparse
+from typing import Any, Dict, List
 
 from utils import (
-    OBJECTS,
     LIFTED_OBJECTS,
+    OBJECTS,
     generate_ground_tasks,
 )
 
@@ -73,7 +72,7 @@ def rearrangement_push_task(
     # Construct plan skeleton and arg-object predicates
     for arg_idx in range(num_arg_objects):
         if arg_idx == 0:
-            plan_skeleton.append(f"pick(hook, table)")
+            plan_skeleton.append("pick(hook)")
         arg_object = objects[num_non_arg_objects + arg_idx]
         plan_skeleton.append(f"push({arg_object}, hook, rack)")
         predicates.extend(

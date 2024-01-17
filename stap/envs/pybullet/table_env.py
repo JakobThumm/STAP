@@ -565,8 +565,12 @@ class TableEnv(PybulletEnv):
             elif obj_state == "table":
                 continue
             elif obj_state == "left_hand":
+                # We don't use this observation for now.
+                continue
                 observation[-2] = obj_states[obj_state].vector
             elif obj_state == "right_hand":
+                # We don't use this observation for now.
+                continue
                 observation[-1] = obj_states[obj_state].vector
             else:
                 observation[arg_object_length + counter + 1] = obj_states[obj_state].vector

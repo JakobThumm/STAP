@@ -10,7 +10,7 @@ env_kwargs:
 
   tasks:
     - action_skeleton:
-        - pick(hook, table)
+        - pick(hook)
         - static_handover(hook, right_hand)
       initial_state:
         - free(hook)

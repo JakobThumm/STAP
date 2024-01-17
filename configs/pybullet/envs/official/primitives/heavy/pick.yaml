@@ -8,7 +8,7 @@ env_kwargs:
 
   tasks:
     - action_skeleton:
-        - pick(table_box_1, table)
+        - pick(table_box_1)
       initial_state:
         - aligned(rack)
         - poslimit(rack)
@@ -40,7 +40,7 @@ env_kwargs:
         - on(rack_box_3, rack)
         - on(rack_box_4, rack)
     - action_skeleton:
-        - pick(table_hook, table)
+        - pick(table_hook)
       initial_state:
         - aligned(rack)
         - poslimit(rack)

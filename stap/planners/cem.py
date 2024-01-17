@@ -121,6 +121,8 @@ class CEMPlanner(planners.Planner):
             a = self.policies[primitive.idx_policy].action_space
             action_range = torch.from_numpy(a.high - a.low)
             std[t, : action_range.shape[0]] = self.standard_deviation * 0.5 * action_range
+            # Manually reduce std of last action as we want less deviation in z-axis
+            # std[t, action_range.shape[0] - 1] = 1 / 20 * self.standard_deviation * 0.5 * action_range[-1]
             mean[t, : action_range.shape[0]] = actions[t, : action_range.shape[0]]
             # if std.shape[1] > action_range.shape[0]:
             #     std[t, action_range.shape[0] :] = 1
@@ -181,6 +183,10 @@ class CEMPlanner(planners.Planner):
             # Initialize distribution.
             mean, std = self._compute_initial_distribution(t_observation, action_skeleton)
             elites = torch.empty((0, *mean.shape), dtype=torch.float32, device=self.device)
+            # from stap.planners.debug import debug_value_fn
+            # debug_value_fn(
+            #     t_observation, self.policies[action_skeleton[0].idx_policy].action_space, value_fns[0], decode_fns[0]
+            # )
 
             # Prepare constant agents for rollouts.
             policies = [

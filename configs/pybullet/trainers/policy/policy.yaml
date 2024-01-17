@@ -16,7 +16,7 @@ trainer_kwargs:
 
   num_train_steps: 250000
   num_eval_episodes: 100
-  eval_freq: 1000
+  eval_freq: 10000
   checkpoint_freq: 50000
-  log_freq: 1000
+  log_freq: 10000
   profile_freq: 100

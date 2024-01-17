@@ -25,7 +25,7 @@ def get_object_orientation(observation: torch.Tensor, id: int) -> torch.Tensor:
     idxwx = list(object_state.ObjectState.RANGES.keys()).index("wx")
     idxwy = list(object_state.ObjectState.RANGES.keys()).index("wy")
     idxwz = list(object_state.ObjectState.RANGES.keys()).index("wz")
-    object_orientation = torch.zeros([observation.shape[0], 3])
+    object_orientation = torch.zeros([observation.shape[0], 3], device=observation.device)
     object_orientation[:, 0] = observation[:, id, idxwx]
     object_orientation[:, 1] = observation[:, id, idxwy]
     object_orientation[:, 2] = observation[:, id, idxwz]
@@ -53,7 +53,7 @@ def HookHandoverOrientationFn(
     MIN_VALUE = 0.5
     MAX_VALUE = 1.0
     OPTIMAL_ORIENTATION = torch.pi / 2
-    return_value = MIN_VALUE + (torch.abs(object_orientation[:, 2] - OPTIMAL_ORIENTATION)) / (2 * torch.pi) * (
+    return_value = MIN_VALUE + (torch.abs(object_orientation[:, 1] - OPTIMAL_ORIENTATION)) / (2 * torch.pi) * (
         MAX_VALUE - MIN_VALUE
     )
     return return_value

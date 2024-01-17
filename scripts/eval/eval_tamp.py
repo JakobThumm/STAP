@@ -56,9 +56,7 @@ def scale_actions(
     scaled_actions = actions.copy()
     for t, primitive in enumerate(action_skeleton):
         action_dims = primitive.action_space.shape[0]
-        scaled_actions[..., t, :action_dims] = primitive.scale_action(
-            actions[..., t, :action_dims]
-        )
+        scaled_actions[..., t, :action_dims] = primitive.scale_action(actions[..., t, :action_dims])
 
     return scaled_actions
 
@@ -73,26 +71,19 @@ def task_plan(
 ) -> Generator[List[envs.Primitive], None, None]:
     if hardcoded:
         plan = [
-            "pick(blue_box, table)",
+            "pick(blue_box)",
             "pull(hook, red_box)",
             "place(hook, table)",
-            "pick(red_box, table)",
+            "pick(red_box)",
             "place(red_box, rack)",
         ]
-        action_skeleton = [
-            env.get_primitive_info(action_call=str(node)) for node in plan
-        ]
+        action_skeleton = [env.get_primitive_info(action_call=str(node)) for node in plan]
         yield action_skeleton
     else:
         planner = symbolic.Planner(pddl, pddl.initial_state)
-        bfs = symbolic.BreadthFirstSearch(
-            planner.root, max_depth=max_depth, timeout=timeout, verbose=False
-        )
+        bfs = symbolic.BreadthFirstSearch(planner.root, max_depth=max_depth, timeout=timeout, verbose=False)
         for plan in bfs:
-            action_skeleton = [
-                env.get_primitive_info(action_call=str(node.action))
-                for node in plan[1:]
-            ]
+            action_skeleton = [env.get_primitive_info(action_call=str(node.action)) for node in plan[1:]]
             yield action_skeleton
 
 
@@ -141,9 +132,7 @@ def eval_tamp(
 
     # Run TAMP.
     num_success = 0
-    pbar = tqdm.tqdm(
-        seed_generator(num_eval, load_path), f"Evaluate {path.name}", dynamic_ncols=True
-    )
+    pbar = tqdm.tqdm(seed_generator(num_eval, load_path), f"Evaluate {path.name}", dynamic_ncols=True)
     for idx_iter, (seed, loaded_plan) in enumerate(pbar):
         # Initialize environment.
         observation, info = env.reset(seed=seed)
@@ -155,9 +144,7 @@ def eval_tamp(
         motion_planner_times = []
 
         # Task planning outer loop.
-        action_skeleton_generator = task_plan(
-            pddl=pddl, env=env, max_depth=max_depth, timeout=timeout, verbose=verbose
-        )
+        action_skeleton_generator = task_plan(pddl=pddl, env=env, max_depth=max_depth, timeout=timeout, verbose=verbose)
 
         for action_skeleton in action_skeleton_generator:
             timer.tic("motion_planner")
@@ -178,9 +165,7 @@ def eval_tamp(
 
         # Get best TAMP plan.
         if motion_plans[0].visited_values is not None:
-            values = [
-                (plan.p_success, -plan.visited_values[0]) for plan in motion_plans
-            ]
+            values = [(plan.p_success, -plan.visited_values[0]) for plan in motion_plans]
             best = max(values)
             idx_best = values.index(best)
         else:
@@ -201,9 +186,7 @@ def eval_tamp(
             _, reward, _, _, _ = env.step(action)
 
             # Run closed-loop planning on the rest.
-            rewards, plan, t_planner = planners.run_closed_loop_planning(
-                env, best_task_plan[1:], planner, timer
-            )
+            rewards, plan, t_planner = planners.run_closed_loop_planning(env, best_task_plan[1:], planner, timer)
             rewards = np.append(reward, rewards)
             plan = planners.PlanningResult(
                 actions=np.concatenate((action[None, ...], plan.actions), axis=0),
@@ -261,15 +244,11 @@ def eval_tamp(
                     motion_plans[idx_best].p_visited_success,
                     motion_plans[idx_best].visited_values,
                 )
-            for primitive, action in zip(
-                task_plans[idx_best], motion_plans[idx_best].actions
-            ):
+            for primitive, action in zip(task_plans[idx_best], motion_plans[idx_best].actions):
                 if isinstance(primitive, table_primitives.Primitive):
                     primitive_action = str(primitive.Action(action))
                     primitive_action = primitive_action.replace("\n", "\n  ")
-                    print(
-                        "-", primitive, primitive_action[primitive_action.find("{") :]
-                    )
+                    print("-", primitive, primitive_action[primitive_action.find("{") :])
                 else:
                     print("-", primitive, action)
             print("discarded plans:")
@@ -281,9 +260,7 @@ def eval_tamp(
                     motion_plans[idx_plan].p_success,
                     motion_plans[idx_plan].values,
                 )
-                for primitive, action in zip(
-                    task_plans[idx_plan], motion_plans[idx_plan].actions
-                ):
+                for primitive, action in zip(task_plans[idx_plan], motion_plans[idx_plan].actions):
                     if isinstance(primitive, table_primitives.Primitive):
                         primitive_action = str(primitive.Action(action))
                         primitive_action = primitive_action.replace("\n", "\n      ")
@@ -319,9 +296,7 @@ def eval_tamp(
                 "action_skeleton": list(map(str, task_plans[idx_best])),
                 "actions": motion_plans[idx_best].actions,
                 "states": motion_plans[idx_best].states,
-                "scaled_actions": scale_actions(
-                    motion_plans[idx_best].actions, env, task_plans[idx_best]
-                ),
+                "scaled_actions": scale_actions(motion_plans[idx_best].actions, env, task_plans[idx_best]),
                 "p_success": motion_plans[idx_best].p_success,
                 "values": motion_plans[idx_best].values,
                 "rewards": rewards,
@@ -367,34 +342,22 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--planner-config", "--planner", "-c", help="Path to planner config"
-    )
+    parser.add_argument("--planner-config", "--planner", "-c", help="Path to planner config")
     parser.add_argument("--env-config", "--env", "-e", help="Path to env config")
-    parser.add_argument(
-        "--policy-checkpoints", "-p", nargs="+", help="Policy checkpoints"
-    )
+    parser.add_argument("--policy-checkpoints", "-p", nargs="+", help="Policy checkpoints")
     parser.add_argument("--scod-checkpoints", "-s", nargs="+", help="SCOD checkpoints")
     parser.add_argument("--dynamics-checkpoint", "-d", help="Dynamics checkpoint")
     parser.add_argument("--device", default="auto", help="Torch device")
-    parser.add_argument(
-        "--num-eval", "-n", type=int, default=1, help="Number of eval iterations"
-    )
+    parser.add_argument("--num-eval", "-n", type=int, default=1, help="Number of eval iterations")
     parser.add_argument("--path", default="plots", help="Path for output plots")
-    parser.add_argument(
-        "--closed-loop", default=1, type=int, help="Run closed-loop planning"
-    )
+    parser.add_argument("--closed-loop", default=1, type=int, help="Run closed-loop planning")
     parser.add_argument("--seed", type=int, help="Random seed")
     parser.add_argument("--gui", type=int, help="Show pybullet gui")
     parser.add_argument("--verbose", type=int, default=1, help="Print debug messages")
     parser.add_argument("--pddl-domain", help="Pddl domain")
     parser.add_argument("--pddl-problem", help="Pddl problem")
-    parser.add_argument(
-        "--max-depth", type=int, default=4, help="Task planning search depth"
-    )
-    parser.add_argument(
-        "--timeout", type=float, default=10.0, help="Task planning timeout"
-    )
+    parser.add_argument("--max-depth", type=int, default=4, help="Task planning search depth")
+    parser.add_argument("--timeout", type=float, default=10.0, help="Task planning timeout")
     args = parser.parse_args()
 
     main(args)

@@ -116,6 +116,11 @@ class TableEnvEncoder(Encoder):
         # observation = TableEnvEncoder.rearrange_observation(
         #     observation, policy_args, randomize
         # )
+        # Debug: Remove human hand observation
+        observation[:, -2:, :] = torch.zeros_like(observation[:, -2:, :], device=observation.device)
+        # Debug: Switch table pick.
+        # observation[:, 1, :] = observation[:, 2, :].clone()
+        # observation[:, 2, :] = torch.zeros_like(observation[:, 2, :], device=observation.device)
 
         # print("encoded:", observation)
         observation = (observation - self.observation_mid) / self.observation_range

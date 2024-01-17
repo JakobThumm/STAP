@@ -8,7 +8,7 @@ env_kwargs:
 
   tasks:
     - action_skeleton:
-        - pick(table_box_1, table)
+        - pick(table_box_1)
       initial_state:
         - free(table_box_1)
         - aligned(rack)
@@ -25,7 +25,7 @@ env_kwargs:
         - on(rack_box_3, rack)
         - on(rack_box_4, rack)
     - action_skeleton:
-        - pick(hook, table)
+        - pick(hook)
       initial_state:
         - free(hook)
         - aligned(rack)
