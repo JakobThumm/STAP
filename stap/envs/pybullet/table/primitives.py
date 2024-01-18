@@ -638,10 +638,10 @@ class StaticHandover(Primitive):
 
         assert isinstance(self.env, HumanTableEnv)
 
-        SUCCESS_DISTANCE = 0.6
+        SUCCESS_DISTANCE = 0.4
         SUCCESS_TIME = 1.0
         FIRST_MOVEMENT_TIMEOUT = 2.0
-        WAIT_TIMEOUT = 10
+        WAIT_TIMEOUT = 15
         ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
         success = False
         self.success_counter = 0
@@ -665,7 +665,7 @@ class StaticHandover(Primitive):
                 command_quat,
                 check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
                 timeout=FIRST_MOVEMENT_TIMEOUT,
-                precision=0.02,
+                precision=0.1,
             )
             if not success:
                 raise ControlException("Moving to handover pose failed")
@@ -680,7 +680,7 @@ class StaticHandover(Primitive):
             if not allow_collisions and did_non_args_move():
                 raise ControlException("Robot.grasp(0) collided")
 
-            robot.goto_pose(self.env.robot.arm.home_pose.pos, self.env.robot.arm.home_pose.quat)
+            robot.goto_configuration(robot.arm.q_home)
             if not allow_collisions and did_non_args_move():
                 raise ControlException("Robot.goto_pose() collided")
         except ControlException as e:
