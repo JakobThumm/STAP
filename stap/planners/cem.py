@@ -1,10 +1,11 @@
 import functools
-from typing import Callable, Optional, Sequence, Tuple
+from typing import Callable, Dict, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
 
 from stap import agents, dynamics, envs, networks
+from stap.envs.base import Primitive
 from stap.planners import base as planners
 from stap.planners import utils
 from stap.utils import spaces
@@ -18,7 +19,7 @@ class CEMPlanner(planners.Planner):
         policies: Sequence[agents.Agent],
         dynamics: dynamics.Dynamics,
         custom_fns: Optional[
-            Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]
+            Dict[Primitive, Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor, Primitive], torch.Tensor]]]
         ] = None,
         env: Optional[envs.Env] = None,
         num_iterations: int = 8,
@@ -158,6 +159,10 @@ class CEMPlanner(planners.Planner):
 
         value_fns = [self.policies[primitive.idx_policy].critic for primitive in action_skeleton]
         decode_fns = [functools.partial(self.dynamics.decode, primitive=primitive) for primitive in action_skeleton]
+        if self.custom_fns is not None:
+            custom_fns = [self.custom_fns[type(primitive)] for primitive in action_skeleton]  # type: ignore
+        else:
+            custom_fns = None
 
         with torch.no_grad():
             # Prepare action spaces.
@@ -232,7 +237,7 @@ class CEMPlanner(planners.Planner):
                     decode_fns=decode_fns,
                     states=states,
                     actions=samples,
-                    custom_fns=self.custom_fns,
+                    custom_fns=custom_fns,
                     action_skeleton=action_skeleton,
                 )
 

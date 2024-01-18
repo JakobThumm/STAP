@@ -2,7 +2,7 @@ planner: CEMPlanner
 planner_kwargs:
   num_samples: 10000
   num_iterations: 10
-  num_elites: 10
+  num_elites: 100
   keep_elites_fraction: 1.0
   standard_deviation: 0.3
 
@@ -15,5 +15,6 @@ agent_configs:
 dynamics_config: "{DYNAMICS_CONFIG}"
 
 custom_fns:
-  - null
-  - "HookHandoverOrientationFn"
+  pick: null
+  place: null
+  static_handover: "HookHandoverOrientationFn"

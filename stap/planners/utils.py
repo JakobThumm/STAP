@@ -20,7 +20,7 @@ from stap import agents, dynamics, envs, networks, planners
 from stap.dynamics import Dynamics, LatentDynamics
 from stap.dynamics import load as load_dynamics
 from stap.envs.base import Primitive
-from stap.envs.pybullet.table.primitives import Null
+from stap.envs.pybullet.table.primitives import PRIMITIVE_MATCHING, Null
 from stap.planners.custom_fns import CUSTOM_FNS
 from stap.utils import configs, recording, spaces, tensors, timing
 
@@ -135,12 +135,13 @@ class PlannerFactory(configs.Factory):
             )
         # Custom fns
         if "custom_fns" in self.config:
-            custom_fns = []
-            for fn_name in self.config["custom_fns"]:
+            custom_fns = dict()
+            for policy_name in self.config["custom_fns"]:
+                fn_name = self.config["custom_fns"][policy_name]
                 if fn_name is not None and fn_name in CUSTOM_FNS:
-                    custom_fns.append(CUSTOM_FNS[fn_name])
+                    custom_fns[PRIMITIVE_MATCHING[policy_name]] = CUSTOM_FNS[fn_name]
                 else:
-                    custom_fns.append(None)
+                    custom_fns[PRIMITIVE_MATCHING[policy_name]] = None
         else:
             custom_fns = None
 
