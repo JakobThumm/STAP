@@ -6,6 +6,7 @@ import numpy as np
 import torch
 
 from stap import agents, dynamics, envs
+from stap.envs.base import Primitive
 from stap.utils import tensors
 
 
@@ -30,7 +31,7 @@ class Planner(abc.ABC):
         policies: Sequence[agents.Agent],
         dynamics: dynamics.Dynamics,
         custom_fns: Optional[
-            Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]
+            Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor, Primitive], torch.Tensor]]]
         ] = None,
         env: Optional[envs.Env] = None,
         device: str = "auto",
@@ -62,7 +63,7 @@ class Planner(abc.ABC):
     @property
     def custom_fns(
         self,
-    ) -> Optional[Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]]]]:
+    ) -> Optional[Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor, Primitive], torch.Tensor]]]]:
         """Custom functions."""
         return self._custom_fns
 
