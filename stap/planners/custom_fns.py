@@ -73,17 +73,16 @@ def HookHandoverOrientationFn(
     object_orientation = get_object_orientation(next_state, idx)
     MIN_VALUE = 0.0
     MAX_VALUE = 1.0
-    # OPTIMAL_ORIENTATION = -torch.pi / 2
-    # orientation_value = MIN_VALUE + (torch.abs(object_orientation[:, 2] - OPTIMAL_ORIENTATION)) / (2 * torch.pi) * (
-    #     MAX_VALUE - MIN_VALUE
-    # )
-    OPTIMAL_POSITION = torch.tensor([0.0, -0.7, 0.2], device=state.device)
-    POS_RANGE = 1.0
-    position_value = MIN_VALUE + torch.norm(object_position - OPTIMAL_POSITION, dim=1) / POS_RANGE * (
+    OPTIMAL_ORIENTATION = -torch.pi / 2
+    orientation_value = MIN_VALUE + (torch.abs(object_orientation[:, 2] - OPTIMAL_ORIENTATION)) / (2 * torch.pi) * (
         MAX_VALUE - MIN_VALUE
     )
-    # return_value = torch.clip((orientation_value + position_value) / 2.0, MIN_VALUE, MAX_VALUE)
-    return_value = position_value
+    OPTIMAL_POSITION = torch.tensor([0.0, -0.7, 0.2], device=state.device)
+    POS_RANGE = 1.0
+    position_value = MIN_VALUE + (POS_RANGE - torch.norm(object_position - OPTIMAL_POSITION, dim=1)) / POS_RANGE * (
+        MAX_VALUE - MIN_VALUE
+    )
+    return_value = torch.clip((orientation_value + position_value) / 2.0, MIN_VALUE, MAX_VALUE)
     return return_value
 
 
