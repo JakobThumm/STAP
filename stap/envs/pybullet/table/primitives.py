@@ -12,7 +12,7 @@ from stap.envs import base as envs
 from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.sim.robot import ControlException, Robot
 from stap.envs.pybullet.table import object_state, primitive_actions, utils
-from stap.envs.pybullet.table.objects import Box, Hook, Null, Object, Rack
+from stap.envs.pybullet.table.objects import Box, Hook, Null, Object, Rack, Screwdriver
 from stap.utils.macros import SIMULATION_FREQUENCY, SIMULATION_TIME_STEP
 
 dbprint = lambda *args: None  # noqa
@@ -297,6 +297,12 @@ class Pick(Primitive):
                 pos = np.array([pos_head[0], random_y, 0])
                 theta = np.pi / 2
             pos[2] += 0.015
+        elif obj.isinstance(Screwdriver):
+            screwdriver: Screwdriver = obj  # type: ignore
+            action_range = self.Action.range()
+            random_x = np.random.uniform(low=-screwdriver.head_length, high=screwdriver.handle_length)
+            pos = np.array([random_x, 0, screwdriver._head_radius + 0.01])
+            theta = 0.0
         elif obj.isinstance(Box):
             pos = np.array([0.0, 0.0, 0.0])
             theta = 0.0  # if random.random() <= 0.5 else np.pi / 2
@@ -1041,7 +1047,6 @@ class Stop(Primitive):
         return ExecutionResult(success=True, truncated=False)
 
     def sample_action(self) -> primitive_actions.PrimitiveAction:
-        return np.ones(1)
         return np.ones(1)
 
 

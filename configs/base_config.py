@@ -105,6 +105,7 @@ class PolicyDatasetGenerationConfig:
             "yogurt": "box",
             "icecream": "box",
             "salt": "box",
+            "screwdriver": "tool",
         }
     )
 
