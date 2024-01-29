@@ -69,9 +69,9 @@ def HookHandoverOrientationFn(
     assert primitive is not None and isinstance(primitive, Primitive)
     arg_object_ids = primitive.get_policy_args_ids()
     idx = arg_object_ids[0]
-    object_orientation = get_object_orientation(next_state, idx)
     object_position = get_object_position(next_state, idx)
-    MIN_VALUE = 0.5
+    object_orientation = get_object_orientation(next_state, idx)
+    MIN_VALUE = 1.0
     MAX_VALUE = 1.0
     OPTIMAL_ORIENTATION = -torch.pi / 2
     orientation_value = MIN_VALUE + (torch.abs(object_orientation[:, 2] - OPTIMAL_ORIENTATION)) / (2 * torch.pi) * (

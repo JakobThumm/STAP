@@ -28,7 +28,7 @@ class CEMPlanner(planners.Planner):
         standard_deviation: float = 1.0,
         keep_elites_fraction: float = 0.0,
         population_decay: float = 1.0,
-        momentum: float = 0.0,
+        std_decay: float = 0.5,
         device: str = "auto",
     ):
         """Constructs the iCEM planner.
@@ -45,7 +45,7 @@ class CEMPlanner(planners.Planner):
                 population. Will be scaled by the action space.
             keep_elites_fraction: Fraction of elites to keep between iterations.
             population_decay: Population decay applied after each iteration.
-            momentum: Momentum of distribution updates.
+            std_decay: Decay of standard deviation over time. Std_{t+1} = std_t * (1 - std_decay)
             device: Torch device.
         """
         super().__init__(policies=policies, dynamics=dynamics, custom_fns=custom_fns, env=env, device=device)
@@ -57,7 +57,7 @@ class CEMPlanner(planners.Planner):
         # Improved CEM parameters.
         self._num_elites_to_keep = int(keep_elites_fraction * self.num_elites + 0.5)
         self._population_decay = population_decay
-        self._momentum = momentum
+        self._std_decay = std_decay
 
     @property
     def num_iterations(self) -> int:
@@ -90,9 +90,9 @@ class CEMPlanner(planners.Planner):
         return self._population_decay
 
     @property
-    def momentum(self) -> float:
-        """Momentum of distribution updates."""
-        return self._momentum
+    def std_decay(self) -> float:
+        """Decay of standard deviation over time."""
+        return self._std_decay
 
     def _compute_initial_distribution(
         self, observation: torch.Tensor, action_skeleton: Sequence[envs.Primitive]
@@ -187,7 +187,8 @@ class CEMPlanner(planners.Planner):
 
             # Initialize distribution.
             mean, std = self._compute_initial_distribution(t_observation, action_skeleton)
-            elites = torch.empty((0, *mean.shape), dtype=torch.float32, device=self.device)
+            elites = mean[None, ...]
+            elites_scores = torch.ones((1), dtype=torch.float32, device=self.device)
             # from stap.planners.debug import debug_value_fn
             # debug_value_fn(
             #     t_observation, self.policies[action_skeleton[0].idx_policy].action_space, value_fns[0], decode_fns[0]
@@ -208,15 +209,13 @@ class CEMPlanner(planners.Planner):
 
             for idx_iter in range(self.num_iterations):
                 # Sample from distribution.
-                samples = self.sample_from_nan(mean, std, torch.Size((num_samples,)))
+                # samples = self.sample_from_nan(mean, std, torch.Size((num_samples,)))
+                samples = self.sample_from_elites(elites, elites_scores, std, num_samples)
+                num_samples = samples.shape[0]
                 samples = torch.clip(samples, actions_low, actions_high)
 
                 # Include the best elites from the previous iteration.
-                if idx_iter > 0:
-                    samples[: self.num_elites_to_keep] = elites[: self.num_elites_to_keep]
-
-                # Also include the mean.
-                samples[self.num_elites_to_keep] = mean
+                samples[: elites.shape[0]] = elites
 
                 # Roll out trajectories.
                 for t, policy in enumerate(policies):
@@ -243,7 +242,14 @@ class CEMPlanner(planners.Planner):
 
                 # Select the top trajectories.
                 idx_elites = p_success.topk(self.num_elites).indices
+                n_success = torch.sum(p_success[idx_elites] > 0.0)
+                if n_success == 0:
+                    print("No successful plan found.")
+                    n_success = 1
+                if n_success < idx_elites.shape[0]:
+                    idx_elites = idx_elites[:n_success]
                 elites = samples[idx_elites]
+                elites_scores = p_success[idx_elites]
                 idx_best = idx_elites[0]
 
                 # Track best action.
@@ -255,12 +261,8 @@ class CEMPlanner(planners.Planner):
                     best_values = values[idx_best].cpu().numpy()
                     best_values_unc = values_unc[idx_best].cpu().numpy()
 
-                # Update distribution.
-                mean = self.momentum * mean + (1 - self.momentum) * elites.mean(dim=0)
-                # mean = torch.nan_to_num(mean, nan=0.0)
-                std = self.momentum * std + (1 - self.momentum) * elites.std(dim=0)
-                # std = torch.nan_to_num(std, nan=1.0)
-                std = torch.clip(std, 1e-4)
+                # Update standard deviation
+                std = torch.clip(std * (1 - self.std_decay), 1e-8)
 
                 # Decay population size.
                 num_samples = int(self.population_decay * num_samples + 0.5)
@@ -317,3 +319,30 @@ class CEMPlanner(planners.Planner):
         mean = torch.nan_to_num(mean, nan=0.0)
         std = torch.nan_to_num(std, nan=1.0)
         return torch.distributions.Normal(mean, std).sample(n_samples)
+
+    def sample_from_elites(self, elites: torch.Tensor, elites_scores: torch.Tensor, std: torch.Tensor, n_samples: int):
+        """Sample n samples from a torch normal distribution, where some of the entries of mean and std can be nan.
+        Replaces nan in mean with 0 and in std with 1.
+
+        Args:
+            elites: torch tensor of shape [N, T, dim_actions]
+            elites_scores: torch tensor of shape [N, T]
+            std: torch tensor of shape [T, dim_actions]
+            n_samples: int
+        Returns:
+            samples: torch tensor of shape [n_samples, T, dim_actions]
+        """
+        # Figure out how to cast this to int
+        samples_elites = torch.round(elites_scores / torch.sum(elites_scores) * n_samples).to(torch.int32)
+        n_samples = torch.sum(samples_elites)  # type: ignore
+        # Figure out how to concatenate torch.Size
+        samples = torch.zeros([n_samples, *elites[0].shape], device=self.device)
+        std = torch.nan_to_num(std, nan=1.0)
+        current_idx = 0
+        for n_sample_elites, elite in zip(samples_elites, elites):
+            mean = torch.nan_to_num(elite, nan=0.0)
+            samples[current_idx : current_idx + n_sample_elites] = torch.distributions.Normal(mean, std).sample(
+                torch.Size((n_sample_elites,))  # type: ignore
+            )
+            current_idx += n_sample_elites
+        return samples

@@ -31,22 +31,16 @@ class Dynamics(abc.ABC):
         self._policies = policies
 
         if state_space is None:
-            if not all(
-                policy.state_space == policies[0].state_space for policy in policies[1:]
-            ):
+            if not all(policy.state_space == policies[0].state_space for policy in policies[1:]):
                 raise ValueError("All policy state spaces must be the same.")
             self._state_space = policies[0].state_space
         else:
             self._state_space = state_space
 
         if action_space is None:
-            if not all(
-                isinstance(policy.action_space, gym.spaces.Box) for policy in policies
-            ):
+            if not all(isinstance(policy.action_space, gym.spaces.Box) for policy in policies):
                 raise ValueError("All policy action spaces must be boxes.")
-            self._action_space = spaces.overlay_boxes(
-                [policy.action_space for policy in policies]
-            )
+            self._action_space = spaces.overlay_boxes([policy.action_space for policy in policies])
         else:
             self._action_space = action_space
 
@@ -121,13 +115,13 @@ class Dynamics(abc.ABC):
 
         # Initialize variables.
         T = len(action_skeleton)
-        states = spaces.null_tensor(
-            self.state_space, (_batch_size, T + 1), device=self.device
-        ).requires_grad_(state_requires_grad)
+        states = spaces.null_tensor(self.state_space, (_batch_size, T + 1), device=self.device).requires_grad_(
+            state_requires_grad
+        )
         states[:, 0] = state
-        actions = spaces.null_tensor(
-            self.action_space, (_batch_size, T), device=self.device
-        ).requires_grad_(action_requires_grad)
+        actions = spaces.null_tensor(self.action_space, (_batch_size, T), device=self.device).requires_grad_(
+            action_requires_grad
+        )
 
         # Rollout.
         for t, primitive in enumerate(action_skeleton):
@@ -139,6 +133,62 @@ class Dynamics(abc.ABC):
 
             # Dynamics state -> dynamics state.
             state = self.forward_eval(state, action, primitive)
+            states[:, t + 1] = state
+
+        if batch_size is None:
+            return states[0], actions[0]
+
+        return states, actions
+
+    def rollout_action_samples(
+        self,
+        observation: torch.Tensor,
+        action_skeleton: Sequence[envs.Primitive],
+        actions: torch.Tensor,
+        policies: Optional[Sequence[agents.Agent]] = None,
+        batch_size: Optional[int] = None,
+        state_requires_grad: bool = False,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Rolls out trajectories according to the action skeleton.
+
+        Args:
+            observation: Initial observation.
+            action_skeleton: List of primitives.
+            actions: Actions to execute.
+            policies: Optional policies to use. Otherwise uses `self.policies`.
+            batch_size: Number of trajectories to roll out.
+
+        Returns:
+            2-tuple (
+                states [batch_size, T + 1],
+                actions [batch_size, T],
+            ).
+        """
+        if policies is None:
+            policies = self.policies
+
+        state = self.encode(
+            observation,
+            action_skeleton[0].idx_policy,
+            action_skeleton[0].get_policy_args(),
+        )
+        if state.ndim == len(self.state_space.shape) + 1:
+            _batch_size = state.shape[0]
+        else:
+            _batch_size = 1 if batch_size is None else batch_size
+            state = state.unsqueeze(0).repeat(_batch_size, *([1] * len(state.shape)))
+
+        # Initialize variables.
+        T = len(action_skeleton)
+        states = spaces.null_tensor(self.state_space, (_batch_size, T + 1), device=self.device).requires_grad_(
+            state_requires_grad
+        )
+        states[:, 0] = state
+
+        # Rollout.
+        for t, primitive in enumerate(action_skeleton):
+            # Dynamics state -> dynamics state.
+            state = self.forward_eval(state, actions[:, t, :], primitive)
             states[:, t + 1] = state
 
         if batch_size is None:
@@ -184,9 +234,7 @@ class Dynamics(abc.ABC):
         Returns:
             Prediction of next state.
         """
-        return self.forward(
-            state, action, primitive.idx_policy, primitive.get_policy_args()
-        )
+        return self.forward(state, action, primitive.idx_policy, primitive.get_policy_args())
 
     def encode(
         self,
@@ -206,9 +254,7 @@ class Dynamics(abc.ABC):
         """
 
         @tensors.vmap(dims=1)
-        def _encode(
-            t_idx_policy: Union[int, torch.Tensor], observation: Any
-        ) -> torch.Tensor:
+        def _encode(t_idx_policy: Union[int, torch.Tensor], observation: Any) -> torch.Tensor:
             if isinstance(t_idx_policy, torch.Tensor):
                 idx_policy = int(t_idx_policy.item())
             else:

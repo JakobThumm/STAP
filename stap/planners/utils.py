@@ -260,6 +260,8 @@ def evaluate_trajectory(
             if isinstance(value_fn, networks.critics.EnsembleDetectorCritic):
                 p_successes_unc[:, t] = value_fn.detect
             if custom_fns is not None and custom_fns[t] is not None and action_skeleton is not None:
+                if clip_success:
+                    p_successes[:, t] = torch.clip(p_successes[:, t], min=0, max=1)
                 p_successes[:, t] = p_successes[:, t] * custom_fns[t](
                     states[:, t], action, states[:, t + 1], action_skeleton[t]
                 )  # type: ignore
