@@ -466,6 +466,134 @@ class Hook(Object):
     #     raise NotImplementedError
 
 
+class Screwdriver(Object):
+    def __init__(
+        self,
+        physics_id: int,
+        name: str,
+        color: Union[List[float], np.ndarray],
+        head_length: float = 0.09,
+        handle_length: float = 0.075,
+        head_radius: float = 0.012,
+        handle_radius: float = 0.0025,
+        mass: float = 0.1,
+        is_active: bool = False,
+    ):
+        if not isinstance(color, np.ndarray):
+            color = np.array(color)
+
+        head = shapes.Cylinder(
+            radius=head_radius,
+            length=head_length,
+            mass=0.4 * mass,
+            color=color,
+            pose=math.Pose(
+                pos=np.array([-0.5 * head_length, 0.0, 0.0]),
+                quat=eigen.Quaterniond(eigen.AngleAxisd(angle=np.pi / 2, axis=np.array([0.0, 1.0, 0.0]))).coeffs,
+            ),
+        )
+        handle = shapes.Cylinder(
+            radius=handle_radius,
+            length=handle_length,
+            mass=0.6 * mass,
+            color=np.array([0.5, 0.5, 0.5, 1.0]),
+            pose=math.Pose(
+                pos=np.array([0.5 * handle_length, 0.0, 0.0]),
+                quat=eigen.Quaterniond(eigen.AngleAxisd(angle=np.pi / 2, axis=np.array([0.0, 1.0, 0.0]))).coeffs,
+            ),
+        )
+        self._shapes = [head, handle]
+        body_id = shapes.create_body(self.shapes, link_parents=[0], physics_id=physics_id)
+
+        super().__init__(physics_id=physics_id, body_id=body_id, name=name, is_static=mass == 0.0, is_active=is_active)
+
+        self._state.head_length = head_length
+        self._state.handle_length = handle_length
+        self._state.handle_y = 0.0
+        self._radius = head_radius
+        self._head_radius = head_radius
+        self._handle_radius = handle_radius
+
+        self._size = np.array([handle_length + head_length, 2 * head_radius, 2 * head_radius])
+        self._bbox = np.array([-0.5 * self.size, 0.5 * self.size])
+
+    @property
+    def head_length(self) -> float:
+        return self._state.head_length  # type: ignore
+
+    @property
+    def handle_length(self) -> float:
+        return self._state.handle_length  # type: ignore
+
+    @property
+    def handle_y(self) -> float:
+        return self._state.handle_y  # type: ignore
+
+    @property
+    def radius(self) -> float:
+        return self._radius
+
+    @property
+    def size(self) -> np.ndarray:
+        return self._size
+
+    @property
+    def bbox(self) -> np.ndarray:
+        return self._bbox
+
+    def convex_hulls(
+        self,
+        world_frame: bool = True,
+        project_2d: bool = False,
+        sim: bool = True,
+    ) -> List[np.ndarray]:
+        """Computes the convex hulls of the handle and head links."""
+        head_pose = self.shapes[0].pose
+        handle_pose = self.shapes[1].pose
+        assert handle_pose is not None and head_pose is not None
+        """
+        center_pos = 0.5 * (head_pose.pos + handle_pose.pos)
+        head_vec = head_pose.pos - center_pos
+        outer_head = center_pos + 2 * head_vec
+        head_normal_y = np.array([head_vec[1], -head_vec[0], head_vec[2]])
+        head_normal_y = head_normal_y / np.linalg.norm(head_normal_y)
+        head_vertices = np.array([outer_head + head_normal_y * self._head_radius, 
+                                  outer_head - head_normal_y * self._head_radius])
+        handle_vec = handle_pose.pos - center_pos
+        outer_handle = center_pos + 2 * handle_vec
+        handle_normal_y = np.array([handle_vec[1], -handle_vec[0], handle_vec[2]])
+        handle_normal_y = handle_normal_y / np.linalg.norm(handle_normal_y)
+        handle_vertices = np.array([outer_handle + handle_normal_y * self._handle_radius, 
+                                  outer_handle - handle_normal_y * self._handle_radius])
+        vertices = np.concatenate([head_vertices, handle_vertices])
+        """
+        positions = np.array(
+            [
+                [head_pose.pos[0], 0.0, 0.0],
+                [handle_pose.pos[0], 0.0, 0.0],
+            ]
+        )
+        sizes = np.array(
+            [
+                [self.head_length, 2 * self._head_radius, 2 * self._head_radius],
+                [self.handle_length, 2 * self._handle_radius, 2 * self._handle_radius],
+            ]
+        )
+        bboxes = np.array([positions - 0.5 * sizes, positions + 0.5 * sizes]).swapaxes(0, 1)
+
+        pose = self.pose(sim=sim) if world_frame else None
+        vertices = [compute_bbox_vertices(bbox, pose, project_2d) for bbox in bboxes]
+
+        return vertices
+
+    @property
+    def shapes(self) -> Sequence[shapes.Shape]:
+        return self._shapes
+
+    # def aabb(self) -> np.ndarray:
+    #     raise NotImplementedError
+
+
 class Rack(Object):
     TOP_THICKNESS = 0.01
     LEG_THICKNESS = 0.01
