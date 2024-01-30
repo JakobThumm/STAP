@@ -10,13 +10,14 @@ env_kwargs:
 
   tasks:
     - action_skeleton:
-         - pick(screwdriver)
-         - static_handover(screwdriver, right_hand)
+        # - pick(screwdriver)
+         - static_handover(icecream, right_hand)
       initial_state:
         # - on(rack, table)
         # - on(hook, table)
-        - on(icecream, table)
-        - on(screwdriver, table)
+        # - on(icecream, table)
+        # - on(hook, table)
+        - ingripper(icecream)
 
   robot_config: configs/pybullet/envs/robots/safe_franka_panda_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

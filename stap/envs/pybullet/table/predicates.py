@@ -11,7 +11,7 @@ from shapely.geometry import LineString, Polygon
 from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.sim.robot import Robot
 from stap.envs.pybullet.table import primitive_actions, utils
-from stap.envs.pybullet.table.objects import Box, Hook, Null, Object, Rack
+from stap.envs.pybullet.table.objects import Box, Hook, Null, Object, Rack, Screwdriver
 
 dbprint = lambda *args: None  # noqa
 # dbprint = print
@@ -596,17 +596,23 @@ class Ingripper(Predicate):
 
         # Generate grasp pose.
         for i in range(Ingripper.MAX_GRASP_ATTEMPTS):
+            # Get EEF pose
+            ee_pose = robot.arm.ee_pose(update=True)
+            rot = Rotation.from_quat(ee_pose.quat)
+            # Generate a grasp pose in EEF frame.
             grasp_pose = self.generate_grasp_pose(
                 obj,
                 handlegrasp=f"handlegrasp({obj})" in state,
                 upperhandlegrasp=f"upperhandlegrasp({obj})" in state,
             )
-            ee_pose = robot.arm.ee_pose(update=True)
-            rot = Rotation.from_quat(ee_pose.quat)
+            # Transform grasp pose to object frame.
             obj_pose = math.Pose.from_eigen(grasp_pose.to_eigen().inverse())
-            obj_pose.pos = ee_pose.pos - robot.arm.ee_offset + Ingripper.SAMPLE_OFFSET
-            rot_obj = Rotation.from_quat(obj_pose.quat)
-            obj_pose.quat = Rotation.as_quat(rot_obj * rot)
+            rot_obj = Rotation.from_quat(obj_pose.quat) * rot
+            obj_pose.quat = Rotation.as_quat(rot_obj)
+            obj_pos_offset = rot_obj.apply(obj_pose.pos)
+            # Final pos is grasp pose in obj frame + eef pos in world frame.
+            obj_pose.pos = obj_pos_offset + ee_pose.pos - robot.arm.ee_offset + Ingripper.SAMPLE_OFFSET
+
             # Use fake grasp.
             obj.freeze()
             obj.disable_collisions()
@@ -678,23 +684,35 @@ class Ingripper(Predicate):
                 if hook.handle_y > 0:
                     max_xyz[1] = pos_handle[1] - hook.radius - 0.5 * FINGER_WIDTH
 
+                temp_min = min_xyz[0]
+                temp_max = max_xyz[0]
+                min_xyz[0] = min_xyz[1]
+                max_xyz[0] = max_xyz[1]
+                min_xyz[1] = temp_min
+                max_xyz[1] = temp_max
                 theta = np.pi / 2
+            min_xyz[2] -= hook.radius
+            min_xyz[2] = max(min_xyz[2], -FINGER_HEIGHT)
+            max_xyz[2] -= hook.radius
+        elif obj.isinstance(Screwdriver):
+            min_xyz, max_xyz = np.array(obj.bbox)
+            theta = 0.0
+            y_center = 0.5 * (min_xyz[1] + max_xyz[1])
+            min_xyz[0] = -obj.handle_length
+            max_xyz[0] = obj.head_length
+            min_xyz[1] = 0.0
+            max_xyz[1] = 0.0
+            min_xyz[2] -= 2 * obj._head_radius
+            min_xyz[2] = max(min_xyz[2], -FINGER_HEIGHT)
+            max_xyz[2] -= 2 * obj._head_radius
         else:
             # Fit object between gripper fingers.
             theta = np.random.choice([0.0, np.pi / 2])
 
-            min_xyz, max_xyz = np.array(obj.bbox)
-            if theta == 0.0:
-                y_center = 0.5 * (min_xyz[1] + max_xyz[1])
-                min_xyz[1] = max(min_xyz[1] + 0.5 * FINGER_DISTANCE, y_center - MAX_GRASP_Y_OFFSET)
-                max_xyz[1] = min(max_xyz[1] - 0.5 * FINGER_DISTANCE, y_center + MAX_GRASP_Y_OFFSET)
-            elif theta == np.pi / 2:
-                x_center = 0.5 * (min_xyz[0] + max_xyz[0])
-                min_xyz[0] = max(min_xyz[0] + 0.5 * FINGER_DISTANCE, x_center - MAX_GRASP_Y_OFFSET)
-                max_xyz[0] = min(max_xyz[0] - 0.5 * FINGER_DISTANCE, x_center + MAX_GRASP_Y_OFFSET)
-
+            min_xyz, max_xyz = 0.5 * np.array(obj.bbox)
             min_xyz[2] += FINGER_COLLISION_MARGIN
             min_xyz[2] = max(min_xyz[2], max_xyz[0] - FINGER_HEIGHT)
+            max_xyz[2] -= FINGER_COLLISION_MARGIN
 
         xyz = np.random.uniform(min_xyz, max_xyz)
         theta += np.random.normal(scale=THETA_STDDEV)

@@ -515,7 +515,7 @@ class Screwdriver(Object):
         self._handle_radius = handle_radius
 
         self._size = np.array([handle_length + head_length, 2 * head_radius, 2 * head_radius])
-        self._bbox = np.array([-0.5 * self.size, 0.5 * self.size])
+        self._bbox = np.array([[-head_length, -head_radius, -head_radius], [handle_length, head_radius, head_radius]])
 
     @property
     def head_length(self) -> float:
