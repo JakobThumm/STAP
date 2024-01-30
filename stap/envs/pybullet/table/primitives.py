@@ -301,7 +301,7 @@ class Pick(Primitive):
             screwdriver: Screwdriver = obj  # type: ignore
             action_range = self.Action.range()
             random_x = np.random.uniform(low=-screwdriver.head_length, high=screwdriver.handle_length)
-            pos = np.array([random_x, 0, screwdriver._head_radius + 0.01])
+            pos = np.array([random_x, 0, screwdriver.head_radius + 0.01])
             theta = 0.0
         elif obj.isinstance(Box):
             pos = np.array([0.0, 0.0, 0.0])

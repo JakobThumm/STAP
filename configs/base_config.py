@@ -99,13 +99,13 @@ class PolicyDatasetGenerationConfig:
             "table": "unmovable",
             "right_hand": "actor",
             "left_hand": "actor",
+            "screwdriver": "tool",
             # "rack": "receptacle",
             "hook": "tool",
             "milk": "box",
             "yogurt": "box",
             "icecream": "box",
             "salt": "box",
-            "screwdriver": "tool",
         }
     )
 

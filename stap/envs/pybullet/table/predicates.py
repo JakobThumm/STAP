@@ -702,9 +702,9 @@ class Ingripper(Predicate):
             max_xyz[0] = obj.head_length
             min_xyz[1] = 0.0
             max_xyz[1] = 0.0
-            min_xyz[2] -= 2 * obj._head_radius
+            min_xyz[2] -= 2 * obj.head_radius
             min_xyz[2] = max(min_xyz[2], -FINGER_HEIGHT)
-            max_xyz[2] -= 2 * obj._head_radius
+            max_xyz[2] -= 2 * obj.head_radius
         else:
             # Fit object between gripper fingers.
             theta = np.random.choice([0.0, np.pi / 2])

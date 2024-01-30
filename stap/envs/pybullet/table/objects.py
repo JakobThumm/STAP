@@ -526,12 +526,16 @@ class Screwdriver(Object):
         return self._state.handle_length  # type: ignore
 
     @property
-    def handle_y(self) -> float:
-        return self._state.handle_y  # type: ignore
+    def head_radius(self) -> float:
+        return self._head_radius
+
+    @property
+    def handle_radius(self) -> float:
+        return self._handle_radius
 
     @property
     def radius(self) -> float:
-        return self._radius
+        return self.head_radius
 
     @property
     def size(self) -> np.ndarray:
@@ -551,22 +555,6 @@ class Screwdriver(Object):
         head_pose = self.shapes[0].pose
         handle_pose = self.shapes[1].pose
         assert handle_pose is not None and head_pose is not None
-        """
-        center_pos = 0.5 * (head_pose.pos + handle_pose.pos)
-        head_vec = head_pose.pos - center_pos
-        outer_head = center_pos + 2 * head_vec
-        head_normal_y = np.array([head_vec[1], -head_vec[0], head_vec[2]])
-        head_normal_y = head_normal_y / np.linalg.norm(head_normal_y)
-        head_vertices = np.array([outer_head + head_normal_y * self._head_radius, 
-                                  outer_head - head_normal_y * self._head_radius])
-        handle_vec = handle_pose.pos - center_pos
-        outer_handle = center_pos + 2 * handle_vec
-        handle_normal_y = np.array([handle_vec[1], -handle_vec[0], handle_vec[2]])
-        handle_normal_y = handle_normal_y / np.linalg.norm(handle_normal_y)
-        handle_vertices = np.array([outer_handle + handle_normal_y * self._handle_radius, 
-                                  outer_handle - handle_normal_y * self._handle_radius])
-        vertices = np.concatenate([head_vertices, handle_vertices])
-        """
         positions = np.array(
             [
                 [head_pose.pos[0], 0.0, 0.0],
@@ -575,8 +563,8 @@ class Screwdriver(Object):
         )
         sizes = np.array(
             [
-                [self.head_length, 2 * self._head_radius, 2 * self._head_radius],
-                [self.handle_length, 2 * self._handle_radius, 2 * self._handle_radius],
+                [self.head_length, 2 * self.head_radius, 2 * self.head_radius],
+                [self.handle_length, 2 * self.handle_radius, 2 * self.handle_radius],
             ]
         )
         bboxes = np.array([positions - 0.5 * sizes, positions + 0.5 * sizes]).swapaxes(0, 1)
@@ -947,13 +935,23 @@ class WrapperObject(Object):
 
     @property
     def head_length(self) -> float:
-        assert isinstance(self.body, Hook)
+        assert isinstance(self.body, Hook) or isinstance(self.body, Screwdriver)
         return self.body.head_length
 
     @property
     def handle_length(self) -> float:
-        assert isinstance(self.body, Hook)
+        assert isinstance(self.body, Hook) or isinstance(self.body, Screwdriver)
         return self.body.handle_length
+
+    @property
+    def head_radius(self) -> float:
+        assert isinstance(self.body, Screwdriver)
+        return self.body.head_radius
+
+    @property
+    def handle_radius(self) -> float:
+        assert isinstance(self.body, Screwdriver)
+        return self.body.handle_radius
 
     @property
     def handle_y(self) -> float:
