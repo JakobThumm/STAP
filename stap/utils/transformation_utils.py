@@ -524,6 +524,33 @@ def quaternion_to_axis_angle(quaternions: torch.Tensor) -> torch.Tensor:
     return quaternions[..., 1:] / sin_half_angles_over_angles
 
 
+def rotate_vector_by_axis_angle(vector: torch.Tensor, axis_angle: torch.Tensor) -> torch.Tensor:
+    """
+    Rotate a vector by the given axis-angle vector.
+
+    Args:
+        vector: Vector to rotate, of shape (..., 3).
+        axis_angle: Axis angle vector of shape (..., 3).
+
+    Returns:
+        The vector after the rotation, of shape (..., 3).
+    """
+    return quaternion_apply(axis_angle_to_quaternion(axis_angle), vector)
+
+
+def get_object_vector_from_axis_angle(axis_angle: torch.Tensor) -> torch.Tensor:
+    """Rotate the x-axis by the given axis-angle vector.
+
+    Args:
+        axis_angle: Axis angle vector of shape (..., 3).
+    Returns:
+        The vector representing the x-axis after the rotation.
+    """
+    x_axis = torch.zeros_like(axis_angle, device=axis_angle.device)
+    x_axis[..., 0] = 1.0
+    return rotate_vector_by_axis_angle(axis_angle, x_axis)
+
+
 def rotation_6d_to_matrix(d6: torch.Tensor) -> torch.Tensor:
     """
     Converts 6D rotation representation by Zhou et al. [1] to rotation matrix

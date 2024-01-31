@@ -18,4 +18,4 @@ dynamics_config: "{DYNAMICS_CONFIG}"
 custom_fns:
   pick: "ScrewdriverPickFn"
   place: null
-  static_handover: "HandoverPositionFn"
+  static_handover: "HandoverOrientationFn"

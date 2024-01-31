@@ -467,6 +467,12 @@ class Hook(Object):
 
 
 class Screwdriver(Object):
+    """A model of a screwdirver with a handle and a head.
+    The head is the grip of the screwdriver, the handle is the shaft.
+    The head points in the negative x direction, the handle in the positive x direction of the object in the object frame.
+    The head is easier to grasp than the handle.
+    """
+
     def __init__(
         self,
         physics_id: int,

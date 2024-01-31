@@ -10,7 +10,11 @@ import torch
 
 from stap.envs.base import Primitive
 from stap.envs.pybullet.table import object_state
-from stap.utils.transformation_utils import axis_angle_to_matrix, matrix_to_axis_angle
+from stap.utils.transformation_utils import (
+    axis_angle_to_matrix,
+    matrix_to_axis_angle,
+    rotate_vector_by_axis_angle,
+)
 
 
 def get_object_position(observation: torch.Tensor, id: int) -> torch.Tensor:
@@ -175,7 +179,7 @@ def HookHandoverOrientationFn(
 def ScrewdriverPickFn(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
-    r"""Evaluates the orientation of the hook handover.
+    r"""Evaluates the position of the pick primitive.
 
     Args:
         state [batch_size, state_dim]: Current state.
@@ -207,7 +211,7 @@ def ScrewdriverPickFn(
 def HandoverPositionFn(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
-    r"""Evaluates the orientation of the hook handover.
+    r"""Evaluates the position of the handover.
 
     Args:
         state [batch_size, state_dim]: Current state.
@@ -233,8 +237,48 @@ def HandoverPositionFn(
     return position_value
 
 
+def HandoverOrientationFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the orientation of the hook handover.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    arg_object_ids = primitive.get_policy_args_ids()
+    idx_obj = arg_object_ids[0]
+    idx_hand = arg_object_ids[1]
+    object_position = get_object_position(next_state, idx_obj)
+    hand_position = get_object_position(state, idx_hand)
+    object_orientation = get_object_orientation(next_state, idx_obj)
+    # The head of the screwdriver points in negative x-direction in the object frame.
+    x_axis = torch.zeros_like(object_orientation, device=object_orientation.device)
+    x_axis[..., 0] = -1.0
+    new_direction_vector = rotate_vector_by_axis_angle(x_axis, object_orientation)
+    # Hand direction before the handover
+    hand_direction = hand_position - object_position
+    hand_direction = hand_direction / torch.norm(hand_direction, dim=1, keepdim=True)
+    # Calculate great circle distance between the two vectors
+    dot_product = torch.sum(new_direction_vector * hand_direction, dim=1)
+    angle_difference = torch.acos(torch.clip(dot_product, -1.0, 1.0))
+    MIN_VALUE = 0.0
+    MAX_VALUE = 1.0
+    ANGLE_RANGE = torch.pi
+    orientation_value = MIN_VALUE + (ANGLE_RANGE - angle_difference) / ANGLE_RANGE * (MAX_VALUE - MIN_VALUE)
+    assert not torch.any(torch.isnan(orientation_value))
+    return orientation_value
+
+
 CUSTOM_FNS = {
     "HookHandoverOrientationFn": HookHandoverOrientationFn,
     "ScrewdriverPickFn": ScrewdriverPickFn,
     "HandoverPositionFn": HandoverPositionFn,
+    "HandoverOrientationFn": HandoverOrientationFn,
 }

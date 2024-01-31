@@ -10,11 +10,11 @@ env_kwargs:
 
   tasks:
     - action_skeleton:
-        - pick(hook)
-        - static_handover(hook, right_hand)
+        - pick(screwdriver)
+        - static_handover(screwdriver, right_hand)
       initial_state:
         # - on(rack, table)
-        - on(hook, table)
+        # - on(hook, table)
         - on(icecream, table)
         - on(screwdriver, table)
         # - ingripper(hook)

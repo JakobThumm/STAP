@@ -239,7 +239,7 @@ class CEMPlanner(planners.Planner):
                     custom_fns=custom_fns,
                     action_skeleton=action_skeleton,
                 )
-
+                assert not torch.any(torch.isnan(p_success))
                 # Select the top trajectories.
                 idx_elites = p_success.topk(self.num_elites).indices
                 n_success = torch.sum(p_success[idx_elites] > 0.0)
@@ -332,8 +332,16 @@ class CEMPlanner(planners.Planner):
         Returns:
             samples: torch tensor of shape [n_samples, T, dim_actions]
         """
+        assert elites.shape[0] > 0
+        assert elites.shape[0] == elites_scores.shape[0]
         # Figure out how to cast this to int
-        samples_elites = torch.round(elites_scores / torch.sum(elites_scores) * n_samples).to(torch.int32)
+        sum_elites = torch.sum(elites_scores)
+        if sum_elites > 0:
+            samples_elites = torch.round(elites_scores / torch.sum(elites_scores) * n_samples).to(torch.int32)
+        else:
+            samples_elites = (
+                torch.ones_like(elites_scores, dtype=torch.int32, device=self.device) * n_samples / elites.shape[0]
+            )
         n_samples = torch.sum(samples_elites)  # type: ignore
         # Figure out how to concatenate torch.Size
         samples = torch.zeros([n_samples, *elites[0].shape], device=self.device)
