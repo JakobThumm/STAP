@@ -1,7 +1,8 @@
 import numpy as np
 import torch
 
-from stap.planners.custom_fns import axis_angle_to_matrix, matrix_to_axis_angle
+# from stap.planners.custom_fns import axis_angle_to_matrix, matrix_to_axis_angle
+from stap.utils.transformation_utils import axis_angle_to_matrix, matrix_to_axis_angle
 
 
 def test_axis_angle_to_matrix():
@@ -27,3 +28,30 @@ def test_axis_angle_to_matrix():
         assert torch.allclose(random_axis_angle_normalized, recovered_normalized, atol=1e-5) or torch.allclose(
             random_axis_angle_normalized, -recovered_normalized, atol=1e-5
         )
+
+
+def test_axis_angle_to_matrix_multi_dim():
+    # Test known values
+    axis_angle = torch.tensor([[np.pi, 0.0, 0.0], [0.0, 0.0, 0.0]])
+    matrices = axis_angle_to_matrix(axis_angle)
+    expected_matrix_1 = torch.tensor([[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]])
+    expected_matrix_2 = torch.eye(3)
+    assert torch.allclose(matrices[0], expected_matrix_1, atol=1e-5)
+    assert torch.allclose(matrices[1], expected_matrix_2, atol=1e-5)
+
+
+def test_matrix_to_axis_angle_multi_dim():
+    # Test known values
+    matrix = torch.tensor(
+        [[[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]], [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]]
+    )
+    axis_angles = matrix_to_axis_angle(matrix)
+    expected_axis_angle_1 = torch.tensor([[np.pi, 0.0, 0.0]])
+    expected_axis_angle_2 = torch.tensor([[0.0, 0.0, 0.0]])
+    assert torch.allclose(axis_angles[0], expected_axis_angle_1, atol=1e-5)
+    assert torch.allclose(axis_angles[1], expected_axis_angle_2, atol=1e-5)
+
+
+if __name__ == "__main__":
+    print("Running tests for custom_fns.py")
+    test_matrix_to_axis_angle_multi_dim()
