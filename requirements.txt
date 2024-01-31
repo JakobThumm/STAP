@@ -28,3 +28,4 @@ black
 mypy
 flake8
 shapely
+pytest

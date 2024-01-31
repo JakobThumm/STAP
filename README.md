@@ -172,17 +172,20 @@ bash scripts/eval/eval_daf.sh
 ```
 Remove docker container.
 ### Train Q-Functions
-Not inside docker
+Not inside docker: The lower command is a fast version for easy testing.
 ```
 ./scripts/train/train_values_docker.sh user gpu
+./scripts/train/train_values_docker_fast.sh user gpu
 ```
 ### Train Policies
 ```
 ./scripts/train/train_policies_docker.sh user gpu
+./scripts/train/train_policies_docker_fast.sh user gpu
 ```
 ### Train Dynamics
 ```
 ./scripts/train/train_dynamics_docker.sh user gpu
+./scripts/train/train_dynamics_docker_fast.sh user gpu
 ```
 
 ---
