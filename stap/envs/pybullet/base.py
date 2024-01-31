@@ -1,12 +1,11 @@
 import os
-import sys
+from contextlib import redirect_stdout
 from typing import Any, Dict, Tuple
 
 from stap.envs.base import Env
-from stap.envs.pybullet.utils import RedirectStream
 from stap.utils.macros import SIMULATION_TIME_STEP
 
-with RedirectStream(sys.stderr):
+with open(os.devnull, "w") as f, redirect_stdout(f):
     import pybullet as p
 
 
@@ -23,12 +22,12 @@ def to_str_kwarg(kv: Tuple[str, Any]) -> str:
 
 def connect_pybullet(gui: bool = True, gui_kwargs: Dict[str, Any] = {}) -> int:
     if not gui:
-        with RedirectStream():
+        with open(os.devnull, "w") as f, redirect_stdout(f):
             physics_id = p.connect(p.DIRECT, options=gui_kwargs["options"])
     elif not os.environ["DISPLAY"]:
         raise p.error
     else:
-        with RedirectStream():
+        with open(os.devnull, "w") as f, redirect_stdout(f):
             physics_id = p.connect(p.GUI, options=gui_kwargs["options"])
 
         p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0, physicsClientId=physics_id)
@@ -85,7 +84,7 @@ class PybulletEnv(Env):
         return self._physics_id
 
     def close(self) -> None:
-        with RedirectStream():
+        with open(os.devnull, "w") as f, redirect_stdout(f):
             try:
                 p.disconnect(physicsClientId=self.physics_id)
             except (AttributeError, p.error):
