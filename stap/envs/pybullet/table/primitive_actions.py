@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Tuple
 
+import gym
 import numpy as np
 
 
@@ -251,20 +252,26 @@ class PushAction(PrimitiveAction):
 class HandoverAction(PrimitiveAction):
     RANGES = {
         "pitch": (-2.0, 0),
+        "yaw": (-np.pi, np.pi),
         "distance": (0.4, 0.9),
         "height": (0.2, 0.7),
     }
+
+    SPACE = gym.spaces.Box(low=-1.0, high=1.0, shape=(4,))
 
     def __init__(
         self,
         vector: Optional[np.ndarray] = None,
         pitch: Optional[float] = None,
+        yaw: Optional[float] = None,
         distance: Optional[float] = None,
         height: Optional[float] = None,
     ):
         super().__init__(vector)
         if pitch is not None:
             self.pitch = pitch  # type: ignore
+        if yaw is not None:
+            self.yaw = yaw  # type: ignore
         if distance is not None:
             self.distance = distance  # type: ignore
         if height is not None:
@@ -279,20 +286,28 @@ class HandoverAction(PrimitiveAction):
         self.vector[..., 0] = pitch
 
     @property
-    def distance(self) -> np.ndarray:
+    def yaw(self) -> np.ndarray:
         return self.vector[..., 1]
+
+    @yaw.setter
+    def yaw(self, yaw: np.ndarray) -> None:
+        self.vector[..., 1] = yaw
+
+    @property
+    def distance(self) -> np.ndarray:
+        return self.vector[..., 2]
 
     @distance.setter
     def distance(self, distance: np.ndarray) -> None:
-        self.vector[..., 1] = distance
+        self.vector[..., 2] = distance
 
     @property
     def height(self) -> np.ndarray:
-        return self.vector[..., 2]
+        return self.vector[..., 3]
 
     @height.setter
     def height(self, height: np.ndarray) -> None:
-        self.vector[..., 2] = height
+        self.vector[..., 3] = height
 
     def __repr__(self) -> str:
         return (

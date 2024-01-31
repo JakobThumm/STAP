@@ -634,7 +634,7 @@ class StaticHandover(Primitive):
                   x
     """
 
-    action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(3,))
+    action_space = primitive_actions.HandoverAction.SPACE
     action_scale = gym.spaces.Box(*primitive_actions.HandoverAction.range())
     Action = primitive_actions.HandoverAction
     ALLOW_COLLISIONS = False
@@ -712,13 +712,17 @@ class StaticHandover(Primitive):
         target_pos = target.pose().pos
         target_pos[2] = action.height
         base_pos = self.env.robot.arm.base_pos + additional_offset
-        # The yaw angle is defined as the angle between the current end-effector position and the target position on the x-y plane.
-        yaw = np.arctan2(target_pos[1] - base_pos[1], target_pos[0] - base_pos[0])
+
+        yaw = action.yaw
         pitch = action.pitch
         height = min(target_pos[2] - base_pos[2], action.distance)
-        phi = np.arcsin(height / action.distance)
+        # Mathematics convention:
+        # Phi is the polar angle https://en.wikipedia.org/wiki/Spherical_coordinate_system#/media/File:3D_Spherical_2.svg
+        phi = np.arccos(height / action.distance)
+        # Theta angle is the azimuthal angle https://en.wikipedia.org/wiki/Spherical_coordinate_system#/media/File:3D_Spherical_2.svg
+        theta = np.arctan2(target_pos[1] - base_pos[1], target_pos[0] - base_pos[0])
         command_pos = base_pos + np.array(
-            [np.cos(phi) * action.distance * np.cos(yaw), np.cos(phi) * action.distance * np.sin(yaw), height]
+            [np.sin(phi) * action.distance * np.cos(theta), np.sin(phi) * action.distance * np.sin(theta), height]
         )
         rot = Rotation.from_euler("ZY", [yaw, pitch])  # type: ignore
         command_quat = eigen.Quaterniond(rot.as_quat())
@@ -740,6 +744,7 @@ class StaticHandover(Primitive):
             return False
 
     def sample_action(self) -> primitive_actions.PrimitiveAction:
+        # return primitive_actions.HandoverAction(pitch=0.0, yaw=-1.5, distance=0.6, height=0.3)  # For debugging
         return self.Action.random()
 
     @classmethod
