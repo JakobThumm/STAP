@@ -128,7 +128,8 @@ class SafeArm(Arm):
         pos_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         ori_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         timeout: Optional[float] = None,
-        precision: Optional[float] = 1e-3,
+        positional_precision: Optional[float] = 1e-3,
+        orientational_precision: Optional[float] = None,
         ignore_last_half_rotation: bool = True,
         use_prior: bool = False,
     ) -> bool:
@@ -156,7 +157,12 @@ class SafeArm(Arm):
         q, _ = self.get_joint_state(self.torque_joints)
         prior = self._prior if use_prior else None
         desired_q_pos, success = self.inverse_kinematics(
-            pos=pos, quat=quat, precision=precision, ignore_last_half_rotation=ignore_last_half_rotation, prior=prior
+            pos=pos,
+            quat=quat,
+            positional_precision=positional_precision,
+            orientational_precision=orientational_precision,
+            ignore_last_half_rotation=ignore_last_half_rotation,
+            prior=prior,
         )
         if not success:
             return False

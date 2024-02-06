@@ -159,7 +159,9 @@ class Robot(body.Body):
         timeout: Optional[float] = None,
         check_collisions: Sequence[int] = [],
         check_collision_freq: int = 10,
-        precision: Optional[float] = 1e-3,
+        positional_precision: Optional[float] = 1e-3,
+        orientational_precision: Optional[float] = None,
+        ignore_last_half_rotation: bool = True,
     ) -> bool:
         """Uses opspace control to go to the desired pose.
 
@@ -176,6 +178,9 @@ class Robot(body.Body):
                 object collides with any of the body_ids in this list.
             check_collision_freq: Iteration interval with which to check
                 collisions.
+            precision: Precision for IK algorithm.
+            ignore_last_half_rotation: Ignores rotation around the last joint that are larger than 180 degrees.
+                They are clipped back to the range [-pi, pi] by the modulo(alpha, pi) operator.
         Returns:
             True if the grasp controller converges to the desired position or
             zero velocity, false if the command times out.
@@ -189,7 +194,16 @@ class Robot(body.Body):
                 link_ids_a.append(None)
 
         # Set the pose goal.
-        success = self.arm.set_pose_goal(pos, quat, pos_gains, ori_gains, timeout, precision)
+        success = self.arm.set_pose_goal(
+            pos=pos,
+            quat=quat,
+            pos_gains=pos_gains,
+            ori_gains=ori_gains,
+            timeout=timeout,
+            positional_precision=positional_precision,
+            orientational_precision=orientational_precision,
+            ignore_last_half_rotation=ignore_last_half_rotation,
+        )
         if not success:
             raise ControlException(f"Could not resolve inverse kinematics for ({pos}, {quat}).")
 
@@ -234,7 +248,8 @@ class Robot(body.Body):
         pos_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         ori_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         timeout: Optional[float] = None,
-        precision: Optional[float] = 1e-3,
+        positional_precision: Optional[float] = 1e-3,
+        orientational_precision: Optional[float] = None,
         update_pose_every: Optional[int] = 5,
         check_collisions: Sequence[int] = [],
         check_collision_freq: int = 10,
@@ -283,7 +298,8 @@ class Robot(body.Body):
                     pos_gains=pos_gains,
                     ori_gains=ori_gains,
                     timeout=new_timeout,
-                    precision=precision,
+                    positional_precision=positional_precision,
+                    orientational_precision=orientational_precision,
                     use_prior=True,
                 )
             status = self.arm.update_torques(self._sim_time)

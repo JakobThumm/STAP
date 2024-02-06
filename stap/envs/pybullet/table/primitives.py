@@ -72,7 +72,9 @@ def initialize_robot_pose(robot: Robot) -> bool:
     pos = np.append(xy, ACTION_CONSTRAINTS["max_lift_height"])
     aa = eigen.AngleAxisd(theta, np.array([0.0, 0.0, 1.0]))
     quat = eigen.Quaterniond(aa)
-    desired_qpos, success = robot.arm.inverse_kinematics(pos, quat, precision=0.01)
+    desired_qpos, success = robot.arm.inverse_kinematics(
+        pos, quat, positional_precision=0.01, orientational_precision=0.05
+    )
     if success:
         robot.reset(qpos=desired_qpos)
         return True
@@ -254,7 +256,7 @@ class Pick(Primitive):
             if not real_world and not utils.is_inworkspace(obj=obj):
                 raise ControlException(f"Object {obj} is beyond the robot workspace.")
 
-            robot.goto_pose(pre_pos, command_quat, precision=0.01)
+            robot.goto_pose(pre_pos, command_quat, positional_precision=0.01, orientational_precision=0.05)
             if not allow_collisions and did_non_args_move():
                 raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
 
@@ -262,13 +264,14 @@ class Pick(Primitive):
                 command_pos,
                 command_quat,
                 check_collisions=[obj.body_id for obj in self.get_non_arg_objects(objects)],
-                precision=0.002,
+                positional_precision=0.002,
+                orientational_precision=0.05,
             )
 
             if not robot.grasp_object(obj):
                 raise ControlException(f"Robot.grasp_object({obj}) failed")
 
-            robot.goto_pose(pre_pos, command_quat, precision=0.02)
+            robot.goto_pose(pre_pos, command_quat, positional_precision=0.02, orientational_precision=0.05)
             if not allow_collisions and did_non_args_move():
                 raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
         except ControlException as e:
@@ -510,7 +513,8 @@ class Handover(Primitive):
                 termination_fn=termination_fn,
                 update_pose_every=UPDATE_POS_EVERY,
                 timeout=TIMEOUT,
-                precision=PRECISION,
+                positional_precision=PRECISION,
+                orientational_precision=PRECISION,
                 check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
             )
             if not success or (not allow_collisions and did_non_args_move()):
@@ -649,6 +653,8 @@ class StaticHandover(Primitive):
         FIRST_MOVEMENT_TIMEOUT = 2.0
         WAIT_TIMEOUT = 15
         ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
+        POSITIONAL_PRECISION = 0.1
+        ORIENTATIONAL_PRECISION = 0.1
         success = False
         self.success_counter = 0
         # Parse action.
@@ -671,7 +677,9 @@ class StaticHandover(Primitive):
                 command_quat,
                 check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
                 timeout=FIRST_MOVEMENT_TIMEOUT,
-                precision=0.1,
+                positional_precision=POSITIONAL_PRECISION,
+                orientational_precision=ORIENTATIONAL_PRECISION,
+                ignore_last_half_rotation=False,
             )
             if not success:
                 raise ControlException("Moving to handover pose failed")
@@ -744,7 +752,7 @@ class StaticHandover(Primitive):
             return False
 
     def sample_action(self) -> primitive_actions.PrimitiveAction:
-        # return primitive_actions.HandoverAction(pitch=0.0, yaw=-1.5, distance=0.6, height=0.3)  # For debugging
+        # return primitive_actions.HandoverAction(pitch=0.0, yaw=np.pi / 2, distance=0.6, height=0.3)  # For debugging
         return self.Action.random()
 
     @classmethod

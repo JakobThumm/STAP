@@ -138,7 +138,9 @@ class Arm(articulated_body.ArticulatedBody):
         pos_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         ori_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
         timeout: Optional[float] = None,
-        precision: Optional[float] = 1e-3,
+        positional_precision: Optional[float] = 1e-3,
+        orientational_precision: Optional[float] = None,
+        ignore_last_half_rotation: bool = True,
         use_prior: bool = False,
     ) -> bool:
         """Sets the pose goal.
@@ -151,6 +153,8 @@ class Arm(articulated_body.ArticulatedBody):
             pos_gains: (kp, kv) gains or [3 x 2] array of xyz gains.
             ori_gains: (kp, kv) gains or [3 x 2] array of xyz gains.
             timeout: Uses the timeout specified in the yaml arm config if None.
+            precision: not used here.
+            ignore_last_half_rotation: not used here.
             use_prior: Not used here.
         """
         if pos is not None:
@@ -244,11 +248,26 @@ class Arm(articulated_body.ArticulatedBody):
         self,
         target_pos: np.ndarray,
         target_quat: Optional[Union[eigen.Quaterniond, np.ndarray]] = None,
-        precision: Optional[float] = 1e-3,
+        positional_precision: Optional[float] = 1e-3,
+        orientational_precision: Optional[float] = None,
         max_iter: int = 5,
         prior: Optional[np.ndarray] = None,
         ignore_last_half_rotation: bool = False,
     ) -> Tuple[np.ndarray, bool]:
+        """Computes the inverse kinematics solution for the given end-effector pose.
+
+        Args:
+            target_pos: Desired end-effector position.
+            target_quat: Desired end-effector orientation.
+            positional_precision: Precision of the solution acceptance in the position.
+            orientational_precision: Precision of the solution acceptance in the orientation.
+            max_iter: Max. number of iterations to compute the solution.
+            prior: Prior joint configuration to start the IK solver from.
+            ignore_last_half_rotation: Ignores rotation around the last joint that are larger than 180 degrees.
+
+        Returns:
+            Joint configuration and whether the solution was accepted.
+        """
         current_q, _ = self.get_joint_state(self.torque_joints)
         use_nullspace = not (self._lower_limit is None or self._upper_limit is None or self._joint_ranges_ns is None)
         n_joints = self.q_home.shape[0]
@@ -278,9 +297,17 @@ class Arm(articulated_body.ArticulatedBody):
             self.reset_joint_state(desired_q_pos)
             ls = p.getLinkState(self.body_id, self.end_effector_id)
             newPos = ls[4]
-            diff = [target_pos[0] - newPos[0], target_pos[1] - newPos[1], target_pos[2] - newPos[2]]
-            dist2 = np.linalg.norm(diff)
-            close_enough = dist2 < precision if precision is not None else True
+            newQuat = ls[5]
+            close_enough = (
+                np.linalg.norm(target_pos - np.array(newPos)) < positional_precision  # type: ignore
+                if positional_precision is not None
+                else True
+            )
+            close_enough = close_enough and (
+                np.linalg.norm(target_quat - np.array(newQuat)) < orientational_precision  # type: ignore
+                if (positional_precision is not None and target_quat is not None)
+                else True
+            )
             iter = iter + 1
         self.reset_joint_state(current_q)
         return desired_q_pos, close_enough
@@ -290,7 +317,8 @@ class Arm(articulated_body.ArticulatedBody):
         pos: np.ndarray,
         quat: Optional[Union[eigen.Quaterniond, np.ndarray]] = None,
         ignore_last_half_rotation: bool = True,
-        precision: Optional[float] = 1e-3,
+        positional_precision: Optional[float] = 1e-3,
+        orientational_precision: Optional[float] = None,
         max_iter: int = 5,
         prior: Optional[np.ndarray] = None,
     ) -> Tuple[np.ndarray, bool]:
@@ -323,7 +351,8 @@ class Arm(articulated_body.ArticulatedBody):
         desired_q_pos, close_enough = self.accurate_calculate_inverse_kinematics(
             target_pos=desired_ee_pos,
             target_quat=quat,
-            precision=precision,
+            positional_precision=positional_precision,
+            orientational_precision=orientational_precision,
             max_iter=max_iter,
             prior=prior,
             ignore_last_half_rotation=ignore_last_half_rotation,
