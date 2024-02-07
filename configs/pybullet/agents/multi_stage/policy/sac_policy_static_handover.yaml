@@ -13,8 +13,8 @@ agent_kwargs:
     ortho_init: true
     action_space:
       type: Box
-      low: [-1.0, -1.0, -1.0]
-      high: [1.0, 1.0, 1.0]
+      low: [-1.0, -1.0, -1.0, -1.0]
+      high: [1.0, 1.0, 1.0, 1.0]
 
   critic_class: critics.ContinuousMLPCritic
   critic_kwargs:
