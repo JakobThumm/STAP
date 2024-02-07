@@ -247,7 +247,7 @@ class Arm(articulated_body.ArticulatedBody):
     def accurate_calculate_inverse_kinematics(
         self,
         target_pos: np.ndarray,
-        target_quat: Optional[Union[eigen.Quaterniond, np.ndarray]] = None,
+        target_quat: Optional[np.ndarray] = None,
         positional_precision: Optional[float] = 1e-3,
         orientational_precision: Optional[float] = None,
         max_iter: int = 5,
@@ -305,7 +305,7 @@ class Arm(articulated_body.ArticulatedBody):
             )
             close_enough = close_enough and (
                 np.linalg.norm(target_quat - np.array(newQuat)) < orientational_precision  # type: ignore
-                if (positional_precision is not None and target_quat is not None)
+                if (orientational_precision is not None and target_quat is not None)
                 else True
             )
             iter = iter + 1
