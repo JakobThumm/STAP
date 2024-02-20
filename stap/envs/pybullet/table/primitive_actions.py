@@ -313,7 +313,8 @@ class HandoverAction(PrimitiveAction):
         return (
             "Handover {\n"
             f"    pitch: {self.pitch},\n"
+            f"    yaw: {self.yaw}, \n"
             f"    distance: {self.distance},\n"
-            f"    distance: {self.height},\n"
+            f"    height: {self.height},\n"
             "}"
         )

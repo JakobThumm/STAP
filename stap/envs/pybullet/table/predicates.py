@@ -587,6 +587,14 @@ class InOodZone(Predicate, TableBounds):
 class Ingripper(Predicate):
     MAX_GRASP_ATTEMPTS = 1
     SAMPLE_OFFSET = np.array([0.0, 0.0, 0.0])
+    # Maximum deviation of the object from the gripper's center y.
+    MAX_GRASP_Y_OFFSET = 0.01
+    # Gap required between control point and object bottom.
+    FINGER_COLLISION_MARGIN = 0.02
+    FINGER_WIDTH = 0.022
+    FINGER_HEIGHT = 0.04
+    FINGER_DISTANCE = 0.08
+    THETA_STDDEV = 0.05
 
     def sample(self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]) -> bool:
         """Samples a geometric grounding of the InHand(a) predicate."""
@@ -632,94 +640,109 @@ class Ingripper(Predicate):
         dbprint(f"{self}.sample():", True)
         return True
 
-    @staticmethod
-    def generate_grasp_pose(obj: Object, handlegrasp: bool = False, upperhandlegrasp: bool = False) -> math.Pose:
-        """Generates a grasp pose in the object frame of reference."""
-        # Maximum deviation of the object from the gripper's center y.
-        MAX_GRASP_Y_OFFSET = 0.01
-        # Gap required between control point and object bottom.
-        FINGER_COLLISION_MARGIN = 0.02
-        FINGER_WIDTH = 0.022
-        FINGER_HEIGHT = 0.04
-        FINGER_DISTANCE = 0.08
-        THETA_STDDEV = 0.05
+    def generate_grasp_pose_hook(
+        self, hook: Hook, handlegrasp: bool = False, upperhandlegrasp: bool = False
+    ) -> math.Pose:
+        """Generate a grasp for the hook."""
+        pos_handle, pos_head, pos_joint = Hook.compute_link_positions(
+            head_length=hook.head_length,
+            handle_length=hook.handle_length,
+            handle_y=hook.handle_y,
+            radius=hook.radius,
+        )
+        if (
+            handlegrasp
+            or upperhandlegrasp
+            or np.random.random() < hook.handle_length / (hook.handle_length + hook.head_length)
+        ):
+            # Handle.
+            min_xyz, max_xyz = np.array(hook.bbox)
 
-        if obj.isinstance(Hook):
-            hook: Hook = obj  # type: ignore
-            pos_handle, pos_head, pos_joint = Hook.compute_link_positions(
-                head_length=hook.head_length,
-                handle_length=hook.handle_length,
-                handle_y=hook.handle_y,
-                radius=hook.radius,
-            )
-            if (
-                handlegrasp
-                or upperhandlegrasp
-                or np.random.random() < hook.handle_length / (hook.handle_length + hook.head_length)
-            ):
-                # Handle.
-                min_xyz, max_xyz = np.array(obj.bbox)
+            if upperhandlegrasp:
+                min_xyz[0] = 0.0
+            min_xyz[1] = pos_handle[1] - self.MAX_GRASP_Y_OFFSET
+            min_xyz[2] += self.FINGER_COLLISION_MARGIN
 
-                if upperhandlegrasp:
-                    min_xyz[0] = 0.0
-                min_xyz[1] = pos_handle[1] - MAX_GRASP_Y_OFFSET
-                min_xyz[2] += FINGER_COLLISION_MARGIN
+            max_xyz[0] = pos_head[0] - hook.radius - 0.5 * self.FINGER_WIDTH
+            if handlegrasp:
+                max_xyz[0] = 0.0
+            max_xyz[1] = pos_handle[1] + self.MAX_GRASP_Y_OFFSET
 
-                max_xyz[0] = pos_head[0] - hook.radius - 0.5 * FINGER_WIDTH
-                if handlegrasp:
-                    max_xyz[0] = 0.0
-                max_xyz[1] = pos_handle[1] + MAX_GRASP_Y_OFFSET
-
-                theta = 0.0
-            else:
-                # Head.
-                min_xyz, max_xyz = np.array(obj.bbox)
-
-                min_xyz[0] = pos_head[0] - MAX_GRASP_Y_OFFSET
-                if hook.handle_y < 0:
-                    min_xyz[1] = pos_handle[1] + hook.radius + 0.5 * FINGER_WIDTH
-                min_xyz[2] += FINGER_COLLISION_MARGIN
-
-                max_xyz[0] = pos_head[0] + MAX_GRASP_Y_OFFSET
-                if hook.handle_y > 0:
-                    max_xyz[1] = pos_handle[1] - hook.radius - 0.5 * FINGER_WIDTH
-
-                temp_min = min_xyz[0]
-                temp_max = max_xyz[0]
-                min_xyz[0] = min_xyz[1]
-                max_xyz[0] = max_xyz[1]
-                min_xyz[1] = temp_min
-                max_xyz[1] = temp_max
-                theta = np.pi / 2
-            min_xyz[2] -= hook.radius
-            min_xyz[2] = max(min_xyz[2], -FINGER_HEIGHT)
-            max_xyz[2] -= hook.radius
-        elif obj.isinstance(Screwdriver):
-            min_xyz, max_xyz = np.array(obj.bbox)
             theta = 0.0
-            y_center = 0.5 * (min_xyz[1] + max_xyz[1])
-            min_xyz[0] = -obj.handle_length
-            max_xyz[0] = obj.head_length
-            min_xyz[1] = 0.0
-            max_xyz[1] = 0.0
-            min_xyz[2] -= 2 * obj.head_radius
-            min_xyz[2] = max(min_xyz[2], -FINGER_HEIGHT)
-            max_xyz[2] -= 2 * obj.head_radius
         else:
-            # Fit object between gripper fingers.
-            theta = np.random.choice([0.0, np.pi / 2])
+            # Head.
+            min_xyz, max_xyz = np.array(hook.bbox)
 
-            min_xyz, max_xyz = 0.5 * np.array(obj.bbox)
-            min_xyz[2] += FINGER_COLLISION_MARGIN
-            min_xyz[2] = max(min_xyz[2], max_xyz[0] - FINGER_HEIGHT)
-            max_xyz[2] -= FINGER_COLLISION_MARGIN
+            min_xyz[0] = pos_head[0] - self.MAX_GRASP_Y_OFFSET
+            if hook.handle_y < 0:
+                min_xyz[1] = pos_handle[1] + hook.radius + 0.5 * self.FINGER_WIDTH
+            min_xyz[2] += self.FINGER_COLLISION_MARGIN
 
+            max_xyz[0] = pos_head[0] + self.MAX_GRASP_Y_OFFSET
+            if hook.handle_y > 0:
+                max_xyz[1] = pos_handle[1] - hook.radius - 0.5 * self.FINGER_WIDTH
+
+            temp_min = min_xyz[0]
+            temp_max = max_xyz[0]
+            min_xyz[0] = min_xyz[1]
+            max_xyz[0] = max_xyz[1]
+            min_xyz[1] = temp_min
+            max_xyz[1] = temp_max
+            theta = np.pi / 2
+        min_xyz[2] -= hook.radius
+        min_xyz[2] = max(min_xyz[2], -self.FINGER_HEIGHT)
+        max_xyz[2] -= hook.radius
         xyz = np.random.uniform(min_xyz, max_xyz)
-        theta += np.random.normal(scale=THETA_STDDEV)
+        theta += np.random.normal(scale=self.THETA_STDDEV)
         theta = np.clip(theta, *primitive_actions.PickAction.RANGES["theta"])
         aa = eigen.AngleAxisd(theta, np.array([0.0, 0.0, 1.0]))
-
         return math.Pose(pos=xyz, quat=eigen.Quaterniond(aa).coeffs)
+
+    def generate_grasp_pose_screwdriver(self, screwdriver: Screwdriver) -> math.Pose:
+        """Generate a grasp for the screwdriver."""
+        X_ROT_STDDEV = 1.0
+        Y_ROT_STDDEV = 0.05
+        min_xyz, max_xyz = np.array(screwdriver.bbox)
+        theta = np.random.choice([0.0, np.pi, -np.pi])
+        y_center = 0.5 * (min_xyz[1] + max_xyz[1])
+        min_xyz[0] = -screwdriver.handle_length
+        max_xyz[0] = screwdriver.head_length
+        min_xyz[1] = 0.0
+        max_xyz[1] = 0.0
+        min_xyz[2] -= 2 * screwdriver.head_radius
+        min_xyz[2] = max(min_xyz[2], -self.FINGER_HEIGHT)
+        max_xyz[2] -= 2 * screwdriver.head_radius
+        xyz = np.random.uniform(min_xyz, max_xyz)
+        x_rot = np.clip(np.random.normal(scale=X_ROT_STDDEV), -np.pi, np.pi)
+        y_rot = np.clip(np.random.normal(scale=Y_ROT_STDDEV), -np.pi, np.pi)
+        z_rot = np.clip(theta + np.random.normal(scale=self.THETA_STDDEV), -np.pi, np.pi)
+        rot = Rotation.from_euler("ZYX", [z_rot, y_rot, x_rot])
+        return math.Pose(pos=xyz, quat=rot.as_quat())
+
+    def generate_grasp_pose_box(self, obj: Object):
+        """Generates a grasp pose in the object frame of reference."""
+        theta = np.random.choice([0.0, np.pi / 2, -np.pi / 2, np.pi, -np.pi])
+        min_xyz, max_xyz = 0.5 * np.array(obj.bbox)
+        min_xyz[2] += self.FINGER_COLLISION_MARGIN
+        min_xyz[2] = max(min_xyz[2], max_xyz[0] - self.FINGER_HEIGHT)
+        max_xyz[2] -= self.FINGER_COLLISION_MARGIN
+        xyz = np.random.uniform(min_xyz, max_xyz)
+        theta += np.random.normal(scale=self.THETA_STDDEV)
+        theta = np.clip(theta, *primitive_actions.PickAction.RANGES["theta"])
+        aa = eigen.AngleAxisd(theta, np.array([0.0, 0.0, 1.0]))
+        return math.Pose(pos=xyz, quat=eigen.Quaterniond(aa).coeffs)
+
+    def generate_grasp_pose(self, obj: Object, handlegrasp: bool = False, upperhandlegrasp: bool = False) -> math.Pose:
+        """Generates a grasp pose in the object frame of reference."""
+        if obj.isinstance(Hook):
+            hook: Hook = obj  # type: ignore
+            return self.generate_grasp_pose_hook(hook, handlegrasp, upperhandlegrasp)
+        elif obj.isinstance(Screwdriver):
+            screwdriver: Screwdriver = obj  # type: ignore
+            return self.generate_grasp_pose_screwdriver(screwdriver)
+        else:
+            # Fit object between gripper fingers.
+            return self.generate_grasp_pose_box(obj)
 
     def value(
         self,

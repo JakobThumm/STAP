@@ -23,6 +23,9 @@ dbprint = lambda *args: None  # noqa
 # dbprint = print
 
 
+HUMAN_TIME_RAND_STD = 1.0
+
+
 class HumanTableEnv(TableEnv):
     """The table environment with an added human in the scene."""
 
@@ -88,6 +91,9 @@ class HumanTableEnv(TableEnv):
         self._sim_time = 0.0
         obs, info = super().reset(seed=seed, options=options, max_samples_per_trial=max_samples_per_trial)
         self.human.enable_animation()
+        # Set a random negative start time to randomize the beginning of the animation.
+        start_time = -1.0 * np.abs(np.random.randn()) * HUMAN_TIME_RAND_STD
+        self.human._start_time = start_time
         self.human.animate(self._sim_time)
         obs = self.get_observation()
         return obs, info
