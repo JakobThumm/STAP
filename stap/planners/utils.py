@@ -469,7 +469,6 @@ def run_closed_loop_planning(
     t_planner: Optional[List[float]] = None if timer is None else []
     for t, primitive in enumerate(action_skeleton):
         env.set_primitive(primitive)
-
         # Plan.
         if timer is not None:
             timer.tic("planner")
@@ -477,8 +476,13 @@ def run_closed_loop_planning(
         if t_planner is not None and timer is not None:
             t_planner.append(timer.toc("planner"))
 
-        # Execute first action.
-        observation, reward, _, _, _ = env.step(plan.actions[0, : env.action_space.shape[0]])
+        next_observation, reward, _, _, _ = env.step(plan.actions[0, : env.action_space.shape[0]])
+
+        # DEBUG: Find observation difference to transition prediction
+        next_state_predicted = plan.states[1]
+        next_state_observed = next_observation
+        state_diff = next_state_observed - next_state_predicted
+        sum_state_diff_first_arg_obj = np.sum(np.abs(state_diff[1, :]))
 
         rewards[t] = reward
         visited_actions[t, t:] = plan.actions
@@ -496,7 +500,8 @@ def run_closed_loop_planning(
         states[t : t + 1] = plan.states[:1]
         values[t] = plan.values[0]
         # ensure last state has something in it
-        states[t + 1 : t + 2] = observation
+        states[t + 1 : t + 2] = next_observation
+        observation = next_observation
 
     p_success = np.exp(np.log(values).sum())
 
