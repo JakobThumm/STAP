@@ -188,6 +188,21 @@ Not inside docker: The lower command is a fast version for easy testing.
 ./scripts/train/train_dynamics_docker_fast.sh user gpu
 ```
 
+## Real-world tests
+1. Build docker
+2. Run docker
+3. Build catkin workspace
+4. Export ROS master URI
+5. Install correct numpy version if running into pybullet issues
+```
+pip install numpy==1.24.4
+``` 
+6. Run example:
+    ```
+    python scripts/debug/debug_pybullet.py -e configs/pybullet/envs/official/real_domains/debug/real_human_template_env.yaml
+    ```
+
+
 ---
 ## Citation
 Sequencing Task-Agnostic Policies is offered under the [MIT License](https://github.com/agiachris/STAP/blob/main/LICENSE) agreement. 

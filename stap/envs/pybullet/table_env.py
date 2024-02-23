@@ -8,11 +8,14 @@ from typing import Any, Dict, Generator, List, Optional, Sequence, Tuple, Union
 
 import gym
 import numpy as np
-import pybullet as p  # Import after envs.pybullet.base to avoid print statement.
+import pybullet as p
+import rospy  # noqa
 import torch
 from PIL import Image, ImageDraw, ImageFont
+from std_msgs.msg import Float32MultiArray  # noqa
 
 from stap.envs import base as envs
+from stap.envs import pybullet
 from stap.envs.pybullet import real
 from stap.envs.pybullet.base import PybulletEnv
 from stap.envs.pybullet.real import object_tracker
@@ -28,8 +31,8 @@ from stap.envs.pybullet.table.primitives import (
 )
 from stap.envs.pybullet.table.utils import primitive_from_action_call
 from stap.envs.variant import VariantEnv
+from stap.utils import configs, recording
 from stap.utils import random as random_utils
-from stap.utils import recording
 from stap.utils.macros import SIMULATION_FREQUENCY, SIMULATION_TIME_STEP
 
 dbprint = lambda *args: None  # noqa
@@ -158,6 +161,7 @@ class TableEnv(PybulletEnv):
         reset_queue_size: int = 100,
         child_process_seed: Optional[int] = None,
         use_curriculum: bool = False,
+        use_ros: bool = True,
     ):
         """Constructs the TableEnv.
 
@@ -184,6 +188,7 @@ class TableEnv(PybulletEnv):
                 main process!
             use_curriculum: Whether to use a curriculum on the number of objects.
         """
+        self._use_ros = use_ros
         self._sim_time = None
         if render_mode not in TableEnv.metadata["render_modes"]:
             raise ValueError(f"Render mode {render_mode} is not supported.")
@@ -273,7 +278,10 @@ class TableEnv(PybulletEnv):
         # Load optional object tracker.
         if object_tracker_config is not None:
             object_tracker_kwargs: Dict[str, Any] = utils.load_config(object_tracker_config)
-            self._object_tracker: Optional[object_tracker.ObjectTracker] = object_tracker.ObjectTracker(
+            tracker_class = object_tracker_kwargs.pop("tracker_class")
+            if isinstance(tracker_class, str):
+                tracker_class = configs.get_class(tracker_class, pybullet)
+            self._object_tracker: Optional[object_tracker.ObjectTracker] = tracker_class(
                 objects=self.objects, **object_tracker_kwargs
             )
         else:
@@ -729,6 +737,7 @@ class TableEnv(PybulletEnv):
             self.robot.reset(time=self._sim_time)
             p.restoreState(stateId=self._initial_state_id, physicsClientId=self.physics_id)
 
+            # TODO
             if self.object_tracker is not None and isinstance(self.robot.arm, real.arm.Arm):
                 # Track objects from the real world.
                 self.object_tracker.update_poses()
@@ -822,6 +831,7 @@ class TableEnv(PybulletEnv):
         self._timelapse.add_frame(self.render)
         result = primitive.execute(action, real_world=isinstance(self.robot.arm, real.arm.Arm))
 
+        # TODO
         if (
             self.object_tracker is not None
             and isinstance(self.robot.arm, real.arm.Arm)
@@ -942,6 +952,7 @@ class TableEnv(PybulletEnv):
         # contact_points = p.getContactPoints(physicsClientId=self.physics_id, bodyA=self.robot.arm.body_id)
         self._recorder.add_frame(self.render)
 
+        # TODO
         if self.object_tracker is not None and not isinstance(self.robot.arm, real.arm.Arm):
             # Send objects to RedisGl.
             self.object_tracker.send_poses(self.real_objects())
