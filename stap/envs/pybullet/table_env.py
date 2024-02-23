@@ -188,13 +188,14 @@ class TableEnv(PybulletEnv):
                 main process!
             use_curriculum: Whether to use a curriculum on the number of objects.
         """
+        print("Initializing table env.")
         self._use_ros = use_ros
         self._sim_time = None
         if render_mode not in TableEnv.metadata["render_modes"]:
             raise ValueError(f"Render mode {render_mode} is not supported.")
         gui_kwargs = {} if gui_kwargs is None else gui_kwargs
         render_kwargs = {} if render_kwargs is None else render_kwargs
-
+        print("Initializing base env.")
         super().__init__(name=name, gui=gui, gui_kwargs=gui_kwargs)
         shadows = gui_kwargs.get("shadows", 0)
         self.gui = gui
@@ -255,6 +256,7 @@ class TableEnv(PybulletEnv):
         self._primitives = primitives
 
         # Create robot.
+        print("Initializing robot.")
         self._robot = robot.Robot(
             physics_id=self.physics_id,
             step_simulation_fn=self.step_simulation,
@@ -276,6 +278,7 @@ class TableEnv(PybulletEnv):
         #     group.compute_probabilities(self.objects)
 
         # Load optional object tracker.
+        print("Initializing object tracker.")
         if object_tracker_config is not None:
             object_tracker_kwargs: Dict[str, Any] = utils.load_config(object_tracker_config)
             tracker_class = object_tracker_kwargs.pop("tracker_class")

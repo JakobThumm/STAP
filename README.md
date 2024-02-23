@@ -190,19 +190,39 @@ Not inside docker: The lower command is a fast version for easy testing.
 
 ## Real-world tests
 1. Build docker
-2. Run docker
-3. Build catkin workspace
-4. Export ROS master URI
-5. Install correct numpy version if running into pybullet issues
 ```
-pip install numpy==1.24.4
-``` 
-6. Run example:
+./build_docker_ros.sh user
+```
+2. Run docker
+```
+./run_docker_ros.sh user
+```
+We recommend running `tmux` in the docker container to have multiple tabs ([see controls here](https://www.seanh.cc/2020/12/30/how-to-make-tmux%27s-windows-behave-like-browser-tabs/))
+3. Build catkin workspace
+```
+catkin build
+```
+4. Export ROS master URI
+```
+export ROS_MASTER_URI=http://[ROS_MASTER_IP]:11311
+```
+e.g., 
+```
+export ROS_MASTER_URI=http://10.42.0.69:11311
+```
+5. Run example:
     ```
     python scripts/debug/debug_pybullet.py -e configs/pybullet/envs/official/real_domains/debug/real_human_template_env.yaml
     ```
+6. Tmux commands:
+    - Open a new tab with `Ctrl`+`T`
+    - Close the current tab with `Ctrl`+`Alt`+`T`
+    - Switch to a different tab with `Ctrl`+`Page up` (or down)
 
-
+### Troubleshooting
+If the connection between machines is incorrect, check for `ROS_MASTER_URI` and `ROS_IP`.
+A great tutorial can be found [here](https://roscon.ros.org/2013/wp-content/uploads/2013/06/Networking-for-ROS-Users.pdf).
+And more details concerning connecting ROS within docker containers [here](https://www.finnrietz.dev/linux/ros-docker/).
 ---
 ## Citation
 Sequencing Task-Agnostic Policies is offered under the [MIT License](https://github.com/agiachris/STAP/blob/main/LICENSE) agreement. 

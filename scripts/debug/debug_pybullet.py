@@ -54,4 +54,3 @@ if __name__ == "__main__":
     parser.add_argument("--seed", "-s", type=int, help="Seed to reset env")
     args = parser.parse_args()
     main(**vars(args))
-    main(**vars(args))

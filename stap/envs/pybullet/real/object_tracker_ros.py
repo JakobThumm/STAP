@@ -1,5 +1,4 @@
 import pathlib
-from copy import deepcopy
 from typing import Dict, Iterable, List, Optional, Sequence, Union
 
 import numpy as np
@@ -30,7 +29,7 @@ class ObjectTrackerRos(ObjectTracker):
         self._tracked_objects = dict()
         for object in objects.values():
             self._joint_pos_sub = rospy.Subscriber("/stap/objects/" + object.name, PoseStamped, self.object_callback)
-            self._tracked_objects[object.name] = deepcopy(object)
+            self._tracked_objects[object.name] = object
 
     def __del__(self) -> None:
         pass

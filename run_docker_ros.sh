@@ -17,7 +17,16 @@ fi
 command="${bash_command}"
 
 echo "Chosen mode: $user, chosen command: $command"
-options="--net=host --shm-size=10.24gb"
+options="--shm-size=10.24gb 
+         --privileged 
+         --init 
+         --net=host 
+         -v /tmp/.X11-unix:/tmp/.X11-unix 
+         -e DISPLAY=$DISPLAY 
+         -h $HOSTNAME 
+         -v $HOME/.Xauthority:/root/.Xauthority"
+         -e ROS_MASTER_URI=http://10.42.0.69:11311
+         -e ROS_IP=10.42.0.69
 image="stap-ros"
 
 if [ "$user" = "root" ]
@@ -28,7 +37,9 @@ if [ "$user" = "root" ]
         --volume="$(pwd)/package.xml:/root/catkin_ws/src/stap-ros-pkg/package.xml" 
         --volume="$(pwd)/setup.py:/root/catkin_ws/src/stap-ros-pkg/setup.py" 
         --volume="$(pwd)/stap/:/root/catkin_ws/src/stap-ros-pkg/stap/" 
-        --volume="$(pwd)/launch/:/root/catkin_ws/src/stap-ros-pkg/launch/" 
+        --volume="$(pwd)/configs/:/root/catkin_ws/src/stap-ros-pkg/configs/" 
+        --volume="$(pwd)/scripts/:/root/catkin_ws/src/stap-ros-pkg/scripts/" 
+        --volume="$(pwd)/launch/:/root/catkin_ws/src/stap-ros-pkg/launch/"
     "
     image="${image}/root:v2"
 elif [ "$user" = "user" ]
@@ -39,6 +50,8 @@ elif [ "$user" = "user" ]
         --volume="$(pwd)/package.xml:/home/$USER/catkin_ws/src/stap-ros-pkg/package.xml" 
         --volume="$(pwd)/setup.py:/home/$USER/catkin_ws/src/stap-ros-pkg/setup.py" 
         --volume="$(pwd)/stap/:/home/$USER/catkin_ws/src/stap-ros-pkg/src/stap/" 
+        --volume="$(pwd)/configs/:/home/$USER/catkin_ws/src/stap-ros-pkg/configs/" 
+        --volume="$(pwd)/scripts/:/home/$USER/catkin_ws/src/stap-ros-pkg/scripts/" 
         --volume="$(pwd)/launch/:/home/$USER/catkin_ws/src/stap-ros-pkg/launch/" 
         --user=$USER"
     image="${image}/$USER:v2"

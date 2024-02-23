@@ -343,17 +343,21 @@ class Robot(body.Body):
             True if the controller converges to the desired position or zero
             velocity, false if the command times out.
         """
+        print("Robot.goto_configuration: " + q)
         # Set the configuration goal.
         self.arm.set_configuration_goal(q, time=self._sim_time)
-
+        print("Robot.goto_configuration: " + q)
         # Simulate until the pose goal is reached.
         status = self.arm.update_torques(time=self._sim_time)
+        print("status = ", status)
         self.gripper.update_torques()
+        print("Gripper updated.")
         while status == articulated_body.ControlStatus.IN_PROGRESS:
+            print("Stepping...")
             self.step_simulation()
             status = self.arm.update_torques(time=self._sim_time)
             self.gripper.update_torques()
-
+        print("Finished goto configuration. Status = ", status)
         return status in (
             articulated_body.ControlStatus.POS_CONVERGED,
             articulated_body.ControlStatus.VEL_CONVERGED,

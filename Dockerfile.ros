@@ -52,7 +52,10 @@ RUN apt-get update --fix-missing && \
         bc \
         tmux \
         python3-catkin-tools \
-        iputils-ping
+        iputils-ping \
+        net-tools \
+        netcat \
+        tcpdump
 
 RUN apt-get upgrade libstdc++6 -y
 RUN apt-get dist-upgrade
@@ -116,8 +119,8 @@ WORKDIR $STAP_PKG_PATH
 
 # Copy all required folders
 COPY --chown=$USERNAME Pipfile pyproject.toml setup.cfg generate_primitive_dataset.py $STAP_PKG_PATH/
-COPY --chown=$USERNAME configs/ $STAP_PKG_PATH/configs/
-COPY --chown=$USERNAME scripts/ $STAP_PKG_PATH/scripts/
+# COPY --chown=$USERNAME configs/ $STAP_PKG_PATH/configs/
+# COPY --chown=$USERNAME scripts/ $STAP_PKG_PATH/scripts/
 # COPY --chown=$USERNAME stap/ $STAP_PKG_PATH/stap/
 COPY --chown=$USERNAME third_party/ $STAP_PKG_PATH/third_party/
 # Copy the ROS files.
@@ -157,10 +160,13 @@ RUN pip install numpy==1.24.4
 # RUN source devel/setup.bash
 
 COPY --chown=$USERNAME .bashrc_ros $HOME_PATH/.bashrc
+COPY --chown=$USERNAME .tmux.conf $HOME_PATH/.tmux.conf
 
 RUN echo "export SARA_SHIELD_CONFIG_PATH=${STAP_PKG_PATH}/third_party/sara-shield/safety_shield/config" >> $HOME_PATH/.bashrc
 RUN echo "source /opt/ros/noetic/setup.bash" >> $HOME_PATH/.bashrc
 RUN echo "source $CATKIN_WS_PATH/devel/setup.bash" >> $HOME_PATH/.bashrc
+RUN echo "export ROS_MASTER_URI=http://10.42.0.69:11311" >> $HOME_PATH/.bashrc
+RUN echo "export ROS_IP=10.42.0.69" >> $HOME_PATH/.bashrc
 RUN echo 'echo "USAGE:"' >> $HOME_PATH/.bashrc
 RUN echo 'echo "roslaunch ..."' >> $HOME_PATH/.bashrc
 

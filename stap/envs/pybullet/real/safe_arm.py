@@ -68,6 +68,7 @@ class SafeArm(SafeArmSim):
     def joint_pos_callback(self, data: Float32MultiArray):
         """ROS callback for new joint position."""
         self._q = np.array(data.data)
+        print("Received joint position: ", self._q)
 
     def get_joint_state(self, joints: List[int]) -> Tuple[np.ndarray, np.ndarray]:
         """Gets the position and velocities of the given joints.
@@ -79,7 +80,9 @@ class SafeArm(SafeArmSim):
         Returns:
             Joint positions and velocities (q, dq).
         """
-        assert len(joints) == self._q
+        assert len(joints) == len(self._q), (
+            "Number of joints does not match: " + str(len(joints)) + " != " + str(len(self._q))
+        )
         return self._q, self._dq
 
     def reset_joints(self, q: np.ndarray, joints: List[int]) -> None:
@@ -117,11 +120,13 @@ class SafeArm(SafeArmSim):
                 torque control to achieve them.
             time: Simulation time
         """
-        # TODO send out joint goal configuration.
+        print("Setting joint configuration goal: ", q)
         self._q_d = q
         msg = Float32MultiArray()
         msg.data = q
+        print("Sending joint configuration goal: ", msg.data)
         self._goal_joint_pub.publish(msg)
+        print("Joint configuration goal sent.")
 
     def set_pose_goal(
         self,
@@ -152,6 +157,7 @@ class SafeArm(SafeArmSim):
         Returns:
             True if the goal is set successfully.
         """
+        print("Setting pose goal: ", pos, quat)
         if pos is None:
             return False
         if quat is None:
@@ -180,6 +186,7 @@ class SafeArm(SafeArmSim):
         Returns:
             Controller status.
         """
+        print("Updating torques")
         assert time is not None
         if not self._arm_state.torque_control:
             return articulated_body.ControlStatus.UNINITIALIZED
