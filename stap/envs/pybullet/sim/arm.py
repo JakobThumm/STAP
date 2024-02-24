@@ -128,6 +128,7 @@ class Arm(articulated_body.ArticulatedBody):
         """
         self._arm_state = ArmState()
         resetting_qpos = self.q_home if qpos is None else np.array(qpos)
+        print("Resetting arm to home configuration: ", resetting_qpos)
         self.set_configuration_goal(resetting_qpos, skip_simulation=True, time=time)
         return True
 

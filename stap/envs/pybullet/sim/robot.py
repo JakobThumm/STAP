@@ -95,11 +95,14 @@ class Robot(body.Body):
         else:
             self._sim_time = time
 
+        print("Robot.reset: " + str(qpos))
         self.gripper.reset()
         self.clear_load()
         status = self.arm.reset(time=self._sim_time, qpos=qpos)
         resetting_qpos = np.array(qpos) if qpos is not None else self.arm.q_home
-        if isinstance(self.arm, real.arm.Arm):
+        if isinstance(self.arm, real.arm.Arm) or isinstance(self.arm, real.safe_arm.SafeArm):
+            print("Going to qpos: ", resetting_qpos)
+            self.arm.set_timeout(10.0)
             status = self.goto_configuration(resetting_qpos)
         return status
 
@@ -185,6 +188,7 @@ class Robot(body.Body):
             True if the grasp controller converges to the desired position or
             zero velocity, false if the command times out.
         """
+        print("Robot.goto_pose: ", pos, quat)
         if check_collisions:
             body_ids_a = [self.body_id] * len(self.gripper.finger_links)
             link_ids_a: List[Optional[int]] = list(self.gripper.finger_links)
@@ -343,17 +347,13 @@ class Robot(body.Body):
             True if the controller converges to the desired position or zero
             velocity, false if the command times out.
         """
-        print("Robot.goto_configuration: " + q)
+        print("Robot.goto_configuration: ", q)
         # Set the configuration goal.
         self.arm.set_configuration_goal(q, time=self._sim_time)
-        print("Robot.goto_configuration: " + q)
         # Simulate until the pose goal is reached.
         status = self.arm.update_torques(time=self._sim_time)
-        print("status = ", status)
         self.gripper.update_torques()
-        print("Gripper updated.")
         while status == articulated_body.ControlStatus.IN_PROGRESS:
-            print("Stepping...")
             self.step_simulation()
             status = self.arm.update_torques(time=self._sim_time)
             self.gripper.update_torques()

@@ -50,7 +50,7 @@ class ObjectTrackerRos(ObjectTracker):
     ) -> List[Object]:
         returned_objects = []
         if objects is None:
-            objects = self._tracked_objects
+            objects = self._tracked_objects.values()
         excluded_object_names = [object.name for object in exclude] if exclude is not None else None
         for object in objects:
             if excluded_object_names is not None and object.name in excluded_object_names:

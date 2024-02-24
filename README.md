@@ -216,12 +216,19 @@ export ROS_MASTER_URI=http://10.42.0.69:11311
     ```
 6. Tmux commands:
     - Open a new tab with `Ctrl`+`T`
-    - Close the current tab with `Ctrl`+`Alt`+`T`
+    - Close the current tab with `Ctrl`+`Alt`+`W`
     - Switch to a different tab with `Ctrl`+`Page up` (or down)
 
 ### Troubleshooting
-If the connection between machines is incorrect, check for `ROS_MASTER_URI` and `ROS_IP`.
+If the connection between machines is incorrect, check for `ROS_MASTER_URI`, `ROS_IP`, and `ROS_HOSTNAME`.
+Make sure you allow communication through the firewall:
+E.g. on machine 10.42.0.1 to ROS Master on 10.42.0.69:
+```
+sudo ufw allow out to 10.42.0.69
+sudo ufw allow from 10.42.0.69
+```
 A great tutorial can be found [here](https://roscon.ros.org/2013/wp-content/uploads/2013/06/Networking-for-ROS-Users.pdf).
+[This](http://wiki.ros.org/ROS/NetworkSetup) is also helpful.
 And more details concerning connecting ROS within docker containers [here](https://www.finnrietz.dev/linux/ros-docker/).
 ---
 ## Citation

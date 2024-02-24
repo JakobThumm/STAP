@@ -68,7 +68,6 @@ class SafeArm(SafeArmSim):
     def joint_pos_callback(self, data: Float32MultiArray):
         """ROS callback for new joint position."""
         self._q = np.array(data.data)
-        print("Received joint position: ", self._q)
 
     def get_joint_state(self, joints: List[int]) -> Tuple[np.ndarray, np.ndarray]:
         """Gets the position and velocities of the given joints.
@@ -124,9 +123,8 @@ class SafeArm(SafeArmSim):
         self._q_d = q
         msg = Float32MultiArray()
         msg.data = q
-        print("Sending joint configuration goal: ", msg.data)
         self._goal_joint_pub.publish(msg)
-        print("Joint configuration goal sent.")
+        self._arm_state.torque_control = True
 
     def set_pose_goal(
         self,
@@ -176,8 +174,6 @@ class SafeArm(SafeArmSim):
         self._prior = desired_q_pos
         # Set the desired joint position as new goal for sara-shield
         self.set_configuration_goal(desired_q_pos)
-        self.set_timeout(timeout)
-        self._arm_state.torque_control = True
         return True
 
     def update_torques(self, time: Optional[float] = None) -> articulated_body.ControlStatus:
@@ -186,7 +182,6 @@ class SafeArm(SafeArmSim):
         Returns:
             Controller status.
         """
-        print("Updating torques")
         assert time is not None
         if not self._arm_state.torque_control:
             return articulated_body.ControlStatus.UNINITIALIZED

@@ -295,6 +295,10 @@ class TableEnv(PybulletEnv):
         self._task = self.tasks.tasks[0]
         self.set_primitive(self.action_skeleton[0])
 
+        if isinstance(self._object_tracker, real.object_tracker_ros.ObjectTrackerRos):
+            for object in self.objects.values():
+                object.reset(self.action_skeleton)
+
         # Initialize pybullet state cache.
         self._initial_state_id = p.saveState(physicsClientId=self.physics_id)
         self._states: Dict[int, Dict[str, Any]] = {}  # Saved states.
@@ -741,7 +745,9 @@ class TableEnv(PybulletEnv):
             p.restoreState(stateId=self._initial_state_id, physicsClientId=self.physics_id)
 
             # TODO
-            if self.object_tracker is not None and isinstance(self.robot.arm, real.arm.Arm):
+            if self.object_tracker is not None and (
+                isinstance(self.robot.arm, real.arm.Arm) or isinstance(self.robot.arm, real.safe_arm.SafeArm)
+            ):
                 # Track objects from the real world.
                 self.object_tracker.update_poses()
                 break
@@ -813,7 +819,7 @@ class TableEnv(PybulletEnv):
         }
         self._seed = seed
         task_sampling_trials += 1
-
+        print("Environment resetted.")
         return self.get_observation(), info
 
     def step(
@@ -834,7 +840,6 @@ class TableEnv(PybulletEnv):
         self._timelapse.add_frame(self.render)
         result = primitive.execute(action, real_world=isinstance(self.robot.arm, real.arm.Arm))
 
-        # TODO
         if (
             self.object_tracker is not None
             and isinstance(self.robot.arm, real.arm.Arm)
