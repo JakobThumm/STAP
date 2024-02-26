@@ -208,7 +208,7 @@ export ROS_MASTER_URI=http://[ROS_MASTER_IP]:11311
 ```
 e.g., 
 ```
-export ROS_MASTER_URI=http://10.42.0.69:11311
+export ROS_MASTER_URI=http://[LOCAL_IP]:11311
 ```
 5. Run example:
     ```

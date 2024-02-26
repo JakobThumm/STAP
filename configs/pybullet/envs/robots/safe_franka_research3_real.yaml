@@ -23,9 +23,9 @@ arm_kwargs:
   nullspace_joint_indices: [2, 4]
 
   # lower limits for null space
-  lower_limit: [-2.88, -1.75, -2.88, -3.04, -2.88, -0.001, -2.88]
+  lower_limit: [-2.2893, -1.4933, -2.4737, -2.7278, -2.46, 0.8321, -2.6695]
   # upper limits for null space
-  upper_limit: [2.88, 1.75, 2.88, -0.05, 2.88, 3.74, 2.88]
+  upper_limit: [2.2893, 1.4933, 2.4737, -0.4661, 2.46, 4.1894, 2.6695]
   # joint ranges for null space
   joint_ranges_ns: [6, 4, 6, 4, 6, 4, 6]
 

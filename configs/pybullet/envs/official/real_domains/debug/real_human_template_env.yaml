@@ -1,7 +1,7 @@
 env: pybullet.HumanTableEnv
 env_kwargs:
   name: real_human_template_env
-  gui: false
+  gui: true
 
   primitives:
     - pick
@@ -19,7 +19,7 @@ env_kwargs:
         # - on(screwdriver, table)
         - ingripper(screwdriver)
 
-  robot_config: configs/pybullet/envs/robots/safe_franka_panda_real.yaml
+  robot_config: configs/pybullet/envs/robots/safe_franka_research3_real.yaml
   object_tracker_config: configs/pybullet/envs/perception/object_tracker_ros.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
   animation_type: HumanRobotHandover

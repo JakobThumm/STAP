@@ -68,6 +68,8 @@ class SafeArm(SafeArmSim):
     def joint_pos_callback(self, data: Float32MultiArray):
         """ROS callback for new joint position."""
         self._q = np.array(data.data)
+        # self.reset_joints(self._q, self.torque_joints)
+        self.apply_positions(self._q, self.torque_joints)
 
     def get_joint_state(self, joints: List[int]) -> Tuple[np.ndarray, np.ndarray]:
         """Gets the position and velocities of the given joints.
