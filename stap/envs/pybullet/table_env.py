@@ -284,27 +284,25 @@ class TableEnv(PybulletEnv):
         # for group in self.object_groups.values():
         #     group.compute_probabilities(self.objects)
 
-        # Load optional object tracker.
-        print("Initializing object tracker.")
-        if object_tracker_config is not None:
-            object_tracker_kwargs: Dict[str, Any] = utils.load_config(object_tracker_config)
-            tracker_class = object_tracker_kwargs.pop("tracker_class")
-            if isinstance(tracker_class, str):
-                tracker_class = configs.get_class(tracker_class, pybullet)
-            self._object_tracker: Optional[object_tracker.ObjectTracker] = tracker_class(
-                objects=self.objects, **object_tracker_kwargs
-            )
-        else:
-            self._object_tracker = None
-
         # Create tasks.
         self._tasks = TaskDistribution(self, tasks)
         self._task = self.tasks.tasks[0]
         self.set_primitive(self.action_skeleton[0])
 
-        if isinstance(self._object_tracker, real.object_tracker_ros.ObjectTrackerRos):
+        # Load optional object tracker.
+        print("Initializing object tracker.")
+        if object_tracker_config is not None:
             for object in self.objects.values():
-                object.reset(self.action_skeleton)
+                object.reset(self.action_skeleton)  # type: ignore
+            object_tracker_kwargs: Dict[str, Any] = utils.load_config(object_tracker_config)
+            tracker_class = object_tracker_kwargs.pop("tracker_class")
+            if isinstance(tracker_class, str):
+                tracker_class = configs.get_class(tracker_class, pybullet)
+            self._object_tracker: Optional[object_tracker.ObjectTracker] = tracker_class(
+                objects=self.objects, base_transform=self._base_transform, **object_tracker_kwargs
+            )
+        else:
+            self._object_tracker = None
 
         # Initialize pybullet state cache.
         self._initial_state_id = p.saveState(physicsClientId=self.physics_id)
@@ -751,7 +749,6 @@ class TableEnv(PybulletEnv):
             self.robot.reset(time=self._sim_time)
             p.restoreState(stateId=self._initial_state_id, physicsClientId=self.physics_id)
 
-            # TODO
             if self.object_tracker is not None and (
                 isinstance(self.robot.arm, real.arm.Arm) or isinstance(self.robot.arm, real.safe_arm.SafeArm)
             ):
@@ -967,7 +964,7 @@ class TableEnv(PybulletEnv):
         # contact_points = p.getContactPoints(physicsClientId=self.physics_id, bodyA=self.robot.arm.body_id)
         self._recorder.add_frame(self.render)
 
-        # TODO
+        # Is this needed?
         if self.object_tracker is not None and not isinstance(self.robot.arm, real.arm.Arm):
             # Send objects to RedisGl.
             self.object_tracker.send_poses(self.real_objects())

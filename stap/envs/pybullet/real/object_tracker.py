@@ -2,8 +2,8 @@ import pathlib
 from typing import Dict, Iterable, List, Optional, Sequence, Union
 
 import ctrlutils
-from ctrlutils import eigen
 import numpy as np
+from ctrlutils import eigen
 
 from stap.envs.pybullet.real import redisgl
 from stap.envs.pybullet.sim import math, shapes
@@ -14,9 +14,7 @@ def create_pose(shape: shapes.Shape) -> redisgl.Pose:
     if shape.pose is None:
         return redisgl.Pose()
     elif isinstance(shape, shapes.Cylinder):
-        quat_pybullet_to_redisgl = eigen.Quaterniond(
-            eigen.AngleAxisd(np.pi / 2, np.array([1.0, 0.0, 0.0]))
-        )
+        quat_pybullet_to_redisgl = eigen.Quaterniond(eigen.AngleAxisd(np.pi / 2, np.array([1.0, 0.0, 0.0])))
         quat = eigen.Quaterniond(shape.pose.quat) * quat_pybullet_to_redisgl
         return redisgl.Pose(shape.pose.pos, quat.coeffs)
     else:
@@ -103,11 +101,7 @@ class ObjectTracker:
             self._redis_pipe.get(self._object_key_prefix + object.name + "::pos")
         object_models = self._redis_pipe.execute()
 
-        return [
-            object
-            for object, object_model in zip(objects, object_models)
-            if object_model is not None
-        ]
+        return [object for object, object_model in zip(objects, object_models) if object_model is not None]
 
     def update_poses(
         self,
@@ -147,10 +141,6 @@ class ObjectTracker:
 
         for object in objects:
             pose = object.pose()
-            self._redis_pipe.set_matrix(
-                self._object_key_prefix + object.name + "::pos", pose.pos
-            )
-            self._redis_pipe.set_matrix(
-                self._object_key_prefix + object.name + "::ori", pose.quat
-            )
+            self._redis_pipe.set_matrix(self._object_key_prefix + object.name + "::pos", pose.pos)
+            self._redis_pipe.set_matrix(self._object_key_prefix + object.name + "::ori", pose.quat)
         self._redis_pipe.execute()

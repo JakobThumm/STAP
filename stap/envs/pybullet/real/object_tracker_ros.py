@@ -5,6 +5,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Union
 import numpy as np
 import rospy
 from geometry_msgs.msg import PoseStamped
+from scipy.spatial.transform import Rotation
 
 from stap.envs.pybullet.real.object_tracker import ObjectTracker
 from stap.envs.pybullet.sim import math
@@ -21,11 +22,14 @@ class ObjectTrackerRos(ObjectTracker):
         key_namespace: str,
         object_key_prefix: str,
         assets_path: Union[str, pathlib.Path],
+        base_transform: np.ndarray,
     ):
         try:
             rospy.init_node("stap_node")
         except rospy.exceptions.ROSException:
             print("Node has already been initialized, do nothing")
+        assert base_transform.shape == (4, 4), "Base transform must be a 4x4 matrix"
+        self._base_transform = base_transform
         self._object_key_prefix = object_key_prefix
         self._tracked_objects = dict()
         for object in objects.values():
@@ -70,8 +74,14 @@ class ObjectTrackerRos(ObjectTracker):
         pass
 
     def object_callback(self, msg: PoseStamped, object_name: str):
+        object_transform = np.eye(4)
+        object_transform[:3, 3] = np.array([msg.pose.position.x, msg.pose.position.y, msg.pose.position.z])
+        object_transform[:3, :3] = Rotation.from_quat(
+            [msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w]
+        ).as_matrix()
+        object_in_base_frame = self._base_transform @ object_transform
         pose = math.Pose(
-            np.array([msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]),
-            np.array([msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w]),
+            pos=object_in_base_frame[:3, 3],
+            quat=Rotation.from_matrix(object_in_base_frame[:3, :3]).as_quat(),
         )
         self._tracked_objects[object_name].set_pose(pose)
