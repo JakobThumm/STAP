@@ -23,6 +23,7 @@ class ObjectTrackerRos(ObjectTracker):
         object_key_prefix: str,
         assets_path: Union[str, pathlib.Path],
         base_transform: np.ndarray,
+        alpha: float = 1.0,
     ):
         try:
             rospy.init_node("stap_node")
@@ -32,6 +33,7 @@ class ObjectTrackerRos(ObjectTracker):
         self._base_transform = base_transform
         self._object_key_prefix = object_key_prefix
         self._tracked_objects = dict()
+        self._object_transform = dict()
         for object in objects.values():
             self._joint_pos_sub = rospy.Subscriber(
                 "/vrpn_client_node/objects/" + object.name + "/pose",
@@ -39,6 +41,8 @@ class ObjectTrackerRos(ObjectTracker):
                 partial(self.object_callback, object_name=object.name),
             )
             self._tracked_objects[object.name] = object
+            self._object_transform[object.name] = None
+        self.alpha = alpha
 
     def __del__(self) -> None:
         pass
@@ -79,7 +83,16 @@ class ObjectTrackerRos(ObjectTracker):
         object_transform[:3, :3] = Rotation.from_quat(
             [msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w]
         ).as_matrix()
-        object_in_base_frame = self._base_transform @ object_transform
+        if self._object_transform[object_name] is None:
+            self._object_transform[object_name] = object_transform
+        # object_transform_diff = np.clip(
+        #     object_transform - self._object_transform[object_name], -self.meas_diff, self.meas_diff
+        # )
+        # self._object_transform[object_name] = self._object_transform[object_name] + object_transform_diff
+        self._object_transform[object_name] = (
+            self.alpha * object_transform + (1 - self.alpha) * self._object_transform[object_name]
+        )
+        object_in_base_frame = self._base_transform @ self._object_transform[object_name]
         pose = math.Pose(
             pos=object_in_base_frame[:3, 3],
             quat=Rotation.from_matrix(object_in_base_frame[:3, :3]).as_quat(),
