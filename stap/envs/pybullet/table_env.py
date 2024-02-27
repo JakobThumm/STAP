@@ -12,6 +12,7 @@ import pybullet as p
 import rospy  # noqa
 import torch
 from PIL import Image, ImageDraw, ImageFont
+from scipy.spatial.transform import Rotation
 from std_msgs.msg import Float32MultiArray  # noqa
 
 from stap.envs import base as envs
@@ -162,6 +163,7 @@ class TableEnv(PybulletEnv):
         child_process_seed: Optional[int] = None,
         use_curriculum: bool = False,
         use_ros: bool = True,
+        base_transform: Optional[Dict[str, float]] = None,
     ):
         """Constructs the TableEnv.
 
@@ -187,9 +189,14 @@ class TableEnv(PybulletEnv):
                 Helpful for deterministic evaluation. Will not be used for the
                 main process!
             use_curriculum: Whether to use a curriculum on the number of objects.
+            base_transform: Transformation from the sim world frame to the real world frame.
         """
         print("Initializing table env.")
         self._use_ros = use_ros
+        self._base_transform = np.eye(4)
+        if base_transform is not None:
+            self._base_transform[:3, 3] = np.array(base_transform["position"])
+            self._base_transform[:3, :3] = Rotation.from_quat(base_transform["orientation"]).as_matrix()
         self._sim_time = None
         if render_mode not in TableEnv.metadata["render_modes"]:
             raise ValueError(f"Render mode {render_mode} is not supported.")
@@ -833,8 +840,8 @@ class TableEnv(PybulletEnv):
             if custom_recording_text is not None:
                 self._recording_text = custom_recording_text
 
-        if isinstance(self.robot.arm, real.arm.Arm):
-            input("Continue?")
+        # if isinstance(self.robot.arm, real.arm.Arm) or isinstance(self.robot.arm, real.safe_arm.SafeArm):
+        #     input("Continue?")
 
         self._recorder.add_frame(self.render, override_frequency=True)
         self._timelapse.add_frame(self.render)

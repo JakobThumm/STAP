@@ -25,6 +25,12 @@ env_kwargs:
   animation_type: HumanRobotHandover
   animation_frequency: 100
   visualize_shield: false
+
+  base_transform:
+    position: [3.7275, 0.47, -0.072]
+    # Quaternion [x, y, z, w]
+    orientation: [0.0, 0.0, 1.0, 0.0]
+
   # human_animation_names: ["0"]
 
   objects:

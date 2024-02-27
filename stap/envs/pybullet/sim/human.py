@@ -166,6 +166,9 @@ class Human(body.Body):
             self._animation_info["orientation_quat"],
         )
 
+    def animate_with_measurement(self, time: float, measurements: np.ndarray) -> None:
+        self._set_poses(measurements, np.array([0.0, 0.0, 0.0]), np.array([0.0, 0.0, 0.0, 1.0]))
+
     def _set_poses(self, measurements: np.ndarray, position_offset: np.ndarray, base_orientation: np.ndarray) -> None:
         """Set the poses of the bodies according to the measurements.
 

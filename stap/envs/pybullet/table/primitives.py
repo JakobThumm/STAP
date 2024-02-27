@@ -650,8 +650,8 @@ class StaticHandover(Primitive):
 
         SUCCESS_DISTANCE = 0.4
         SUCCESS_TIME = 1.0
-        FIRST_MOVEMENT_TIMEOUT = 2.0
-        WAIT_TIMEOUT = 15
+        FIRST_MOVEMENT_TIMEOUT = 10.0
+        WAIT_TIMEOUT = 10.0
         ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
         POSITIONAL_PRECISION = 0.1
         ORIENTATIONAL_PRECISION = 0.1
@@ -659,7 +659,7 @@ class StaticHandover(Primitive):
         self.success_counter = 0
         # Parse action.
         a = primitive_actions.HandoverAction(self.scale_action(action))
-        dbprint(a)
+        print("Executing Static Handover action ", a)
 
         obj, target = self.arg_objects
         objects = self.env.objects
@@ -684,6 +684,7 @@ class StaticHandover(Primitive):
             if not success:
                 raise ControlException("Moving to handover pose failed")
             termination_fn = partial(self.termination_condition, obj, target, SUCCESS_DISTANCE, SUCCESS_TIME)
+            print("Waiting for handover to be successful")
             success = robot.wait_for_termination(termination_fn=termination_fn, timeout=WAIT_TIMEOUT)
             if not success:
                 raise ControlException("Handover failed: Human hand not within reach")
@@ -699,9 +700,7 @@ class StaticHandover(Primitive):
                 raise ControlException("Robot.goto_pose() collided")
         except ControlException as e:
             # If robot fails before grasp(0), object may still be grasped.
-            dbprint("StaticHandover.execute():\n", e)
-            if verbose:
-                print("StaticHandover.execute():\n", e)
+            print("StaticHandover.execute():\n", e)
             return ExecutionResult(success=False, truncated=True)
 
         self.env.wait_until_stable()
@@ -718,6 +717,7 @@ class StaticHandover(Primitive):
             additional_offset = np.zeros(3)
         # Get target pose.
         target_pos = target.pose().pos
+        print("Target pos: ", target_pos)
         target_pos[2] = action.height
         base_pos = self.env.robot.arm.base_pos + additional_offset
 
@@ -742,6 +742,7 @@ class StaticHandover(Primitive):
         """Checks if the human hand is within reach of the object for at least `success_time` seconds."""
         target_pos = target.pose().pos
         obj_pos = object.pose().pos
+        print("Target pos: ", target_pos, " object pos: ", obj_pos)
         if np.linalg.norm(target_pos - obj_pos) < success_distance:
             self.success_counter += 1
         else:

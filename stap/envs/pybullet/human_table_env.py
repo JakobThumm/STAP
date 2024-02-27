@@ -11,6 +11,7 @@ import pybullet as p
 
 from stap.envs import base as envs
 from stap.envs.base import Primitive
+from stap.envs.pybullet import real
 from stap.envs.pybullet.sim.human import Human
 from stap.envs.pybullet.sim.safe_arm import SafeArm
 from stap.envs.pybullet.table import object_state, utils
@@ -44,6 +45,10 @@ class HumanTableEnv(TableEnv):
             kwargs: Keyword arguments for `TableEnv`.
         """
         self._human_kwargs = utils.load_config(human_config)
+        if "joint_names" in self._human_kwargs:
+            joint_names = self._human_kwargs.pop("joint_names")
+        else:
+            joint_names = None
         self._animations = load_human_animation_data(
             animation_type=animation_type,
             human_animation_names=human_animation_names,
@@ -65,6 +70,12 @@ class HumanTableEnv(TableEnv):
             cameraTargetPosition=[0, 0, 0],
             physicsClientId=self.physics_id,
         )
+        if joint_names is not None and (
+            isinstance(self.robot.arm, real.arm.Arm) or isinstance(self.robot.arm, real.safe_arm.SafeArm)
+        ):
+            self.human_tracker = real.human_tracker_ros.HumanTrackerRos(joint_names, self._base_transform)
+        else:
+            self.human_tracker = None
 
     def _create_objects(self, object_kwargs: Optional[List[Dict[str, Any]]] = None) -> None:
         super()._create_objects(object_kwargs=object_kwargs)
@@ -94,7 +105,10 @@ class HumanTableEnv(TableEnv):
         # Set a random negative start time to randomize the beginning of the animation.
         start_time = -1.0 * np.abs(np.random.randn()) * HUMAN_TIME_RAND_STD
         self.human._start_time = start_time
-        self.human.animate(self._sim_time)
+        if self.human_tracker is None:
+            self.human.animate(self._sim_time)
+        else:
+            self.human.animate_with_measurement(0.0, np.array(self.human_tracker.get_joint_positions()))
         obs = self.get_observation()
         return obs, info
 
@@ -178,7 +192,10 @@ class HumanTableEnv(TableEnv):
 
     def step_simulation(self) -> float:
         self._sim_time += SIMULATION_TIME_STEP
-        self.human.animate(self._sim_time)
+        if self.human_tracker is None:
+            self.human.animate(self._sim_time)
+        else:
+            self.human.animate_with_measurement(0.0, np.array(self.human_tracker.get_joint_positions()))
         super().step_simulation()
         if self.robot._arm_class == SafeArm:
             self.robot.arm.human_measurement(self._sim_time, self.human.measurement(self._sim_time))

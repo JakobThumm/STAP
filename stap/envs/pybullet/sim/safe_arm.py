@@ -26,6 +26,7 @@ class SafeArm(Arm):
         damping_ratio: float = 1.0,
         max_acceleration: float = 10.0,
         joint_pos_threshold: float = 1e-3,
+        create_shield_override: bool = False,
         **kwargs,
     ):
         """Constructs the arm from yaml config.
@@ -38,6 +39,7 @@ class SafeArm(Arm):
             damping_ratio: Damping ratio for the joint space controller.
             max_acceleration: Maximum joint acceleration for the joint space controller.
             joint_pos_threshold: Threshold for joint position convergence.
+            create_shield_override: used to not create the shield if we run the real robot setup.
             kwargs: Keyword arguments for `Arm`.
         """
         self._shield_initialized = False
@@ -49,15 +51,16 @@ class SafeArm(Arm):
         self._damping_ratio = damping_ratio
         self._max_acceleration = max_acceleration
         self._joint_pos_threshold = joint_pos_threshold
-        self._shield = FailsafeController(
-            init_qpos=self.ab.q,
-            base_pos=self._base_pos,
-            base_orientation=base_orientation,
-            shield_type=shield_type,
-            robot_name=robot_name,
-            kp=self.pos_gains[0],
-            damping_ratio=self._damping_ratio,
-        )
+        if not create_shield_override:
+            self._shield = FailsafeController(
+                init_qpos=self.ab.q,
+                base_pos=self._base_pos,
+                base_orientation=base_orientation,
+                shield_type=shield_type,
+                robot_name=robot_name,
+                kp=self.pos_gains[0],
+                damping_ratio=self._damping_ratio,
+            )
         self._shield_initialized = True
         self._visualization_initialized = False
         self._human_sphere_viz = []

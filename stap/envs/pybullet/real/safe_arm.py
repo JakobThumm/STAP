@@ -51,7 +51,7 @@ class SafeArm(SafeArmSim):
         )
 
         self._shield_initialized = False
-        super().__init__(**kwargs)
+        super().__init__(create_shield_override=True, **kwargs)
         self._redisgl = None
         self._base_pos = base_pos
         self._base_orientation = base_orientation
@@ -175,6 +175,7 @@ class SafeArm(SafeArmSim):
             return False
         self._prior = desired_q_pos
         # Set the desired joint position as new goal for sara-shield
+        self.set_timeout(timeout)
         self.set_configuration_goal(desired_q_pos)
         return True
 

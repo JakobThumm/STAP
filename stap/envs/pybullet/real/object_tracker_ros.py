@@ -1,4 +1,5 @@
 import pathlib
+from functools import partial
 from typing import Dict, Iterable, List, Optional, Sequence, Union
 
 import numpy as np
@@ -28,7 +29,11 @@ class ObjectTrackerRos(ObjectTracker):
         self._object_key_prefix = object_key_prefix
         self._tracked_objects = dict()
         for object in objects.values():
-            self._joint_pos_sub = rospy.Subscriber("/stap/objects/" + object.name, PoseStamped, self.object_callback)
+            self._joint_pos_sub = rospy.Subscriber(
+                "/vrpn_client_node/objects/" + object.name + "/pose",
+                PoseStamped,
+                partial(self.object_callback, object_name=object.name),
+            )
             self._tracked_objects[object.name] = object
 
     def __del__(self) -> None:
@@ -64,7 +69,9 @@ class ObjectTrackerRos(ObjectTracker):
     def send_poses(self, objects: Optional[Iterable[Object]] = None) -> None:
         pass
 
-    def object_callback(self, msg: PoseStamped):
-        # TODO figure out if that is the right data format.
-        pose = math.Pose(np.array(msg.pose.pos), np.array(msg.pose.quat))
-        self._tracked_objects[msg.header.name].set_pose(pose)
+    def object_callback(self, msg: PoseStamped, object_name: str):
+        pose = math.Pose(
+            np.array([msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]),
+            np.array([msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w]),
+        )
+        self._tracked_objects[object_name].set_pose(pose)
