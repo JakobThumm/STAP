@@ -1,6 +1,6 @@
 urdf: configs/pybullet/envs/assets/franka_panda/fr3_hand.urdf
 
-arm_class: real.safe_arm.SafeArm
+arm_class: sim.safe_arm.SafeArm
 arm_kwargs:
   arm_urdf: configs/pybullet/envs/assets/franka_panda/fr3.urdf
   torque_joints:
