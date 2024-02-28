@@ -721,7 +721,7 @@ class StaticHandover(Primitive):
             additional_offset = np.zeros(3)
         # Get target pose.
         target_pos = target.pose().pos
-        print("Target pos: ", target_pos)
+        # print("Target pos: ", target_pos)
         target_pos[2] = action.height
         base_pos = self.env.robot.arm.base_pos + additional_offset
 
@@ -746,7 +746,7 @@ class StaticHandover(Primitive):
         """Checks if the human hand is within reach of the object for at least `success_time` seconds."""
         target_pos = target.pose().pos
         obj_pos = object.pose().pos
-        print("Target pos: ", target_pos, " object pos: ", obj_pos)
+        # print("Target pos: ", target_pos, " object pos: ", obj_pos)
         if np.linalg.norm(target_pos - obj_pos) < success_distance:
             self.success_counter += 1
         else:
