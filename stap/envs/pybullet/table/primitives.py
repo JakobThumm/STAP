@@ -264,8 +264,8 @@ class Pick(Primitive):
                 command_pos,
                 command_quat,
                 check_collisions=[obj.body_id for obj in self.get_non_arg_objects(objects)],
-                positional_precision=0.002,
-                orientational_precision=0.05,
+                positional_precision=0.001,
+                orientational_precision=0.03,
             )
 
             if not robot.grasp_object(obj):
@@ -304,10 +304,14 @@ class Pick(Primitive):
             screwdriver: Screwdriver = obj  # type: ignore
             action_range = self.Action.range()
             random_x = np.random.uniform(low=-screwdriver.head_length, high=screwdriver.handle_length)
-            pos = np.array([random_x, 0, screwdriver.head_radius + 0.01])
+            # random_x = np.random.uniform(low=0.0, high=screwdriver.handle_length)
+            if random_x > 0.02:
+                pos = np.array([random_x, 0, 0.02])
+            else:
+                pos = np.array([random_x, 0, 0.01])
             theta = 0.0
         elif obj.isinstance(Box):
-            pos = np.array([0.0, 0.0, 0.0])
+            pos = np.array([0.0, 0.0, obj.size[2] / 2.0])
             theta = 0.0  # if random.random() <= 0.5 else np.pi / 2
         else:
             pos = np.array([0.0, 0.0, 0.0])

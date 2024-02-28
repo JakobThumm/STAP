@@ -212,6 +212,7 @@ class Robot(body.Body):
         self.gripper.update_torques()
         iter = 0
         while status == articulated_body.ControlStatus.IN_PROGRESS:
+            # time.sleep(0.004)
             self.step_simulation()
             status = self.arm.update_torques(self._sim_time)
             self.gripper.update_torques()

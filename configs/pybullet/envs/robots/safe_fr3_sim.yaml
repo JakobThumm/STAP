@@ -14,10 +14,10 @@ arm_kwargs:
 
   # q_home: [0.0, -0.52359878, 0.0, -2.61799388, 0.0, 2.0943951, 0.0]
   q_home: [0.0, -0.78539, 0.0, -2.35619, 0.0, 1.5707, 0.78539]
-  ee_offset: [0.0, 0.0, 0.1034]
+  ee_offset: [0.0, 0.0, 0.094]
 
-  pos_gains: [1000, 0]
-  damping_ratio: 10.0
+  pos_gains: [[1000.0, 1000.0, 1000.0, 1000.0, 100.0, 100.0, 100.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+  damping_ratio: [5.0, 5.0, 5.0, 5.0, 10.0, 10.0, 10.0]
   ori_gains: [0, 0]
   nullspace_joint_gains: [10, 10]
   nullspace_joint_indices: [2, 4]
@@ -68,25 +68,27 @@ gripper_kwargs:
     - fr3_finger_joint1
     - fr3_finger_joint2
 
-  position_joints:
-    - fr3_finger_joint1
-    - fr3_finger_joint2
+  position_joints: null
+    # - fr3_finger_joint1
+    # - fr3_finger_joint2
 
   finger_links:
     - fr3_leftfinger
     - fr3_rightfinger
 
+  q_home: [0.07, 0.07]
+
   base_link: fr3_hand
 
   command_multipliers:
-    [0.05, -0.05, 0.813, -0.813]
+    [-0.02, -0.02]
 
   finger_contact_normals:
-    - [0.0, 1.0, 0.0]  # left_inner_finger_pad_collision
-    - [0.0, -1.0, 0.0]  # right_inner_finger_pad_collision
+    - [0.0, -1.0, 0.0]  # left_inner_finger_pad_collision
+    - [0.0, 1.0, 0.0]  # right_inner_finger_pad_collision
 
   inertia_kwargs:
-    mass: 0.83
+    mass: 0.73
     com: [0, 0, 0.11]
     inertia: [0.001, 0.0025, 0.0017, 0, 0, 0]
 

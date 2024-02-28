@@ -196,6 +196,8 @@ class TableBounds:
         xy_min, xy_max = bounds
         xy_min[0] = utils.TABLE_CONSTRAINTS["table_x_min"]
         xy_max[0] = utils.TABLE_CONSTRAINTS["table_x_max"]
+        xy_min[1] = utils.TABLE_CONSTRAINTS["table_y_min"]
+        xy_max[1] = utils.TABLE_CONSTRAINTS["table_y_max"]
         xy_min += margin
         xy_max -= margin
 

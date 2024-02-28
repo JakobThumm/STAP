@@ -480,18 +480,17 @@ class Screwdriver(Object):
         color: Union[List[float], np.ndarray],
         head_length: float = 0.09,
         handle_length: float = 0.075,
-        head_radius: float = 0.012,
+        head_radius: float = 0.02,
         handle_radius: float = 0.0025,
-        mass: float = 0.1,
+        mass: float = 0.3,
         is_active: bool = False,
     ):
         if not isinstance(color, np.ndarray):
             color = np.array(color)
 
-        head = shapes.Cylinder(
-            radius=head_radius,
-            length=head_length,
-            mass=0.4 * mass,
+        head = shapes.Box(
+            size=np.array([2 * head_radius, 2 * head_radius, head_length]),
+            mass=0.7 * mass,
             color=color,
             pose=math.Pose(
                 pos=np.array([-0.5 * head_length, 0.0, 0.0]),
@@ -501,7 +500,7 @@ class Screwdriver(Object):
         handle = shapes.Cylinder(
             radius=handle_radius,
             length=handle_length,
-            mass=0.6 * mass,
+            mass=0.3 * mass,
             color=np.array([0.5, 0.5, 0.5, 1.0]),
             pose=math.Pose(
                 pos=np.array([0.5 * handle_length, 0.0, 0.0]),
