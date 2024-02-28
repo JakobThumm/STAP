@@ -70,9 +70,7 @@ class HumanTableEnv(TableEnv):
             cameraTargetPosition=[0, 0, -0.02],
             physicsClientId=self.physics_id,
         )
-        if joint_names is not None and (
-            isinstance(self.robot.arm, real.arm.Arm) or isinstance(self.robot.arm, real.safe_arm.SafeArm)
-        ):
+        if joint_names is not None and self.real_world:
             self.human_tracker = real.human_tracker_ros.HumanTrackerRos(joint_names, self._base_transform)
         else:
             self.human_tracker = None

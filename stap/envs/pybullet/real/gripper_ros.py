@@ -87,7 +87,7 @@ class GripperRos(sim_gripper.Gripper):
     def gripper_success_callback(self, msg: Bool):
         """ROS callback for gripper success."""
         if msg.data:
-            self._status = articulated_body.ControlStatus.POS_CONVERGED
+            self._status = articulated_body.ControlStatus.VEL_CONVERGED
         else:
             self._status = articulated_body.ControlStatus.TIMEOUT
 

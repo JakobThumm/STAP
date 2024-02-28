@@ -310,6 +310,8 @@ class TableEnv(PybulletEnv):
 
         self._use_curriculum = use_curriculum
 
+        self._real_world = isinstance(self.robot.arm, real.arm.Arm) or isinstance(self.robot.arm, real.safe_arm.SafeArm)
+
         # Initialize rendering.
         WIDTH, HEIGHT = 405, 270
         PROJECTION_MATRIX = p.computeProjectionMatrixFOV(
@@ -390,6 +392,10 @@ class TableEnv(PybulletEnv):
         except AttributeError:
             pass
         super().close()
+
+    @property
+    def real_world(self) -> bool:
+        return self._real_world
 
     @property
     def tasks(self) -> TaskDistribution:
@@ -749,11 +755,11 @@ class TableEnv(PybulletEnv):
             self.robot.reset(time=self._sim_time)
             p.restoreState(stateId=self._initial_state_id, physicsClientId=self.physics_id)
 
-            if self.object_tracker is not None and (
-                isinstance(self.robot.arm, real.arm.Arm) or isinstance(self.robot.arm, real.safe_arm.SafeArm)
-            ):
+            if self.object_tracker is not None and self.real_world:
                 # Track objects from the real world.
-                self.object_tracker.update_poses()
+                objects = self.object_tracker.update_poses()
+                for object in objects:
+                    print(f"Object {object.name} is at {object.pose()}")
                 break
 
             # Reset variants and freeze objects so they don't get simulated.
@@ -837,18 +843,14 @@ class TableEnv(PybulletEnv):
             if custom_recording_text is not None:
                 self._recording_text = custom_recording_text
 
-        # if isinstance(self.robot.arm, real.arm.Arm) or isinstance(self.robot.arm, real.safe_arm.SafeArm):
-        #     input("Continue?")
+        if self.real_world:
+            input("Continue?")
 
         self._recorder.add_frame(self.render, override_frequency=True)
         self._timelapse.add_frame(self.render)
-        result = primitive.execute(action, real_world=isinstance(self.robot.arm, real.arm.Arm))
+        result = primitive.execute(action, real_world=self.real_world)
 
-        if (
-            self.object_tracker is not None
-            and isinstance(self.robot.arm, real.arm.Arm)
-            and not isinstance(primitive, Pick)
-        ):
+        if self.object_tracker is not None and self.real_world and not isinstance(primitive, Pick):
             if isinstance(primitive, (Pull, Push)):
                 self.object_tracker.update_poses(exclude=[primitive.arg_objects[1]])
             else:
@@ -964,8 +966,7 @@ class TableEnv(PybulletEnv):
         # contact_points = p.getContactPoints(physicsClientId=self.physics_id, bodyA=self.robot.arm.body_id)
         self._recorder.add_frame(self.render)
 
-        # Is this needed?
-        if self.object_tracker is not None and not isinstance(self.robot.arm, real.arm.Arm):
+        if self.object_tracker is not None and not self.real_world:
             # Send objects to RedisGl.
             self.object_tracker.send_poses(self.real_objects())
         return None

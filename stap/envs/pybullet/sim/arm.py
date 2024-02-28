@@ -81,6 +81,8 @@ class Arm(articulated_body.ArticulatedBody):
             timeout=timeout,
         )
 
+        self._allow_joint_callback = True
+
         self.q_home = np.array(q_home, dtype=np.float64)
         self.ee_offset = np.array(ee_offset, dtype=np.float64)
 
@@ -118,6 +120,9 @@ class Arm(articulated_body.ArticulatedBody):
     def ab(self) -> dyn.ArticulatedBody:
         """Spatialdyn articulated body."""
         return self._ab
+
+    def set_shield_mode(self, mode: Optional[str] = None) -> None:
+        pass
 
     def reset(self, time: Optional[float] = None, qpos: Optional[Union[np.ndarray, List[float]]] = None) -> bool:
         """Disables torque control and resets the arm to the home configuration (bypassing simulation).
@@ -245,6 +250,12 @@ class Arm(articulated_body.ArticulatedBody):
         for i in range(q.shape[0]):
             p.resetJointState(self.body_id, i, q[i])
 
+    def deactivate_joint_callback(self):
+        self._allow_joint_callback = False
+
+    def activate_joint_callback(self):
+        self._allow_joint_callback = True
+
     def accurate_calculate_inverse_kinematics(
         self,
         target_pos: np.ndarray,
@@ -273,12 +284,15 @@ class Arm(articulated_body.ArticulatedBody):
         use_nullspace = not (self._lower_limit is None or self._upper_limit is None or self._joint_ranges_ns is None)
         n_joints = self.q_home.shape[0]
         rest_pose = self.q_home if use_nullspace else None
-        close_enough = False
+        rest_pose = self._q
+        close_enough: bool = False
         iter = 0
         dist2 = 1e30
         desired_q_pos = np.zeros((n_joints,))
+        # print(f"Prior: {prior}, rest_pose: {rest_pose}")
         if prior is not None:
             self.reset_joint_state(prior)
+        self.deactivate_joint_callback()
         while not close_enough and iter < max_iter:
             desired_q_pos = np.array(
                 p.calculateInverseKinematics(
@@ -309,8 +323,12 @@ class Arm(articulated_body.ArticulatedBody):
                 if (orientational_precision is not None and target_quat is not None)
                 else True
             )
+            # print(
+            #     f"Iteration {iter}: positional error: {np.linalg.norm(target_pos - np.array(newPos))}, orientational error: {np.linalg.norm(target_quat - np.array(newQuat))}"
+            # )
             iter = iter + 1
         self.reset_joint_state(current_q)
+        self.activate_joint_callback()
         return desired_q_pos, close_enough
 
     def inverse_kinematics(

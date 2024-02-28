@@ -32,6 +32,7 @@ class ObjectTrackerRos(ObjectTracker):
         assert base_transform.shape == (4, 4), "Base transform must be a 4x4 matrix"
         self._base_transform = base_transform
         self._object_key_prefix = object_key_prefix
+        self.alpha = alpha
         self._tracked_objects = dict()
         self._object_transform = dict()
         for object in objects.values():
@@ -42,7 +43,6 @@ class ObjectTrackerRos(ObjectTracker):
             )
             self._tracked_objects[object.name] = object
             self._object_transform[object.name] = None
-        self.alpha = alpha
 
     def __del__(self) -> None:
         pass
@@ -61,6 +61,7 @@ class ObjectTrackerRos(ObjectTracker):
         objects: Optional[Iterable[Object]] = None,
         exclude: Optional[Sequence[Object]] = None,
     ) -> List[Object]:
+        rospy.sleep(0.1)
         returned_objects = []
         if objects is None:
             objects = self._tracked_objects.values()
@@ -97,4 +98,5 @@ class ObjectTrackerRos(ObjectTracker):
             pos=object_in_base_frame[:3, 3],
             quat=Rotation.from_matrix(object_in_base_frame[:3, :3]).as_quat(),
         )
+        # print(f"Object {object_name} pose: {pose}")
         self._tracked_objects[object_name].set_pose(pose)

@@ -14,7 +14,7 @@ arm_kwargs:
 
   # q_home: [0.0, -0.52359878, 0.0, -2.61799388, 0.0, 2.0943951, 0.0]
   q_home: [0.0, -0.78539, 0.0, -2.35619, 0.0, 1.5707, 0.78539]
-  ee_offset: [0.0, 0.0, 0.094]
+  ee_offset: [0.0, 0.0, 0.107]
 
   pos_gains: [[1000.0, 1000.0, 1000.0, 1000.0, 100.0, 100.0, 100.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
   damping_ratio: [5.0, 5.0, 5.0, 5.0, 10.0, 10.0, 10.0]
@@ -31,11 +31,11 @@ arm_kwargs:
 
   pos_threshold: [0.01, 0.01]
   ori_threshold: [0.01, 0.01]
-  joint_pos_threshold: 0.1
+  joint_pos_threshold: 0.02
   timeout: 10.0
 
   # shield settings
-  shield_type: "PFL"
+  default_shield_mode: "PFL"
   robot_name: "panda"
   max_acceleration: 30.0
   end_effector_id: 7

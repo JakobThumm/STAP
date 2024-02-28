@@ -8,4 +8,4 @@ key_namespace: segmentation
 object_key_prefix: "segmentation::objects::"
 
 assets_path: configs/pybullet/envs/assets
-alpha: 0.1
+alpha: 0.5

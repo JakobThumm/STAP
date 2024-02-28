@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import rospy
 from ctrlutils import eigen
-from std_msgs.msg import Float32MultiArray  # noqa
+from std_msgs.msg import Float32MultiArray, String  # noqa
 
 from stap.controllers.joint_space_control import joint_space_control  # noqa: F401
 from stap.envs.pybullet.sim import articulated_body
@@ -19,11 +19,11 @@ class SafeArm(SafeArmSim):
         self,
         base_pos: Union[List[float], np.ndarray] = np.zeros(3),
         base_orientation: Union[List[float], np.ndarray] = np.array([0, 0, 0, 1]),
-        shield_type: str = "SSM",
         robot_name: str = "panda",
         damping_ratio: float = 1.0,
         max_acceleration: float = 10.0,
         joint_pos_threshold: float = 1e-3,
+        default_shield_mode: str = "SSM",
         **kwargs,
     ):
         """Constructs the arm from yaml config.
@@ -45,6 +45,8 @@ class SafeArm(SafeArmSim):
         # Define publisher and subscribers
         # Publish Float 32 array to /sara_shield/goal_joint_pos
         self._goal_joint_pub = rospy.Publisher("/sara_shield/goal_joint_pos", Float32MultiArray, queue_size=100)
+        # Publish the shield mode as a string to /sara_shield/shield_mode
+        self._shield_mode_pub = rospy.Publisher("/sara_shield/shield_mode", String, queue_size=100)
         # Subscribe to Float 32 array /sara_shield/observed_joint_pos
         self._joint_pos_sub = rospy.Subscriber(
             "/sara_shield/observed_joint_pos", Float32MultiArray, self.joint_pos_callback
@@ -55,7 +57,8 @@ class SafeArm(SafeArmSim):
         self._redisgl = None
         self._base_pos = base_pos
         self._base_orientation = base_orientation
-        self._shield_type = shield_type
+        self._shield_type = default_shield_mode
+        self._default_shield_mode = default_shield_mode
         self._joint_pos_threshold = joint_pos_threshold
         self._shield_initialized = True
         self._visualization_initialized = False
@@ -67,9 +70,10 @@ class SafeArm(SafeArmSim):
 
     def joint_pos_callback(self, data: Float32MultiArray):
         """ROS callback for new joint position."""
-        self._q = np.array(data.data)
         # self.reset_joints(self._q, self.torque_joints)
-        self.apply_positions(self._q, self.torque_joints)
+        if self._allow_joint_callback:
+            self._q = np.array(data.data)
+            self.apply_positions(self._q, self.torque_joints)
 
     def get_joint_state(self, joints: List[int]) -> Tuple[np.ndarray, np.ndarray]:
         """Gets the position and velocities of the given joints.
@@ -92,8 +96,17 @@ class SafeArm(SafeArmSim):
     def apply_torques(self, torques: np.ndarray, joints: Optional[List[int]] = None) -> None:
         raise NotImplementedError
 
+    def set_shield_mode(self, mode: Optional[str] = None) -> None:
+        """Sets the shield to the default mode."""
+        if mode is None:
+            mode = self._default_shield_mode
+        assert mode in ["OFF", "SSM", "PFL"], "Invalid shield mode: " + mode
+        self._shield_type = mode
+        self._shield_mode_pub.publish(mode)
+
     def reset(self, time: Optional[float] = None, qpos: Optional[Union[np.ndarray, List[float]]] = None) -> bool:
         """Disables torque control and resets the arm to the home configuration (bypassing simulation)."""
+        self.set_shield_mode(mode=None)
         super().reset(time=time, qpos=qpos)
         return True
 
@@ -169,7 +182,7 @@ class SafeArm(SafeArmSim):
             positional_precision=positional_precision,
             orientational_precision=orientational_precision,
             ignore_last_half_rotation=ignore_last_half_rotation,
-            prior=prior,
+            prior=self._q,
         )
         if not success:
             return False
@@ -205,7 +218,7 @@ class SafeArm(SafeArmSim):
         # if self._shield.get_safety():
         #     self._arm_state.iter_timeout -= 1
         self._arm_state.iter_timeout -= 1
-        if np.linalg.norm(self.ab.q - self._q_d) < self._joint_pos_threshold:
+        if np.all(np.abs(self.ab.q - self._q_d) < self._joint_pos_threshold):
             return articulated_body.ControlStatus.POS_CONVERGED
 
         return articulated_body.ControlStatus.IN_PROGRESS

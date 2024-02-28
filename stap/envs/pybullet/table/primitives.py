@@ -236,8 +236,13 @@ class Pick(Primitive):
 
         # Get object pose.
         obj = self.arg_objects[0]
-        obj_pose = obj.pose()
-        obj_quat = eigen.Quaterniond(obj_pose.quat)
+        obj_pose = obj.pose(sim=(not real_world))
+        # Only take z-Rotation for picking
+        obj_rot = Rotation.from_quat(obj_pose.quat)
+        obj_euler_Z, _, _ = obj_rot.as_euler("ZYX")
+        obj_rot_z_only = Rotation.from_euler("ZYX", [obj_euler_Z, 0, 0])
+        obj_quat = eigen.Quaterniond(obj_rot_z_only.as_quat())
+        print("Object pose: ", obj_pose)
 
         # Compute position.
         command_pos = obj_pose.pos + obj_quat * a.pos
@@ -256,6 +261,10 @@ class Pick(Primitive):
             if not real_world and not utils.is_inworkspace(obj=obj):
                 raise ControlException(f"Object {obj} is beyond the robot workspace.")
 
+            robot.grasp(0)
+
+            robot.arm.set_shield_mode("SSM")
+
             robot.goto_pose(pre_pos, command_quat, positional_precision=0.01, orientational_precision=0.05)
             if not allow_collisions and did_non_args_move():
                 raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
@@ -264,9 +273,12 @@ class Pick(Primitive):
                 command_pos,
                 command_quat,
                 check_collisions=[obj.body_id for obj in self.get_non_arg_objects(objects)],
-                positional_precision=0.001,
+                positional_precision=0.01,
                 orientational_precision=0.03,
             )
+
+            q, _ = robot.arm.get_joint_state(robot.arm.joints)
+            print(f"EE pose: {robot.arm.ee_pose()}, joint positions: {q}")
 
             if not robot.grasp_object(obj):
                 raise ControlException(f"Robot.grasp_object({obj}) failed")
@@ -275,7 +287,7 @@ class Pick(Primitive):
             if not allow_collisions and did_non_args_move():
                 raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
         except ControlException as e:
-            dbprint("Pick.execute():\n", e)
+            print("Pick.execute():\n", e)
             return ExecutionResult(success=False, truncated=True)
 
         self.env.wait_until_stable()  # handle pick failures
@@ -376,6 +388,8 @@ class Place(Primitive):
         try:
             if not real_world and not utils.is_inworkspace(obj_pos=pre_pos[:2]):
                 raise ControlException(f"Placement location {pre_pos} is beyond robot workspace.")
+
+            robot.arm.set_shield_mode("SSM")
 
             robot.goto_pose(pre_pos, command_quat)
             if not allow_collisions and did_non_args_move():
@@ -676,6 +690,7 @@ class StaticHandover(Primitive):
             command_pose = self.calculate_command_pose(a, target, ADDITIONAL_OFFSET)
             command_pos = command_pose.pos
             command_quat = command_pose.quat
+            robot.arm.set_shield_mode("PFL")
             success = robot.goto_pose(
                 command_pos,
                 command_quat,
@@ -689,6 +704,7 @@ class StaticHandover(Primitive):
                 raise ControlException("Moving to handover pose failed")
             termination_fn = partial(self.termination_condition, obj, target, SUCCESS_DISTANCE, SUCCESS_TIME)
             print("Waiting for handover to be successful")
+            robot.arm.set_shield_mode("OFF")
             success = robot.wait_for_termination(termination_fn=termination_fn, timeout=WAIT_TIMEOUT)
             if not success:
                 raise ControlException("Handover failed: Human hand not within reach")
@@ -698,7 +714,7 @@ class StaticHandover(Primitive):
             success = True
             if not allow_collisions and did_non_args_move():
                 raise ControlException("Robot.grasp(0) collided")
-
+            robot.arm.set_shield_mode("PFL")
             robot.goto_configuration(robot.arm.q_home)
             if not allow_collisions and did_non_args_move():
                 raise ControlException("Robot.goto_pose() collided")

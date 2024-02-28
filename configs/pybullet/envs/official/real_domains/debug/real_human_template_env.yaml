@@ -10,14 +10,14 @@ env_kwargs:
 
   tasks:
     - action_skeleton:
-        # - pick(screwdriver)
-        - static_handover(screwdriver, right_hand)
+        - pick(screwdriver)
+        # - static_handover(screwdriver, right_hand)
       initial_state:
         # - on(rack, table)
         # - on(hook, table)
         # - on(icecream, table)
-        # - on(screwdriver, table)
-        - ingripper(screwdriver)
+        - on(screwdriver, table)
+        # - ingripper(screwdriver)
 
   robot_config: configs/pybullet/envs/robots/safe_franka_research3_real.yaml
   object_tracker_config: configs/pybullet/envs/perception/object_tracker_ros.yaml
@@ -27,7 +27,7 @@ env_kwargs:
   visualize_shield: false
 
   base_transform:
-    position: [3.7275, 0.47, -0.072]
+    position: [3.7275, 0.47, -0.055]
     # Quaternion [x, y, z, w]
     orientation: [0.0, 0.0, 1.0, 0.0]
 
