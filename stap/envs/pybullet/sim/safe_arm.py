@@ -199,10 +199,15 @@ class SafeArm(Arm):
         # Calculate torques
         # ddq_desired = np.zeros_like(self.ab.q)
         # torques = joint_space_control(ab=self.ab, ddq_desired=ddq_desired, gravity_comp=True)
+        gains = (
+            np.array([self.pos_gains[0], self._damping_ratio]).T
+            if isinstance(self._damping_ratio, list)
+            else (self.pos_gains[0], self._damping_ratio)
+        )
         torques, converged = dyn.joint_space_control(
             ab=self.ab,
             joint=qpos_desired,
-            joint_gains=(self.pos_gains[0], self._damping_ratio),
+            joint_gains=gains,
             max_joint_acceleration=self._max_acceleration,
             joint_threshold=None,
             gravity_comp=True,

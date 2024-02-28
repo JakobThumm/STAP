@@ -33,9 +33,9 @@ class ArticulatedBody(body.Body, abc.ABC):
         self,
         physics_id: int,
         body_id: int,
-        torque_joints: List[str],
-        position_joints: List[str],
-        timeout: float,
+        torque_joints: Optional[List[str]] = None,
+        position_joints: Optional[List[str]] = None,
+        timeout: float = 1.0,
     ):
         """Constructs the wrapper class.
 
@@ -49,18 +49,14 @@ class ArticulatedBody(body.Body, abc.ABC):
         super().__init__(physics_id, body_id)
 
         def get_joint_name(joint_id: int) -> str:
-            return p.getJointInfo(
-                self.body_id, joint_id, physicsClientId=self.physics_id
-            )[1].decode("utf8")
+            return p.getJointInfo(self.body_id, joint_id, physicsClientId=self.physics_id)[1].decode("utf8")
 
         joint_ids = {get_joint_name(joint_id): joint_id for joint_id in range(self.dof)}
-        self._torque_joints = [joint_ids[joint] for joint in torque_joints]
-        self._position_joints = [joint_ids[joint] for joint in position_joints]
+        self._torque_joints = [joint_ids[joint] for joint in torque_joints] if torque_joints else []
+        self._position_joints = [joint_ids[joint] for joint in position_joints] if position_joints else []
 
         len_joints = max(self.joints) + 1
-        self._articulated_body_state = ArticulatedBodyState(
-            np.zeros(len_joints), np.zeros(len_joints)
-        )
+        self._articulated_body_state = ArticulatedBodyState(np.zeros(len_joints), np.zeros(len_joints))
 
         self.timeout = timeout
 
@@ -91,9 +87,7 @@ class ArticulatedBody(body.Body, abc.ABC):
         Returns:
             Joint positions and velocities (q, dq).
         """
-        joint_states = p.getJointStates(
-            self.body_id, joints, physicsClientId=self.physics_id
-        )
+        joint_states = p.getJointStates(self.body_id, joints, physicsClientId=self.physics_id)
         q, dq, _, _ = zip(*joint_states)
         return np.array(q), np.array(dq)
 
@@ -115,9 +109,7 @@ class ArticulatedBody(body.Body, abc.ABC):
         """
         raise NotImplementedError
 
-    def apply_torques(
-        self, torques: np.ndarray, joints: Optional[List[int]] = None
-    ) -> None:
+    def apply_torques(self, torques: np.ndarray, joints: Optional[List[int]] = None) -> None:
         """Applies torques to the given joints.
 
         Pybullet requires disabling position and velocity control in order to
@@ -166,9 +158,7 @@ class ArticulatedBody(body.Body, abc.ABC):
         )
         self._articulated_body_state.torques[joints] = torques
 
-    def apply_positions(
-        self, q: np.ndarray, joints: Optional[List[int]] = None
-    ) -> None:
+    def apply_positions(self, q: np.ndarray, joints: Optional[List[int]] = None) -> None:
         """Sets the joints to the desired positions.
 
         This method will disable torque mode.
@@ -205,9 +195,7 @@ class ArticulatedBody(body.Body, abc.ABC):
     def set_state(self, state: Dict[str, Any]) -> None:
         self._articulated_body_state = copy.deepcopy(state["articulated_body"])
 
-        idx_disabled_position = np.isnan(
-            self._articulated_body_state.positions[self.joints]
-        )
+        idx_disabled_position = np.isnan(self._articulated_body_state.positions[self.joints])
         idx_torque = self._articulated_body_state.torques[self.joints] > 0
 
         joints = np.array(self.joints)

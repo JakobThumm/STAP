@@ -348,7 +348,6 @@ class Arm(articulated_body.ArticulatedBody):
             quat = np.array([quat.w, quat.z, -quat.y, -quat.x])
         elif isinstance(quat, np.ndarray):
             quat = np.array([quat[3], -quat[2], -quat[1], -quat[0]])
-        # Define current position and limits
         desired_q_pos, close_enough = self.accurate_calculate_inverse_kinematics(
             target_pos=desired_ee_pos,
             target_quat=quat,
