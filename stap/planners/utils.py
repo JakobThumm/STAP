@@ -24,6 +24,131 @@ from stap.envs.pybullet.table.primitives import PRIMITIVE_MATCHING, Null
 from stap.planners.custom_fns import CUSTOM_FNS
 from stap.utils import configs, recording, spaces, tensors, timing
 
+DEBUG_STATE = np.array(
+    [
+        1.8451e-01,
+        -3.7162e-01,
+        3.4614e-03,
+        -1.9850e-04,
+        -1.7642e-04,
+        -6.3469e-03,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        0.0000e00,
+        1.4697e-01,
+        -3.6239e-01,
+        -1.0093e-01,
+        -1.0133e-02,
+        8.6199e-02,
+        4.7206e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -2.0000e-01,
+        -3.5000e-01,
+        0.0000e00,
+        1.4122e-01,
+        -5.1677e-01,
+        -3.1893e-01,
+        0.0000e00,
+        0.0000e00,
+        0.0000e00,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        0.0000e00,
+        2.0694e-01,
+        -1.0460e-01,
+        -3.9093e-01,
+        -3.1155e-06,
+        -4.5634e-06,
+        2.6484e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        1.6667e-01,
+        2.6000e-01,
+        -5.0000e-01,
+        1.4767e-01,
+        -3.2753e-02,
+        -3.5548e-01,
+        1.0702e-04,
+        -7.9734e-06,
+        -2.2392e-02,
+        -3.7500e-01,
+        -3.7500e-01,
+        9.0000e-02,
+        -5.0000e-01,
+        -5.0000e-01,
+        0.0000e00,
+        -2.5000e-01,
+        0.0000e00,
+        -4.0909e-01,
+        0.0000e00,
+        0.0000e00,
+        0.0000e00,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        0.0000e00,
+        -2.5000e-01,
+        0.0000e00,
+        -4.0909e-01,
+        0.0000e00,
+        0.0000e00,
+        0.0000e00,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        0.0000e00,
+        -2.5000e-01,
+        0.0000e00,
+        -4.0909e-01,
+        0.0000e00,
+        0.0000e00,
+        0.0000e00,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        0.0000e00,
+        -2.5000e-01,
+        0.0000e00,
+        -4.0909e-01,
+        0.0000e00,
+        0.0000e00,
+        0.0000e00,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        0.0000e00,
+        -2.5000e-01,
+        0.0000e00,
+        -4.0909e-01,
+        0.0000e00,
+        0.0000e00,
+        0.0000e00,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        -5.0000e-01,
+        0.0000e00,
+    ]
+)
+
 
 class PlannerFactory(configs.Factory):
     """Planner factory."""
@@ -243,6 +368,10 @@ def evaluate_trajectory(
         assert actions is not None
         for t, (value_fn, decode_fn) in enumerate(zip(value_fns, decode_fns)):
             policy_state = decode_fn(states[:, t])
+            if len(value_fns) == 1:
+                policy_state_debug = torch.Tensor(
+                    np.repeat(DEBUG_STATE[np.newaxis, :], states.shape[0], axis=0), device=policy_state.device
+                )
             dim_action = int(torch.sum(~torch.isnan(actions[0, t])).cpu().item())
             action = actions[:, t, :dim_action]
             if isinstance(value_fn, networks.critics.Critic):
@@ -483,6 +612,16 @@ def run_closed_loop_planning(
         next_state_observed = next_observation
         state_diff = next_state_observed - next_state_predicted
         sum_state_diff_first_arg_obj = np.sum(np.abs(state_diff[1, :]))
+        custom_fn = planner.custom_fns[type(primitive)]  # type: ignore
+        state = torch.Tensor(plan.states[0][np.newaxis, :])
+        next_state_predicted_Tensor = torch.Tensor(next_state_predicted[np.newaxis, :])
+        next_state_observed_Tensor = torch.Tensor(next_state_observed[np.newaxis, :])
+        predicted_value = custom_fn(
+            state, torch.Tensor(plan.actions[0, : env.action_space.shape[0]]), next_state_predicted_Tensor, primitive
+        )  # type: ignore
+        observed_value = custom_fn(
+            state, torch.Tensor(plan.actions[0, : env.action_space.shape[0]]), next_state_observed_Tensor, primitive
+        )  # type: ignore
 
         rewards[t] = reward
         visited_actions[t, t:] = plan.actions
