@@ -61,7 +61,7 @@ class HumanTableEnv(TableEnv):
         p.resetDebugVisualizerCamera(
             cameraDistance=2.0,
             cameraYaw=90,
-            cameraPitch=0,
+            cameraPitch=-30,
             cameraTargetPosition=[0, 0, -0.02],
             physicsClientId=self.physics_id,
         )
