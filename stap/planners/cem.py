@@ -341,7 +341,7 @@ class CEMPlanner(planners.Planner):
         else:
             samples_elites = (
                 torch.ones_like(elites_scores, dtype=torch.int32, device=self.device) * n_samples / elites.shape[0]
-            )
+            ).to(torch.int32)
         n_samples = torch.sum(samples_elites)  # type: ignore
         # Figure out how to concatenate torch.Size
         samples = torch.zeros([n_samples, *elites[0].shape], device=self.device)
