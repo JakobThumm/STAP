@@ -42,6 +42,7 @@ class Gripper(articulated_body.ArticulatedBody):
         pos_gains: Tuple[float, float],
         pos_threshold: float,
         timeout: float,
+        q_home: Optional[List[float]] = None,
     ):
         """Constructs the arm from yaml config.
 
@@ -98,7 +99,7 @@ class Gripper(articulated_body.ArticulatedBody):
         self.pos_threshold = pos_threshold
 
         self._gripper_state = GripperState()
-        self._q_home = self.get_joint_state(self.joints)[0]
+        self._q_home = q_home if q_home is not None else self.get_joint_state(self.joints)[0]
         self.reset()
 
     @property

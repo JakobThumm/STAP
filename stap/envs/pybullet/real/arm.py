@@ -232,7 +232,6 @@ class Arm(sim_arm.Arm):
 
     def set_state(self, state: Dict[str, Any]) -> None:
         raise NotImplementedError
-        raise NotImplementedError
 
     def human_measurement(self, time: float, human_pos: Optional[np.ndarray] = None) -> None:
         pass

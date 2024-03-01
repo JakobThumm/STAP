@@ -1,0 +1,95 @@
+urdf: configs/pybullet/envs/assets/franka_panda/fr3_hand.urdf
+
+arm_class: real.safe_arm.SafeArm
+arm_kwargs:
+  arm_urdf: configs/pybullet/envs/assets/franka_panda/fr3.urdf
+  torque_joints:
+    - fr3_joint1
+    - fr3_joint2
+    - fr3_joint3
+    - fr3_joint4
+    - fr3_joint5
+    - fr3_joint6
+    - fr3_joint7
+
+  # q_home: [0.0, -0.52359878, 0.0, -2.61799388, 0.0, 2.0943951, 0.0]
+  q_home: [0.0, -0.78539, 0.0, -2.35619, 0.0, 1.5707, 0.78539]
+  ee_offset: [0.0, 0.0, 0.00]
+
+  pos_gains: [1000, 0]
+  damping_ratio: 10.0
+  ori_gains: [0, 0]
+  nullspace_joint_gains: [10, 10]
+  nullspace_joint_indices: [2, 4]
+
+  # lower limits for null space
+  lower_limit: [-2.2893, -1.4933, -2.4737, -2.7278, -2.46, 0.8321, -2.6695]
+  # upper limits for null space
+  upper_limit: [2.2893, 1.4933, 2.4737, -0.4661, 2.46, 4.1894, 2.6695]
+  # joint ranges for null space
+  joint_ranges_ns: [6, 4, 6, 4, 6, 4, 6]
+
+  pos_threshold: [0.01, 0.01]
+  ori_threshold: [0.01, 0.01]
+  joint_pos_threshold: 0.1
+  timeout: 10.0
+
+  # shield settings
+  shield_type: "PFL"
+  robot_name: "panda"
+  max_acceleration: 30.0
+  end_effector_id: 7
+  base_pos: [0.0, 0.0, 0.0]
+  base_orientation: [0.0, 0.0, 0.0, 1.0]
+
+  redisgl_config:
+    gripper_offset: [0.0, 0.0, 0.107]
+
+    redis_host: "127.0.0.1"
+    redis_port: 6000
+    redis_password: taps
+
+    redis_keys:
+      namespace: "franka_panda"
+      control_pos: "franka_panda::control::pos"
+      control_ori: "franka_panda::control::ori"
+      control_pos_des: "franka_panda::control::pos_des"
+      control_ori_des: "franka_panda::control::ori_des"
+      opspace_inertia_pos: "franka_panda::opspace::inertia_pos"
+      opspace_inertia_ori: "franka_panda::opspace::inertia_ori"
+      sensor_q: "franka_panda::sensor::q"
+      sensor_dq: "franka_panda::sensor::dq"
+      sensor_pos: "franka_panda::sensor::pos"
+      sensor_ori: "franka_panda::sensor::ori"
+
+gripper_class: sim.gripper.Gripper
+gripper_kwargs:
+  torque_joints:
+    - fr3_finger_joint1
+    - fr3_finger_joint2
+
+  position_joints:
+    - fr3_finger_joint1
+    - fr3_finger_joint2
+
+  finger_links:
+    - fr3_leftfinger
+    - fr3_rightfinger
+
+  base_link: fr3_hand
+
+  command_multipliers:
+    [0.05, -0.05, 0.813, -0.813]
+
+  finger_contact_normals:
+    - [0.0, 1.0, 0.0]  # left_inner_finger_pad_collision
+    - [0.0, -1.0, 0.0]  # right_inner_finger_pad_collision
+
+  inertia_kwargs:
+    mass: 0.83
+    com: [0, 0, 0.11]
+    inertia: [0.001, 0.0025, 0.0017, 0, 0, 0]
+
+  pos_gains: [400, 40]
+  pos_threshold: 0.001
+  timeout: 1.0
