@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pybullet as p
+from scipy.spatial.transform import Rotation
 
 from stap.envs import base as envs
 from stap.envs.base import Primitive
@@ -35,15 +36,29 @@ class HumanTableEnv(TableEnv):
         animation_type: str,
         animation_frequency: int,
         human_animation_names: Optional[List[str]] = None,
+        animation_initializations: Optional[Union[str, Dict[str, Any]]] = None,
         visualize_shield: bool = False,
         **kwargs,
     ):
         """Constructs the TableEnv.
 
         Args:
+            human_config (Union[str, Dict[str, Any]]): The human configuration file or dictionary.
+            animation_type (str): The type of animation to load.
+            animation_frequency (int): The frequency at which to play the animation.
+            human_animation_names (Optional[List[str]]): The names of the human animations to load.
+            animation_initializations (Optional[Union[str, Dict[str, Any]]]): The config file listing the initialization
+                points for the animations.
+            visualize_shield (bool): Whether to visualize the shield markers.
             kwargs: Keyword arguments for `TableEnv`.
         """
         self._human_kwargs = utils.load_config(human_config)
+        if animation_initializations is not None:
+            init_config = utils.load_config(animation_initializations)
+            self._animation_initializations = init_config["initializations"]
+            self._initialization_randomization = init_config["randomization"]
+        else:
+            self._animation_initializations = None
         self._animations = load_human_animation_data(
             animation_type=animation_type,
             human_animation_names=human_animation_names,
@@ -59,7 +74,7 @@ class HumanTableEnv(TableEnv):
         self._sim_time = 0.0
         self._animation_number = 0
         p.resetDebugVisualizerCamera(
-            cameraDistance=2.0,
+            cameraDistance=3.0,
             cameraYaw=90,
             cameraPitch=-30,
             cameraTargetPosition=[0, 0, -0.02],
@@ -83,8 +98,11 @@ class HumanTableEnv(TableEnv):
         self._animation_number += 1
         if self._animation_number >= len(self._animations):
             self._animation_number = 0
-        animation, animation_info = self._animations[self._animation_number]
-        self.human.set_animation(animation, animation_info, self._animation_freq)
+        if self._animation_initializations is not None:
+            init_num = np.random.randint(0, len(self._animation_initializations))
+        else:
+            init_num = 0
+        self.set_human_animation(self._animation_number, init_num)
         if self._sim_time is None:
             self._sim_time = 0.0
         self.human.disable_animation()
@@ -111,6 +129,36 @@ class HumanTableEnv(TableEnv):
         self._primitive = primitive
 
         return self
+
+    def set_human_animation(self, animation_number: int, init_pose_number: int = 0) -> None:
+        """Set the human animation.
+
+        Sets the human animation to the given animation number and the initial pose to the animation pose * the initial
+        pose given by the init_pose_number.
+
+        Args:
+            animation_number (int): The number of the animation to set.
+            init_pose_number (int): The number of the initial pose to set.
+        """
+        assert animation_number < len(self._animations) and animation_number >= 0
+        animation, animation_info = self._animations[animation_number]
+        if self._animation_initializations is not None:
+            assert init_pose_number < len(self._animation_initializations) and init_pose_number >= 0
+            animation_info = animation_info.copy()
+            position_offset = self._animation_initializations[init_pose_number]["position_offset"]
+            orientation_aa = self._animation_initializations[init_pose_number]["orientation_aa"]
+            for i in range(3):
+                position_offset[i] += np.random.normal(loc=0.0, scale=self._initialization_randomization["pos_std"][i])
+            for i in range(3):
+                orientation_aa[i] += np.random.normal(loc=0.0, scale=self._initialization_randomization["ori_std"][i])
+            rot = Rotation.from_rotvec(orientation_aa)
+            animation_rot = Rotation.from_quat(animation_info["orientation_quat"])
+            animation_info["position_offset"] = [
+                animation_info["position_offset"][i] + position_offset[i] for i in range(3)
+            ]
+            animation_info["orientation_quat"] = (rot * animation_rot).as_quat()
+
+        self.human.set_animation(animation, animation_info, self._animation_freq)
 
     def get_primitive_info(
         self,

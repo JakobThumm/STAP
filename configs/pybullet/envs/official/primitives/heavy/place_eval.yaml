@@ -115,6 +115,7 @@ env_kwargs:
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
   animation_type: HumanRobotHandover
   animation_frequency: 100
+  animation_initializations: configs/pybullet/envs/humans/animation_initializations.yaml
   visualize_shield: false
 
   object_groups:
