@@ -21,7 +21,7 @@ env_kwargs:
 
   robot_config: configs/pybullet/envs/robots/safe_franka_research3_real.yaml
   object_tracker_config: configs/pybullet/envs/perception/object_tracker_ros.yaml
-  human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
+  human_config: configs/pybullet/envs/humans/ASL_lab_human.yaml
   animation_type: HumanRobotHandover
   animation_frequency: 100
   animation_initializations: configs/pybullet/envs/humans/animation_initializations.yaml

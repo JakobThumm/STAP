@@ -24,10 +24,9 @@ def main(env_config: str, seed: Optional[int] = None) -> None:
             env.set_primitive(primitive=action_skeleton[step])
             primitive = env.get_primitive()
             assert isinstance(primitive, pybullet.table.primitives.Primitive)
-            print(f"Execute primitive: {primitive}")
-
             # Sample action and step environment
             action = primitive.sample_action()
+            print(f"Execute primitive {primitive} with action {action}")
             # if isinstance(primitive, pybullet.table.primitives.StaticHandover):
             #     action.pitch = -2.0
             #     action.distance = 0.6

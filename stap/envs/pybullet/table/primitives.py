@@ -280,7 +280,7 @@ class Pick(Primitive):
             q, _ = robot.arm.get_joint_state(robot.arm.joints)
             print(f"EE pose: {robot.arm.ee_pose()}, joint positions: {q}")
 
-            if not robot.grasp_object(obj):
+            if not robot.grasp_object(obj, timeout=3.0):
                 raise ControlException(f"Robot.grasp_object({obj}) failed")
 
             robot.goto_pose(pre_pos, command_quat, positional_precision=0.02, orientational_precision=0.05)
@@ -317,8 +317,8 @@ class Pick(Primitive):
             action_range = self.Action.range()
             random_x = np.random.uniform(low=-screwdriver.head_length, high=screwdriver.handle_length)
             # random_x = np.random.uniform(low=0.0, high=screwdriver.handle_length)
-            if random_x > 0.02:
-                pos = np.array([random_x, 0, 0.01])
+            if random_x > 0.01:
+                pos = np.array([random_x, 0, -0.005])
             else:
                 pos = np.array([random_x, 0, 0.00])
             theta = 0.0

@@ -1,0 +1,43 @@
+name: "AverageMale"
+color: [0.706, 0.541, 0.471, 1.0]
+
+joint_names:
+ - "torso"
+ - "clav"
+ - "head"
+ - "left_shoulder"
+ - "right_shoulder"
+ - "right_hand"
+ - "left_hand"
+
+body_names:
+  - "head"
+  - "torso"
+  - "left_arm"
+  - "left_hand"
+  - "right_arm"
+  - "right_hand"
+
+body_measurement_ids:
+  head: [1, 2]
+  torso: [0, 1]
+  left_arm: [3, 6]
+  left_hand: [6, 6]
+  right_arm: [4, 5]
+  right_hand: [4, 5]
+
+body_radii:
+  head: 0.1
+  torso: 0.17
+  left_arm: 0.047
+  left_hand: 0.1
+  right_arm: 0.047
+  right_hand: 0.1
+
+body_lengths:
+  head: 0.1
+  torso: 0.35
+  left_arm: 0.6
+  left_hand: 0.0
+  right_arm: 0.6
+  right_hand: 0.0

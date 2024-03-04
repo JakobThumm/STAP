@@ -758,8 +758,8 @@ class TableEnv(PybulletEnv):
             if self.object_tracker is not None and self.real_world:
                 # Track objects from the real world.
                 objects = self.object_tracker.update_poses()
-                for object in objects:
-                    print(f"Object {object.name} is at {object.pose()}")
+                # for object in objects:
+                #     print(f"Object {object.name} is at {object.pose()}")
                 break
 
             # Reset variants and freeze objects so they don't get simulated.

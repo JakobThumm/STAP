@@ -53,12 +53,12 @@ class SafeArm(SafeArmSim):
         )
 
         self._shield_initialized = False
+        self._default_shield_mode = default_shield_mode
         super().__init__(create_shield_override=True, **kwargs)
         self._redisgl = None
         self._base_pos = base_pos
         self._base_orientation = base_orientation
         self._shield_type = default_shield_mode
-        self._default_shield_mode = default_shield_mode
         self._joint_pos_threshold = joint_pos_threshold
         self._shield_initialized = True
         self._visualization_initialized = False
