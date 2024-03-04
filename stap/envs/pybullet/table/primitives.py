@@ -306,9 +306,9 @@ class Pick(Primitive):
             random_x = np.random.uniform(low=-screwdriver.head_length, high=screwdriver.handle_length)
             # random_x = np.random.uniform(low=0.0, high=screwdriver.handle_length)
             if random_x > 0.02:
-                pos = np.array([random_x, 0, 0.02])
-            else:
                 pos = np.array([random_x, 0, 0.01])
+            else:
+                pos = np.array([random_x, 0, 0.00])
             theta = 0.0
         elif obj.isinstance(Box):
             pos = np.array([0.0, 0.0, obj.size[2] / 2.0])
@@ -316,7 +316,8 @@ class Pick(Primitive):
         else:
             pos = np.array([0.0, 0.0, 0.0])
             theta = 0.0
-        return primitive_actions.PickAction(pos=pos, theta=theta)
+        vector = np.concatenate([pos, [theta]])
+        return primitive_actions.PickAction(primitive_actions.PickAction.clip_action(vector))
 
 
 class Place(Primitive):
@@ -652,7 +653,7 @@ class StaticHandover(Primitive):
 
         assert isinstance(self.env, HumanTableEnv)
 
-        SUCCESS_DISTANCE = 0.4
+        SUCCESS_DISTANCE = 0.5
         SUCCESS_TIME = 1.0
         FIRST_MOVEMENT_TIMEOUT = 2.0
         WAIT_TIMEOUT = 15
