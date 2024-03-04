@@ -290,7 +290,9 @@ class Pick(Primitive):
             print("Pick.execute():\n", e)
             return ExecutionResult(success=False, truncated=True)
 
+        print("Wait until stable...")
         self.env.wait_until_stable()  # handle pick failures
+        print("Pick primitive finished.")
         return ExecutionResult(success=True, truncated=False)
 
     def sample_action(self) -> primitive_actions.PrimitiveAction:
@@ -315,12 +317,12 @@ class Pick(Primitive):
         elif obj.isinstance(Screwdriver):
             screwdriver: Screwdriver = obj  # type: ignore
             action_range = self.Action.range()
-            random_x = np.random.uniform(low=-screwdriver.head_length, high=screwdriver.handle_length)
+            random_x = np.random.uniform(low=-screwdriver.head_length + 0.02, high=screwdriver.handle_length)
             # random_x = np.random.uniform(low=0.0, high=screwdriver.handle_length)
             if random_x > 0.01:
-                pos = np.array([random_x, 0, -0.005])
+                pos = np.array([random_x, 0, 0.01])
             else:
-                pos = np.array([random_x, 0, 0.00])
+                pos = np.array([random_x, 0, 0.015])
             theta = 0.0
         elif obj.isinstance(Box):
             pos = np.array([0.0, 0.0, obj.size[2] / 2.0])
@@ -682,6 +684,7 @@ class StaticHandover(Primitive):
 
         obj, target = self.arg_objects
         objects = self.env.objects
+        end_effector = objects[0]
         robot = self.env.robot
         allow_collisions = self.ALLOW_COLLISIONS or real_world
         if not allow_collisions:
@@ -703,7 +706,7 @@ class StaticHandover(Primitive):
             )
             if not success:
                 raise ControlException("Moving to handover pose failed")
-            termination_fn = partial(self.termination_condition, obj, target, SUCCESS_DISTANCE, SUCCESS_TIME)
+            termination_fn = partial(self.termination_condition, end_effector, target, SUCCESS_DISTANCE, SUCCESS_TIME)
             print("Waiting for handover to be successful")
             robot.arm.set_shield_mode("OFF")
             success = robot.wait_for_termination(termination_fn=termination_fn, timeout=WAIT_TIMEOUT)

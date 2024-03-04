@@ -843,8 +843,8 @@ class TableEnv(PybulletEnv):
             if custom_recording_text is not None:
                 self._recording_text = custom_recording_text
 
-        if self.real_world:
-            input("Continue?")
+        # if self.real_world:
+        #     input("Continue?")
 
         self._recorder.add_frame(self.render, override_frequency=True)
         self._timelapse.add_frame(self.render)
