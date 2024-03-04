@@ -57,7 +57,7 @@ env_kwargs:
         - on(rack_box_4, rack)
         - ingripper(hook)
 
-  robot_config: configs/pybullet/envs/robots/safe_franka_panda_sim.yaml
+  robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
 
   object_groups:
     - name: boxes
@@ -79,7 +79,7 @@ env_kwargs:
     - object_type: Urdf
       object_kwargs:
         name: table
-        path: configs/pybullet/envs/assets/iprl_table.urdf
+        path: configs/pybullet/envs/assets/asl_table.urdf
         is_static: true
     - object_type: Rack
       object_kwargs:

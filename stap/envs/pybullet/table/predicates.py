@@ -594,7 +594,7 @@ class Ingripper(Predicate):
     # Gap required between control point and object bottom.
     FINGER_COLLISION_MARGIN = 0.02
     FINGER_WIDTH = 0.022
-    FINGER_HEIGHT = 0.04
+    FINGER_HEIGHT = -0.01
     FINGER_DISTANCE = 0.08
     THETA_STDDEV = 0.05
 
@@ -617,7 +617,7 @@ class Ingripper(Predicate):
             )
             # Transform grasp pose to object frame.
             obj_pose = math.Pose.from_eigen(grasp_pose.to_eigen().inverse())
-            rot_obj = Rotation.from_quat(obj_pose.quat) * rot
+            rot_obj = rot * Rotation.from_quat(obj_pose.quat)
             obj_pose.quat = Rotation.as_quat(rot_obj)
             obj_pos_offset = rot_obj.apply(obj_pose.pos)
             # Final pos is grasp pose in obj frame + eef pos in world frame.
@@ -707,13 +707,12 @@ class Ingripper(Predicate):
         min_xyz, max_xyz = np.array(screwdriver.bbox)
         theta = np.random.choice([0.0, np.pi, -np.pi])
         y_center = 0.5 * (min_xyz[1] + max_xyz[1])
-        min_xyz[0] = -screwdriver.handle_length
-        max_xyz[0] = screwdriver.head_length
+        min_xyz[0] = -screwdriver.head_length
+        max_xyz[0] = screwdriver.handle_length
         min_xyz[1] = 0.0
         max_xyz[1] = 0.0
-        min_xyz[2] -= 2 * screwdriver.head_radius
-        min_xyz[2] = max(min_xyz[2], -self.FINGER_HEIGHT)
-        max_xyz[2] -= 2 * screwdriver.head_radius
+        min_xyz[2] *= 0.5
+        max_xyz[2] *= 0.5
         xyz = np.random.uniform(min_xyz, max_xyz)
         x_rot = np.clip(np.random.normal(scale=X_ROT_STDDEV), -np.pi, np.pi)
         y_rot = np.clip(np.random.normal(scale=Y_ROT_STDDEV), -np.pi, np.pi)
