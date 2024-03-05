@@ -265,7 +265,7 @@ class Pick(Primitive):
 
             robot.arm.set_shield_mode("SSM")
 
-            robot.goto_pose(pre_pos, command_quat, positional_precision=0.01, orientational_precision=0.05)
+            robot.goto_pose(pre_pos, command_quat, positional_precision=0.02, orientational_precision=0.07)
             if not allow_collisions and did_non_args_move():
                 raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
 
@@ -320,9 +320,9 @@ class Pick(Primitive):
             random_x = np.random.uniform(low=-screwdriver.head_length + 0.02, high=screwdriver.handle_length)
             # random_x = np.random.uniform(low=0.0, high=screwdriver.handle_length)
             if random_x > 0.01:
-                pos = np.array([random_x, 0, 0.01])
+                pos = np.array([random_x, 0, 0.005])
             else:
-                pos = np.array([random_x, 0, 0.015])
+                pos = np.array([random_x, 0, 0.01])
             theta = 0.0
         elif obj.isinstance(Box):
             pos = np.array([0.0, 0.0, obj.size[2] / 2.0])
@@ -670,7 +670,7 @@ class StaticHandover(Primitive):
         assert isinstance(self.env, HumanTableEnv)
 
         SUCCESS_DISTANCE = 0.5
-        SUCCESS_TIME = 1.0
+        SUCCESS_TIME = 0.3
         FIRST_MOVEMENT_TIMEOUT = 10.0
         WAIT_TIMEOUT = 10.0
         ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
@@ -684,7 +684,6 @@ class StaticHandover(Primitive):
 
         obj, target = self.arg_objects
         objects = self.env.objects
-        end_effector = objects[0]
         robot = self.env.robot
         allow_collisions = self.ALLOW_COLLISIONS or real_world
         if not allow_collisions:
@@ -706,7 +705,7 @@ class StaticHandover(Primitive):
             )
             if not success:
                 raise ControlException("Moving to handover pose failed")
-            termination_fn = partial(self.termination_condition, end_effector, target, SUCCESS_DISTANCE, SUCCESS_TIME)
+            termination_fn = partial(self.termination_condition_eef, target, SUCCESS_DISTANCE, SUCCESS_TIME)
             print("Waiting for handover to be successful")
             robot.arm.set_shield_mode("OFF")
             success = robot.wait_for_termination(termination_fn=termination_fn, timeout=WAIT_TIMEOUT)
@@ -766,6 +765,22 @@ class StaticHandover(Primitive):
         """Checks if the human hand is within reach of the object for at least `success_time` seconds."""
         target_pos = target.pose().pos
         obj_pos = object.pose().pos
+        # print("Target pos: ", target_pos, " object pos: ", obj_pos)
+        if np.linalg.norm(target_pos - obj_pos) < success_distance:
+            self.success_counter += 1
+        else:
+            self.success_counter = 0
+        if self.success_counter * SIMULATION_TIME_STEP >= success_time:
+            return True
+        else:
+            return False
+
+    def termination_condition_eef(
+        self, target: Object, success_distance: float = 0.1, success_time: float = 0.5
+    ) -> bool:
+        """Checks if the human hand is within reach of the object for at least `success_time` seconds."""
+        target_pos = target.pose().pos
+        obj_pos = self.env.robot.arm.ee_pose().pos
         # print("Target pos: ", target_pos, " object pos: ", obj_pos)
         if np.linalg.norm(target_pos - obj_pos) < success_distance:
             self.success_counter += 1

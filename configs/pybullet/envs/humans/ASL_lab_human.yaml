@@ -24,7 +24,7 @@ body_measurement_ids:
   left_arm: [3, 6]
   left_hand: [6, 6]
   right_arm: [4, 5]
-  right_hand: [4, 5]
+  right_hand: [5, 5]
 
 body_radii:
   head: 0.1

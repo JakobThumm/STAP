@@ -338,7 +338,7 @@ class Arm(articulated_body.ArticulatedBody):
         ignore_last_half_rotation: bool = True,
         positional_precision: Optional[float] = 1e-3,
         orientational_precision: Optional[float] = None,
-        max_iter: int = 5,
+        max_iter: int = 10,
         prior: Optional[np.ndarray] = None,
     ) -> Tuple[np.ndarray, bool]:
         """Computes a suitable joint configuration to achieve the given end-effector pose.

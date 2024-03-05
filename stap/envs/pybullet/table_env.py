@@ -932,6 +932,8 @@ class TableEnv(PybulletEnv):
     def wait_until_stable(self, min_iters: int = 0, max_iters: int = 3 * SIMULATION_FREQUENCY) -> int:
         assert min_iters <= max_iters
         IS_MOVING_KEY = "TableEnv.wait_until_stable"
+        if isinstance(self.robot.arm, real.arm.Arm) or isinstance(self.robot.arm, real.safe_arm.SafeArm):
+            return 1
 
         def is_any_object_moving() -> bool:
             return any(
