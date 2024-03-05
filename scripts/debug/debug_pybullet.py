@@ -62,6 +62,10 @@ def main(env_config: str, seed: Optional[int] = None) -> None:
             while not success:
                 # Sample action and step environment
                 action = primitive.sample_action()
+                if isinstance(primitive, pybullet.table.primitives.StaticHandover):
+                    action.pitch = 0.0
+                    action.distance = 0.6
+                    action.height = 0.3
                 print(f"Execute primitive {primitive} with action {action}")
                 if ask_for_permission:
                     input("Press Enter to continue...")
