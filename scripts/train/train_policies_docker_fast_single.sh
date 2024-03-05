@@ -89,6 +89,22 @@ user=${1:-user}
 gpu=${2:-cpu}
 PRIMITIVE=${3:-pick}
 
+if [ "$PRIMITIVE" = "pick" ]
+then
+    TRAIN_SEEDS=($(seq 0 15))
+    VALIDATION_SEEDS=($(seq 16 19))
+elif [ "$PRIMITIVE" = "place" ]
+then
+    TRAIN_SEEDS=($(seq 20 35))
+    VALIDATION_SEEDS=($(seq 36 39))
+elif [ "$PRIMITIVE" = "static_handover" ]
+then
+    TRAIN_SEEDS=($(seq 40 55))
+    VALIDATION_SEEDS=($(seq 56 59))
+else
+    echo "Primitive unknown. Please choose pick or place"
+fi
+
 ENV_KWARGS="--gui 0"
 if [ "$user" = "root" ]
     then
@@ -110,8 +126,6 @@ POLICY_OUTPUT_PATH="${output_path}/${exp_name}"
 EVAL_RECORDING_PATH="${plots_path}/${exp_name}"
 
 SYMBOLIC_ACTION_TYPE="valid"
-TRAIN_SEEDS=($(seq 0 15))
-VALIDATION_SEEDS=($(seq 16 19))
 DATA_CHECKPOINT_PATH="${input_path}/datasets"
 
 AGENT_CONFIG="${STAP_PATH}/configs/pybullet/agents/multi_stage/policy/sac_policy.yaml"
