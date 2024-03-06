@@ -343,10 +343,8 @@ class Arm(articulated_body.ArticulatedBody):
         else:
             rot = Rotation.from_quat([0.0, 0.0, 0.0, 1.0])
         desired_ee_pos = pos + rot.apply(self.ee_offset)
-        if isinstance(quat, eigen.Quaterniond):
-            quat = np.array([quat.w, quat.z, -quat.y, -quat.x])
-        elif isinstance(quat, np.ndarray):
-            quat = np.array([quat[3], -quat[2], -quat[1], -quat[0]])
+        rot_world_to_ee = Rotation.from_quat([1.0, 0.0, 0.0, 0.0])
+        quat = (rot * rot_world_to_ee).as_quat()
         desired_q_pos, close_enough = self.accurate_calculate_inverse_kinematics(
             target_pos=desired_ee_pos,
             target_quat=quat,
