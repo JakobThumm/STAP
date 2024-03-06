@@ -319,7 +319,7 @@ class Arm(articulated_body.ArticulatedBody):
         ignore_last_half_rotation: bool = True,
         positional_precision: Optional[float] = 1e-3,
         orientational_precision: Optional[float] = None,
-        max_iter: int = 5,
+        max_iter: int = 7,
         prior: Optional[np.ndarray] = None,
     ) -> Tuple[np.ndarray, bool]:
         """Computes a suitable joint configuration to achieve the given end-effector pose.
@@ -354,6 +354,18 @@ class Arm(articulated_body.ArticulatedBody):
             prior=prior,
             ignore_last_half_rotation=ignore_last_half_rotation,
         )
+        if not close_enough and ignore_last_half_rotation and quat is not None:
+            # Try the other half rotation.
+            other_target_quat = (rot * Rotation.from_euler("XYZ", [0, 0, np.pi]) * rot_world_to_ee).as_quat()
+            desired_q_pos, close_enough = self.accurate_calculate_inverse_kinematics(
+                target_pos=desired_ee_pos,
+                target_quat=other_target_quat,
+                positional_precision=positional_precision,
+                orientational_precision=orientational_precision,
+                max_iter=max_iter,
+                prior=prior,
+                ignore_last_half_rotation=ignore_last_half_rotation,
+            )
         if not close_enough:
             return desired_q_pos, False
         return desired_q_pos, self.check_joint_limits(desired_q_pos, ignore_last_half_rotation)
