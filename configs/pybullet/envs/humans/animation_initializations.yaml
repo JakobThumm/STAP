@@ -1,0 +1,19 @@
+initializations:
+  - position_offset: [0.0, 0.2, 0.0]
+    orientation_aa: [0.0, 0.0, 3.141]
+  - position_offset: [0.4, 0.4, 0.0]
+    orientation_aa: [0.0, 0.0, 2.0]
+  - position_offset: [0.2, 0.4, 0.0]
+    orientation_aa: [0.0, 0.0, 2.5]
+  - position_offset: [0.1, 0.2, 0.0]
+    orientation_aa: [0.0, 0.0, 2.8]
+  - position_offset: [0.5, 0.8, 0.0]
+    orientation_aa: [0.0, 0.0, 1.7]
+  - position_offset: [-0.1, 0.2, 0.0]
+    orientation_aa: [0.0, 0.0, -2.9]
+  - position_offset: [-0.3, 0.2, 0.0]
+    orientation_aa: [0.0, 0.0, -2.4]
+
+randomization:
+  pos_std: [0.03, 0.03, 0.03]
+  ori_std: [0.01, 0.01, 0.05]

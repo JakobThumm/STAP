@@ -30,12 +30,17 @@ class PrimitiveAction:
         r = cls.range()
         return cls(np.random.uniform(r[0], r[1]).astype(np.float32))
 
+    @classmethod
+    def clip_action(cls, action: np.ndarray) -> np.ndarray:
+        r = cls.range()
+        return np.clip(action, r[0], r[1])
+
 
 class PickAction(PrimitiveAction):
     RANGES = {
         "x": (-0.2, 0.2),
         "y": (-0.1, 0.1),
-        "z": (-0.05, 0.05),
+        "z": (-0.07, 0.07),
         "theta": (-0.25 * np.pi, 0.75 * np.pi),
     }
 
