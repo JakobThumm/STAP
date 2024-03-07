@@ -81,7 +81,7 @@ gripper_kwargs:
   base_link: fr3_hand
 
   command_multipliers:
-    [-0.02, -0.02]
+    [-0.000001, -0.000001]
 
   finger_contact_normals:
     - [0.0, -1.0, 0.0]  # left_inner_finger_pad_collision
