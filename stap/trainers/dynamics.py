@@ -1,5 +1,5 @@
 import pathlib
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Type, Union, Generator
+from typing import Any, Dict, Generator, List, Mapping, Optional, Sequence, Type, Union
 
 import numpy as np
 import torch
@@ -8,11 +8,11 @@ import tqdm
 from stap import agents, datasets, dynamics, processors
 from stap.schedulers import DummyScheduler
 from stap.trainers.agents import AgentTrainer
-from stap.trainers.policy import PolicyTrainer
 from stap.trainers.base import Trainer
+from stap.trainers.policy import PolicyTrainer
 from stap.trainers.utils import TrainerFactory
 from stap.utils import configs, tensors
-from stap.utils.typing import WrappedBatch, DynamicsBatch, Scalar
+from stap.utils.typing import DynamicsBatch, Scalar, WrappedBatch
 
 
 class DynamicsTrainer(Trainer[dynamics.LatentDynamics, DynamicsBatch, WrappedBatch]):
@@ -26,15 +26,11 @@ class DynamicsTrainer(Trainer[dynamics.LatentDynamics, DynamicsBatch, WrappedBat
         dataset_kwargs: Dict[str, Any],
         skip_truncated: bool = True,
         skip_failed: bool = True,
-        processor_class: Union[
-            str, Type[processors.Processor]
-        ] = processors.IdentityProcessor,
+        processor_class: Union[str, Type[processors.Processor]] = processors.IdentityProcessor,
         processor_kwargs: Dict[str, Any] = {},
         optimizer_class: Union[str, Type[torch.optim.Optimizer]] = torch.optim.Adam,
         optimizer_kwargs: Dict[str, Any] = {"lr": 1e-3},
-        scheduler_class: Union[
-            str, Type[torch.optim.lr_scheduler._LRScheduler]
-        ] = DummyScheduler,
+        scheduler_class: Union[str, Type[torch.optim.lr_scheduler._LRScheduler]] = DummyScheduler,
         scheduler_kwargs: Dict[str, Any] = {},
         checkpoint: Optional[Union[str, pathlib.Path]] = None,
         policy_checkpoints: Optional[Sequence[Union[str, pathlib.Path]]] = None,
@@ -48,7 +44,7 @@ class DynamicsTrainer(Trainer[dynamics.LatentDynamics, DynamicsBatch, WrappedBat
         checkpoint_freq: int = 10000,
         log_freq: int = 100,
         profile_freq: Optional[int] = None,
-        eval_metric: str = "l2_loss",
+        eval_metric: str = "loss",
         num_data_workers: int = 0,
         name: Optional[str] = None,
     ):
@@ -93,9 +89,7 @@ class DynamicsTrainer(Trainer[dynamics.LatentDynamics, DynamicsBatch, WrappedBat
         # Get agent trainers.
         if agent_trainers is None:
             if policy_checkpoints is None:
-                raise ValueError(
-                    "One of agent_trainers or policy_checkpoints must be specified"
-                )
+                raise ValueError("One of agent_trainers or policy_checkpoints must be specified")
             if policies is not None:
                 maybe_policies: Sequence[Optional[agents.RLAgent]] = policies
             else:
@@ -104,10 +98,7 @@ class DynamicsTrainer(Trainer[dynamics.LatentDynamics, DynamicsBatch, WrappedBat
             for policy, policy_checkpoint in zip(maybe_policies, policy_checkpoints):
                 policy_checkpoint = pathlib.Path(policy_checkpoint)
                 if policy_checkpoint.is_file():
-                    trainer_checkpoint = (
-                        policy_checkpoint.parent
-                        / policy_checkpoint.name.replace("model", "trainer")
-                    )
+                    trainer_checkpoint = policy_checkpoint.parent / policy_checkpoint.name.replace("model", "trainer")
                 else:
                     trainer_checkpoint = policy_checkpoint / "final_trainer.pt"
                 agent_trainer_factory = TrainerFactory(
@@ -130,18 +121,12 @@ class DynamicsTrainer(Trainer[dynamics.LatentDynamics, DynamicsBatch, WrappedBat
                     ),
                 )
                 if not isinstance(agent_trainer, (AgentTrainer, PolicyTrainer)):
-                    raise ValueError(
-                        "Trainer checkpoint must be AgentTrainer or PolicyTrainer."
-                    )
+                    raise ValueError("Trainer checkpoint must be AgentTrainer or PolicyTrainer.")
                 agent_trainers.append(agent_trainer)
 
         dataset_class = configs.get_class(dataset_class, datasets)
-        dataset = dataset_class(
-            [trainer.dataset for trainer in agent_trainers], **dataset_kwargs
-        )
-        eval_dataset = dataset_class(
-            [trainer.eval_dataset for trainer in agent_trainers], **dataset_kwargs
-        )
+        dataset = dataset_class([trainer.dataset for trainer in agent_trainers], **dataset_kwargs)
+        eval_dataset = dataset_class([trainer.eval_dataset for trainer in agent_trainers], **dataset_kwargs)
 
         processor_class = configs.get_class(processor_class, processors)
         processor = processor_class(
@@ -153,10 +138,7 @@ class DynamicsTrainer(Trainer[dynamics.LatentDynamics, DynamicsBatch, WrappedBat
         optimizers = dynamics.create_optimizers(optimizer_class, optimizer_kwargs)
 
         scheduler_class = configs.get_class(scheduler_class, torch.optim.lr_scheduler)
-        schedulers = {
-            key: scheduler_class(optimizer, **scheduler_kwargs)
-            for key, optimizer in optimizers.items()
-        }
+        schedulers = {key: scheduler_class(optimizer, **scheduler_kwargs) for key, optimizer in optimizers.items()}
 
         super().__init__(
             path=path,
@@ -179,9 +161,7 @@ class DynamicsTrainer(Trainer[dynamics.LatentDynamics, DynamicsBatch, WrappedBat
             num_data_workers=num_data_workers,
         )
 
-        self._eval_dataloader = self.create_dataloader(
-            self.eval_dataset, self.num_data_workers
-        )
+        self._eval_dataloader = self.create_dataloader(self.eval_dataset, self.num_data_workers)
         self._eval_batches = iter(self.eval_dataloader)
 
     @property

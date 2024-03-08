@@ -7,6 +7,11 @@ import torch
 
 from stap import agents, networks
 from stap.dynamics.base import Dynamics
+from stap.dynamics.utils import (
+    batch_rotations_6D_squashed_to_matrix,
+    batch_rotations_6D_to_matrix,
+    geodesic_loss,
+)
 from stap.utils import configs
 from stap.utils.typing import DynamicsBatch, Model, Scalar
 
@@ -23,6 +28,10 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
         action_space: Optional[gym.spaces.Box] = None,
         checkpoint: Optional[Union[str, pathlib.Path]] = None,
         device: str = "auto",
+        has_6D_rot_state: bool = True,
+        rot_pos_in_state: int = 3,
+        use_geodesic_loss: bool = True,
+        geodesic_loss_factor: float = 0.01,
     ):
         """Initializes the dynamics model network, dataset, and optimizer.
 
@@ -34,9 +43,17 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
             action_space: Optional action space.
             checkpoint: Dynamics checkpoint.
             device: Torch device.
+            has_6D_rot_state: Whether the state space includes 6D rotation or the 3D axis-angle representation.
+            rot_pos_in_state: Position of the first entry of the rotation in the state space.
+            use_geodesic_loss: Whether to use the geodesic loss for the rotation.
+            geodesic_loss_factor: Factor to multiply the geodesic loss by.
         """
         network_class = configs.get_class(network_class, networks)
         self._network = network_class(**network_kwargs)
+        self._has_6D_rot_state = has_6D_rot_state
+        self._rot_pos_in_state = rot_pos_in_state
+        self._use_geodesic_loss = use_geodesic_loss
+        self._geodesic_loss_factor = geodesic_loss_factor
 
         super().__init__(
             policies=policies,
@@ -53,9 +70,7 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
         """Dynamics model network."""
         return self._network
 
-    def load_state_dict(
-        self, state_dict: Dict[str, OrderedDict[str, torch.Tensor]], strict: bool = True
-    ):
+    def load_state_dict(self, state_dict: Dict[str, OrderedDict[str, torch.Tensor]], strict: bool = True):
         """Loads the dynamics state dict.
 
         Args:
@@ -85,9 +100,7 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
         Returns:
             Dict of optimizers.
         """
-        optimizers = {
-            "dynamics": optimizer_class(self.network.parameters(), **optimizer_kwargs)
-        }
+        optimizers = {"dynamics": optimizer_class(self.network.parameters(), **optimizer_kwargs)}
         return optimizers
 
     def to(self, device: Union[str, torch.device]) -> "LatentDynamics":
@@ -130,6 +143,41 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
         dz = self.network(state, idx_policy, action)
         return state + dz
 
+    def get_mse_and_geodesic_loss_entries(self, H: int, W: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Computes the position of the entries that are to be used for the MSE and the geodesic loss.
+
+        The original batch has the following shape: [B, H, W].
+        That is converted in the encoder to a latent state with shape: [B, Z], where Z = H * W, Z = [W_1, ..., W_H].
+        The Geodesic loss is computed only for the rotation part of the latent state.
+        The rotation is located in W at positions:
+            [rot_pos_in_state : rot_pos_in_state + 3], if has_6D_rot_state = False
+            [rot_pos_in_state : rot_pos_in_state + 6], if has_6D_rot_state = True
+        The MSE loss is located in W at positions [0, rot_pos_in_state] + :
+            [rot_pos_in_state + 3 :], if has_6D_rot_state = False
+            [rot_pos_in_state + 6 :], if has_6D_rot_state = True
+
+        Args:
+            H: Height of the latent state.
+            W: Width of the latent state.
+        Returns:
+            Indices for the MSE loss and the geodesic loss in latent space (Z).
+        """
+
+        # Calculating the index range for rotation in latent state
+        rot_end = self._rot_pos_in_state + 6 if self._has_6D_rot_state else self._rot_pos_in_state + 3
+        base_mse_indices = torch.cat((torch.arange(0, self._rot_pos_in_state), torch.arange(rot_end, W)))
+        base_geodesic_indices = torch.arange(self._rot_pos_in_state, rot_end)
+
+        # Repeat indices for each "layer" in H
+        mse_indices = torch.cat([base_mse_indices + i * W for i in range(H)]).long()
+        geodesic_indices = torch.cat([base_geodesic_indices + i * W for i in range(H)]).long()
+
+        return mse_indices, geodesic_indices
+
+    def _unnormalize_state(self, state: torch.Tensor) -> torch.Tensor:
+        # Unflatten state if planning.
+        raise NotImplementedError("This function has to be implemented in a parent class.")
+
     def compute_loss(
         self,
         observation: torch.Tensor,
@@ -151,34 +199,54 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
             L2 loss.
         """
         # Predict next latent state.
-        # [B, 3, H, W], [B] => [B, Z].
+        # [B, H, W], [B] => [B, Z].
         latent = self.encode(observation, idx_policy, policy_args)
 
         # [B, Z], [B], [B, A] => [B, Z].
         next_latent_pred = self.forward(latent, action, idx_policy, policy_args)
 
         # Encode next latent state.
-        # [B, 3, H, W], [B] => [B, Z].
+        # [B, H, W], [B] => [B, Z].
         next_latent = self.encode(next_observation, idx_policy, policy_args)
 
         # Compute L2 loss.
         # [B, Z], [B, Z] => [1].
-        l2_loss = torch.nn.functional.mse_loss(next_latent_pred, next_latent)
+        # Get the indices of the rotation and everything else.
+        if self._use_geodesic_loss:
+            mse_indices, geodesic_indices = self.get_mse_and_geodesic_loss_entries(
+                observation.shape[1], observation.shape[2]
+            )
+            # MSE Loss
+            mse_loss = torch.nn.functional.mse_loss(next_latent_pred[:, mse_indices], next_latent[:, mse_indices])
+            if self._has_6D_rot_state:
+                next_obs_predicted = self._unnormalize_state(next_latent_pred)
+                predicted_R = batch_rotations_6D_squashed_to_matrix(
+                    next_obs_predicted[:, geodesic_indices], observation.shape[1]
+                )
+                true_R = batch_rotations_6D_to_matrix(next_observation[:, :, 3:9])
+            else:
+                raise NotImplementedError("Only 6D rotations are supported.")
+            rotational_losses = geodesic_loss(predicted_R, true_R)
+            rotational_loss = rotational_losses.mean()
+            total_loss = mse_loss + self._geodesic_loss_factor * rotational_loss
+        else:
+            mse_loss = torch.nn.functional.mse_loss(next_latent_pred, next_latent)
+            rotational_loss = torch.tensor(0.0)
+            total_loss = mse_loss
 
         metrics: Dict[str, Union[Scalar, np.ndarray]] = {
-            "l2_loss": l2_loss.item(),
+            "mse_loss": mse_loss.item(),
+            "rotational_loss": rotational_loss.item(),
+            "loss": total_loss.item(),
         }
 
+        """This is only for computing metrics on the individual policies. It is not used for training.
         # Compute per-policy L2 losses.
         # [B, Z], [B, Z] => [B].
-        l2_losses = torch.nn.functional.mse_loss(
-            next_latent_pred, next_latent, reduction="none"
-        ).mean(dim=-1)
+        l2_losses = torch.nn.functional.mse_loss(next_latent_pred, next_latent, reduction="none").mean(dim=-1)
 
         # [B], [P] => [B, P].
-        idx_policies = idx_policy.unsqueeze(-1) == torch.arange(
-            len(self.policies), device=self.device
-        )
+        idx_policies = idx_policy.unsqueeze(-1) == torch.arange(len(self.policies), device=self.device)
 
         # [B] => [B, P].
         l2_losses = l2_losses.unsqueeze(-1).tile((len(self.policies),))
@@ -188,16 +256,12 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
 
         # [B, P], [B, P] => [P].
         batch_dims = list(range(len(l2_losses.shape) - 1))
-        policy_l2_losses = policy_l2_losses.sum(dim=batch_dims) / idx_policies.sum(
-            dim=batch_dims
-        )
+        policy_l2_losses = policy_l2_losses.sum(dim=batch_dims) / idx_policies.sum(dim=batch_dims)
 
-        for i_policy, policy_l2_loss in enumerate(
-            policy_l2_losses.detach().cpu().numpy()
-        ):
+        for i_policy, policy_l2_loss in enumerate(policy_l2_losses.detach().cpu().numpy()):
             metrics[f"l2_loss_policy_{i_policy}"] = policy_l2_loss
-
-        return l2_loss, metrics
+        """
+        return total_loss, metrics
 
     def train_step(
         self,
