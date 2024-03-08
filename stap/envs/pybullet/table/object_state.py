@@ -54,6 +54,8 @@ class ObjectState:
     def __init__(self, vector: Optional[np.ndarray] = None):
         if vector is None:
             vector = np.zeros(len(self.RANGES), dtype=np.float32)
+            vector[3] = 1.0
+            vector[7] = 1.0
         elif vector.shape[-1] != len(self.RANGES):
             vector = vector.reshape(
                 (

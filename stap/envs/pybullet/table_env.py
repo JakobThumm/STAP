@@ -551,7 +551,9 @@ class TableEnv(PybulletEnv):
             raise NotImplementedError
 
         obj_states = self.object_states()
-        observation = np.zeros(self.observation_space.shape, dtype=self.observation_space.dtype)
+        default_state = object_state.ObjectState().vector
+        observation = np.repeat(default_state[np.newaxis, :], self.MAX_NUM_OBJECTS, axis=0)
+        assert observation.shape == self.observation_space.shape
         arg_object_names = [obj.name for obj in self.get_primitive().arg_objects]
         arg_object_length = len(arg_object_names)
         counter = 0

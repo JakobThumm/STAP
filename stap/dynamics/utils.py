@@ -241,6 +241,8 @@ def geodesic_loss(R1: torch.Tensor, R2: torch.Tensor) -> torch.Tensor:
     # Compute the geodesic loss using the provided formula
     # Ensuring the value passed to arccos is within its domain
     # Ensure loss doesn't go to infinity.
-    loss = torch.acos(((trace - 1) / 2).clamp(-0.98, 0.98))
+    t = (trace - 1) / 2
+    t_clamp = t + (torch.clamp(t, -0.98, 0.98) - t).detach()
+    loss = torch.acos(t_clamp)
 
     return loss
