@@ -13,7 +13,7 @@ from stap.envs.base import Primitive
 from stap.envs.pybullet.table import object_state
 from stap.utils.transformation_utils import (
     matrix_to_axis_angle,
-    rotate_vector_by_axis_angle,
+    rotate_vector_by_rotation_matrix,
 )
 
 
@@ -53,7 +53,9 @@ def get_object_orientation(observation: torch.Tensor, id: int) -> torch.Tensor:
     idxR12 = list(object_state.ObjectState.RANGES.keys()).index("R12")
     idxR22 = list(object_state.ObjectState.RANGES.keys()).index("R22")
     idxR32 = list(object_state.ObjectState.RANGES.keys()).index("R32")
-    rotations = batch_rotations_6D_to_matrix(observation[:, [id], [idxR11, idxR21, idxR31, idxR12, idxR22, idxR32]])
+    rotations = batch_rotations_6D_to_matrix(
+        observation[:, id : id + 1, [idxR11, idxR21, idxR31, idxR12, idxR22, idxR32]]
+    )
     return rotations[:, 0, :, :]
 
 
@@ -250,11 +252,11 @@ def HandoverOrientationFn(
     idx_hand = arg_object_ids[1]
     object_position = get_object_position(next_state, idx_obj)
     hand_position = get_object_position(state, idx_hand)
-    object_orientation = get_object_orientation(next_state, idx_obj)
+    R_obj = get_object_orientation(next_state, idx_obj)
     # The head of the screwdriver points in negative x-direction in the object frame.
-    x_axis = torch.zeros_like(object_orientation, device=object_orientation.device)
+    x_axis = torch.zeros([R_obj.shape[0], 3], device=R_obj.device)
     x_axis[..., 0] = -1.0
-    new_direction_vector = rotate_vector_by_axis_angle(x_axis, object_orientation)
+    new_direction_vector = rotate_vector_by_rotation_matrix(x_axis, R_obj)
     # Hand direction before the handover
     hand_direction = hand_position - object_position
     hand_direction = hand_direction / torch.norm(hand_direction, dim=1, keepdim=True)
