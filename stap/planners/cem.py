@@ -188,6 +188,8 @@ class CEMPlanner(planners.Planner):
             # Initialize distribution.
             mean, std = self._compute_initial_distribution(t_observation, action_skeleton)
             elites = mean[None, ...]
+            # Set the action to all zero for now.
+            elites = torch.zeros_like(elites)
             elites_scores = torch.ones((1), dtype=torch.float32, device=self.device)
             # from stap.planners.debug import debug_value_fn
             # debug_value_fn(
