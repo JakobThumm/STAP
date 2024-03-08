@@ -8,10 +8,10 @@ from typing import Optional, Tuple
 
 import torch
 
+from stap.dynamics.utils import batch_rotations_6D_to_matrix
 from stap.envs.base import Primitive
 from stap.envs.pybullet.table import object_state
 from stap.utils.transformation_utils import (
-    axis_angle_to_matrix,
     matrix_to_axis_angle,
     rotate_vector_by_axis_angle,
 )
@@ -38,11 +38,7 @@ def get_object_position(observation: torch.Tensor, id: int) -> torch.Tensor:
 
 
 def get_object_orientation(observation: torch.Tensor, id: int) -> torch.Tensor:
-    r"""Returns the orientation of the object in axis-angle representation.
-
-    The returned orientation is in axis-angle representation, where:
-        - angle = ||w||_2
-        - axis = w / angle
+    r"""Returns the orientation of the object as a Rotation matrix.
 
     Args:
         observation [batch_size, state_dim]: Current state.
@@ -51,14 +47,14 @@ def get_object_orientation(observation: torch.Tensor, id: int) -> torch.Tensor:
     Returns:
         Orientation of the object [batch_size, 3].
     """
-    idxwx = list(object_state.ObjectState.RANGES.keys()).index("wx")
-    idxwy = list(object_state.ObjectState.RANGES.keys()).index("wy")
-    idxwz = list(object_state.ObjectState.RANGES.keys()).index("wz")
-    object_orientation = torch.zeros([observation.shape[0], 3], device=observation.device)
-    object_orientation[:, 0] = observation[:, id, idxwx]
-    object_orientation[:, 1] = observation[:, id, idxwy]
-    object_orientation[:, 2] = observation[:, id, idxwz]
-    return object_orientation
+    idxR11 = list(object_state.ObjectState.RANGES.keys()).index("R11")
+    idxR21 = list(object_state.ObjectState.RANGES.keys()).index("R21")
+    idxR31 = list(object_state.ObjectState.RANGES.keys()).index("R31")
+    idxR12 = list(object_state.ObjectState.RANGES.keys()).index("R12")
+    idxR22 = list(object_state.ObjectState.RANGES.keys()).index("R22")
+    idxR32 = list(object_state.ObjectState.RANGES.keys()).index("R32")
+    rotations = batch_rotations_6D_to_matrix(observation[:, [id], [idxR11, idxR21, idxR31, idxR12, idxR22, idxR32]])
+    return rotations[:, 0, :, :]
 
 
 def get_object_head_length(observation: torch.Tensor, id: int) -> torch.Tensor:
@@ -121,12 +117,9 @@ def get_eef_pose_in_object_frame(
         End-effector orientation in the object frame [batch_size, 3].
     """
     object_position = get_object_position(observation, obj_id)
-    object_orientation = get_object_orientation(observation, obj_id)
+    R_object = get_object_orientation(observation, obj_id)
     eef_position = get_object_position(observation, eef_id)
-    eef_orientation = get_object_orientation(observation, eef_id)
-    # Convert orientations to rotation matrices
-    R_object = axis_angle_to_matrix(object_orientation)
-    R_eef = axis_angle_to_matrix(eef_orientation)
+    R_eef = get_object_orientation(observation, eef_id)
 
     # Compute the inverse of the object's rotation matrix
     R_object_inv = R_object.transpose(-2, -1)
