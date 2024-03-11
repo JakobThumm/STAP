@@ -103,14 +103,16 @@ class SAC(rl.RLAgent):
             action_space = env.action_space
         actor_class = configs.get_class(actor_class, networks)
         if actor is None:
-            actor = actor_class(encoder.state_space, action_space, **agent_kwargs["actor"])  # type: ignore
+            actor = actor_class(state_space=encoder.state_space, action_space=action_space, **agent_kwargs["actor"])  # type: ignore
 
         critic_class = configs.get_class(critic_class, networks)
         if critic is None:
-            critic = critic_class(encoder.state_space, action_space, **agent_kwargs["critic"])  # type: ignore
+            critic = critic_class(
+                observation_space=encoder.state_space, action_space=action_space, **agent_kwargs["critic"]
+            )  # type: ignore
 
         target_critic = critic_class(  # type: ignore
-            target_encoder.state_space, action_space, **agent_kwargs["critic"]
+            observation_space=target_encoder.state_space, action_space=action_space, **agent_kwargs["critic"]
         )
         target_critic.load_state_dict(critic.state_dict())
         for param in target_critic.parameters():

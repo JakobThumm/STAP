@@ -1,11 +1,11 @@
-from typing import List, Any, Optional, Callable, Dict
-
 import abc
+from typing import Any, Callable, Dict, List, Optional
+
 import torch
 from torch.utils.hooks import RemovableHandle
 
 from stap.networks.critics.base import Critic
-from stap.networks.critics.mlp import ContinuousMLPCritic, MLP
+from stap.networks.critics.mlp import MLP, ContinuousMLPCritic
 
 
 class ContinuousEnsembleCritic(Critic, abc.ABC):
@@ -193,14 +193,10 @@ class EnsembleLogitOODCritic(EnsembleDetectorCritic):
         self._hook_handles: Dict[str, RemovableHandle] = {}
         self._reset_hooks()
 
-    def _create_forward_hook(
-        self, key: str
-    ) -> Callable[[torch.nn.Module, torch.Tensor, torch.Tensor], None]:
+    def _create_forward_hook(self, key: str) -> Callable[[torch.nn.Module, torch.Tensor, torch.Tensor], None]:
         """Return forward hook callable."""
 
-        def hook(
-            model: torch.nn.Module, input: torch.Tensor, output: torch.Tensor
-        ) -> None:
+        def hook(model: torch.nn.Module, input: torch.Tensor, output: torch.Tensor) -> None:
             self._activations[key] = output.squeeze(-1).detach()
 
         return hook
@@ -223,7 +219,7 @@ class EnsembleLogitOODCritic(EnsembleDetectorCritic):
                 hook_handle = q.net[-2].register_forward_hook(hook)
                 self._hook_handles[f"q{idx}"] = hook_handle
             else:
-                raise ValueError(f"Require Q-networks with Sigmoid output activation.")
+                raise ValueError("Require Q-networks with Sigmoid output activation.")
 
     @property
     def logits(self) -> torch.Tensor:
