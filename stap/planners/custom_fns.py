@@ -188,18 +188,19 @@ def ScrewdriverPickFn(
     assert primitive is not None and isinstance(primitive, Primitive)
     arg_object_ids = primitive.get_policy_args_ids()
     idx = arg_object_ids[0]
-    MIN_VALUE = -1.0
-    MAX_VALUE = 2.0
-    MAX_DIST = 0.2
+    MIN_VALUE = 0.0
+    MAX_VALUE = 1.0
     eef_pos, eef_aa = get_eef_pose_in_object_frame(next_state, idx, 0)
     # We want to grab the handle.
     # The handle has its center at [0.5 * handle_length, 0.0, 0.0] in the object frame.
     handle_length = get_object_handle_length(next_state, idx)
     handle_center = torch.zeros_like(eef_pos, device=state.device)
     handle_center[:, 0] = 1.5 * handle_length
-    position_value = MIN_VALUE + (MAX_DIST - torch.abs(eef_pos[:, 0] - handle_center[:, 0])) / MAX_DIST * (
-        MAX_VALUE - MIN_VALUE
-    )
+    threshold_greater = 0.02
+    position_value_1 = MAX_VALUE * (eef_pos[:, 0] > threshold_greater) + MIN_VALUE * (eef_pos[:, 0] < threshold_greater)
+    threshold_smaller = handle_length * 0.9
+    position_value_2 = MAX_VALUE * (eef_pos[:, 0] < threshold_smaller) + MIN_VALUE * (eef_pos[:, 0] > threshold_smaller)
+    position_value = position_value_1 * position_value_2
     return position_value
 
 

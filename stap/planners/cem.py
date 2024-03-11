@@ -6,9 +6,11 @@ import torch
 
 from stap import agents, dynamics, envs, networks
 from stap.envs.base import Primitive
+from stap.envs.pybullet.table.primitives import Pick, StaticHandover
 from stap.planners import base as planners
 from stap.planners import utils
 from stap.utils import spaces
+from stap.utils.tensors import to  # noqa: F401
 
 
 class CEMPlanner(planners.Planner):
@@ -122,13 +124,14 @@ class CEMPlanner(planners.Planner):
             a = self.policies[primitive.idx_policy].action_space
             action_range = torch.from_numpy(a.high - a.low)
             std[t, : action_range.shape[0]] = self.standard_deviation * 0.5 * action_range
-            # Manually reduce std of last action as we want less deviation in z-axis
-            # std[t, action_range.shape[0] - 1] = 1 / 20 * self.standard_deviation * 0.5 * action_range[-1]
             mean[t, : action_range.shape[0]] = actions[t, : action_range.shape[0]]
-            # if std.shape[1] > action_range.shape[0]:
-            #     std[t, action_range.shape[0] :] = 1
-            #     mean[t, action_range.shape[0] :] = 0
-
+            if isinstance(primitive, Pick):
+                mean[t, :] = torch.zeros_like(mean[t, :], device=self.device)
+                std[t, 1] = 0.2 * self.standard_deviation * 0.5 * action_range[1]
+                std[t, 2] = 0.2 * self.standard_deviation * 0.5 * action_range[2]
+                std[t, 3] = 1.0 * self.standard_deviation * 0.5 * action_range[3]
+            elif isinstance(primitive, StaticHandover):
+                mean[t, :] = torch.zeros_like(mean[t, :], device=self.device)
         return mean.to(self.device), std.to(self.device)
 
     def plan(
