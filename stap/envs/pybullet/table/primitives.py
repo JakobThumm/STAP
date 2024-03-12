@@ -9,6 +9,7 @@ from ctrlutils import eigen
 from scipy.spatial.transform import Rotation
 
 from stap.envs import base as envs
+from stap.envs.pybullet.real.object_tracker_ros import SAFETY_OFFSET
 from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.sim.robot import ControlException, Robot
 from stap.envs.pybullet.table import primitive_actions, utils
@@ -245,8 +246,15 @@ class Pick(Primitive):
         print("Object pose: ", obj_pose)
 
         # Compute position.
+        if obj.isinstance(Screwdriver):
+            screwdriver: Screwdriver = obj  # type: ignore
+            if a.pos[0] > 0.01:
+                a.pos[2] = 0.005
+            else:
+                a.pos[2] = 0.0
+            # We have to put the screwdriver a bit higher to avoid collision with the table
+            a.pos[2] += SAFETY_OFFSET
         command_pos = obj_pose.pos + obj_quat * a.pos
-
         # Compute orientation.
         command_quat = compute_top_down_orientation(a.theta.item(), obj_quat)
 
@@ -260,7 +268,6 @@ class Pick(Primitive):
         try:
             if not real_world and not utils.is_inworkspace(obj=obj):
                 raise ControlException(f"Object {obj} is beyond the robot workspace.")
-
             robot.grasp(0)
 
             robot.arm.set_shield_mode("SSM")
@@ -280,9 +287,8 @@ class Pick(Primitive):
             q, _ = robot.arm.get_joint_state(robot.arm.joints)
             print(f"EE pose: {robot.arm.ee_pose()}, joint positions: {q}")
 
-            if not robot.grasp_object(obj, timeout=3.0):
+            if not robot.grasp_object(obj, timeout=3.0, realistic=False):
                 raise ControlException(f"Robot.grasp_object({obj}) failed")
-
             robot.goto_pose(pre_pos, command_quat, positional_precision=0.02, orientational_precision=0.05)
             if not allow_collisions and did_non_args_move():
                 raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
@@ -320,9 +326,9 @@ class Pick(Primitive):
             random_x = np.random.uniform(low=-screwdriver.head_length + 0.02, high=screwdriver.handle_length)
             # random_x = np.random.uniform(low=0.0, high=screwdriver.handle_length)
             if random_x > 0.01:
-                pos = np.array([random_x, 0, 0.005])
+                pos = np.array([random_x, 0, 0.00])
             else:
-                pos = np.array([random_x, 0, 0.01])
+                pos = np.array([random_x, 0, 0.00])
             theta = 0.0
         elif obj.isinstance(Box):
             pos = np.array([0.0, 0.0, obj.size[2] / 2.0 - 0.01])

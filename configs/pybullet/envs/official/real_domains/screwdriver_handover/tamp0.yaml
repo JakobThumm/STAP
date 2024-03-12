@@ -1,0 +1,99 @@
+env: pybullet.HumanTableEnv
+env_kwargs:
+  name: screwdriver_handover_0
+  gui: true
+
+  primitives:
+    - pick
+    - place
+    - static_handover
+
+  tasks:
+    - action_skeleton:
+        - pick(screwdriver)
+        - static_handover(screwdriver, right_hand)
+      initial_state:
+        # - free(hook)
+        # - free(red_box)
+        - free(screwdriver)
+        # - inworkspace(hook)
+        # - on(hook, table)
+        # - on(red_box, table)
+        - on(screwdriver, table)
+        
+  robot_config: configs/pybullet/envs/robots/safe_franka_research3_real.yaml
+  object_tracker_config: configs/pybullet/envs/perception/object_tracker_ros.yaml
+  human_config: configs/pybullet/envs/humans/ASL_lab_human.yaml
+  animation_type: HumanRobotHandover
+  animation_frequency: 100
+  animation_initializations: configs/pybullet/envs/humans/animation_initializations.yaml
+  visualize_shield: false
+
+  base_transform:
+    position: [3.7275, 0.47, -0.055]
+    # Quaternion [x, y, z, w]
+    orientation: [0.0, 0.0, 1.0, 0.0]
+
+  # human_animation_names: ["0"]
+
+  objects:
+    - object_type: Urdf
+      object_kwargs:
+        name: table
+        path: configs/pybullet/envs/assets/asl_table.urdf
+        is_static: true
+    # - object_type: Rack
+    #   object_kwargs:
+    #     name: rack
+    #     size: [0.22, 0.32, 0.16]
+    #     color: [0.4, 0.2, 0.0, 1.0]
+    - object_type: Variant
+      object_kwargs:
+        name: hook
+        variants:
+          - object_type: Hook
+            object_kwargs:
+              name: _hook
+              head_length: 0.2
+              handle_length: 0.38
+              handle_y: -1.0
+              color: [0.6, 0.6, 0.6, 1.0]
+          - object_type: Null
+    - object_type: Variant
+      object_kwargs:
+          name: screwdriver
+          variants:
+            - object_type: Screwdriver
+              object_kwargs:
+                name: _screwdriver
+                head_length: 0.09
+                handle_length: 0.075
+                head_radius: 0.012
+                handle_radius: 0.0025
+                mass: 0.1
+                color: [0.95, 0.6, 0.15, 1.0]
+            - object_type: Null
+    - object_type: Variant
+      object_kwargs:
+        name: icecream
+        variants:
+          - configs/pybullet/envs/assets/icecream.yaml
+          - object_type: Null
+    - object_type: Variant
+      object_kwargs:
+        name: milk
+        variants:
+          - configs/pybullet/envs/assets/milk.yaml
+          - object_type: Null
+    - object_type: Variant
+      object_kwargs:
+        name: salt
+        variants:
+          - configs/pybullet/envs/assets/salt.yaml
+          - object_type: Null
+    - object_type: Variant
+      object_kwargs:
+        name: yogurt
+        variants:
+          - configs/pybullet/envs/assets/yogurt.yaml
+          - object_type: Null

@@ -81,7 +81,7 @@ gripper_kwargs:
   base_link: fr3_hand
 
   command_multipliers:
-    [-0.02, -0.02]
+    [0.1, 0.1]
 
   finger_contact_normals:
     - [0.0, -1.0, 0.0]  # left_inner_finger_pad_collision
@@ -94,5 +94,4 @@ gripper_kwargs:
 
   pos_gains: [400, 40]
   pos_threshold: 0.001
-  vel_threshold: 0.01
-  timeout: 1.0
+  timeout: 3.0

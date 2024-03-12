@@ -11,8 +11,12 @@ from stap.envs.pybullet.real.object_tracker import ObjectTracker
 from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.table.objects import Object
 
+SAFETY_OFFSET = 0.025
+
 
 class ObjectTrackerRos(ObjectTracker):
+    # We put objects on little blocks to avoid a collision with the ground.
+
     def __init__(
         self,
         objects: Dict[str, Object],
@@ -33,6 +37,7 @@ class ObjectTrackerRos(ObjectTracker):
         self._base_transform = base_transform
         self._object_key_prefix = object_key_prefix
         self.alpha = alpha
+        self._tracking_activated = dict()
         self._tracked_objects = dict()
         self._object_transform = dict()
         for object in objects.values():
@@ -43,9 +48,19 @@ class ObjectTrackerRos(ObjectTracker):
             )
             self._tracked_objects[object.name] = object
             self._object_transform[object.name] = None
+            self._tracking_activated[object.name] = True
 
     def __del__(self) -> None:
         pass
+
+    def set_tracking_activated(self, activated: bool, objects: Optional[Iterable[Object]] = None) -> None:
+        if objects is None:
+            objects = self._tracked_objects.values()
+        for object in objects:
+            if not self._tracked_objects.__contains__(object.name):
+                print("The object '" + object.name + "' is not in the list of tracked objects.")
+                continue
+            self._tracking_activated[object.name] = activated
 
     def get_tracked_objects(self, objects: Iterable[Object]) -> List[Object]:
         returned_objects = []
@@ -79,8 +94,12 @@ class ObjectTrackerRos(ObjectTracker):
         pass
 
     def object_callback(self, msg: PoseStamped, object_name: str):
+        if not self._tracking_activated[object_name]:
+            return
         object_transform = np.eye(4)
-        object_transform[:3, 3] = np.array([msg.pose.position.x, msg.pose.position.y, msg.pose.position.z])
+        object_transform[:3, 3] = np.array(
+            [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z - SAFETY_OFFSET]
+        )
         object_transform[:3, :3] = Rotation.from_quat(
             [msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w]
         ).as_matrix()

@@ -465,6 +465,9 @@ def run_closed_loop_planning(
     visited_values = np.full((T, T), float("nan"), dtype=np.float32)
 
     observation = env.get_observation()
+    # Deactivate object tracking for closed-loop planning as picked objects have problems being tracked.
+    if env.object_tracker is not None and env.real_world:
+        env.object_tracker.set_tracking_activated(False, [action_skeleton[0].arg_objects[0]])
     t_planner: Optional[List[float]] = None if timer is None else []
     for t, primitive in enumerate(action_skeleton):
         env.set_primitive(primitive)
@@ -475,6 +478,7 @@ def run_closed_loop_planning(
         if t_planner is not None and timer is not None:
             t_planner.append(timer.toc("planner"))
 
+        input("Press Enter to continue...")
         next_observation, reward, _, _, _ = env.step(plan.actions[0, : env.action_space.shape[0]])
 
         # DEBUG: Find observation difference to transition prediction

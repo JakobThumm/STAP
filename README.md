@@ -214,6 +214,10 @@ export ROS_MASTER_URI=http://[LOCAL_IP]:11311
     ```
     python scripts/debug/debug_pybullet.py -e configs/pybullet/envs/official/real_domains/debug/real_human_template_env.yaml
     ```
+    Custom functions handover:
+    ```
+    python scripts/eval/eval_planners.py  --planner-config configs/pybullet/planners/policy_cem_screwdriver_custom_fns.yaml --env-config configs/pybullet/envs/official/real_domains/screwdriver_handover/task0.yaml --policy-checkpoints models/policies_irl/pick/final_model.pt models/policies_irl/place/final_model.pt models/policies_irl/static_handover/final_model.pt --dynamics-checkpoint models/dynamics_irl/pick_place_static_handover_dynamics/best_model.pt --seed 0 --gui 1 --closed-loop 1 --num-eval 1 --path plots/planning/screwdriver_handover/task0 --verbose 1                 
+    ```
 6. Tmux commands:
     - Open a new tab with `Ctrl`+`T`
     - Close the current tab with `Ctrl`+`Alt`+`W`

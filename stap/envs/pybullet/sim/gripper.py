@@ -240,6 +240,7 @@ class Gripper(articulated_body.ArticulatedBody):
             pos_gains: kp gains (only used for sim).
             timeout: Uses the timeout specified in the yaml gripper config if None.
         """
+        # print(f"Setting sim grasp to {command}")
         self._gripper_state.command = command
         if timeout is None:
             timeout = self.timeout
@@ -263,7 +264,8 @@ class Gripper(articulated_body.ArticulatedBody):
         q, dq, _, _ = zip(*joint_states)
         q = np.array(q)
         dq = np.array(dq)
-        q_des = self._torque_multipliers * self._gripper_state.command
+        q_des = self._torque_multipliers * (1 - self._gripper_state.command)
+        # print(f"q: {q}, q_des: {q_des}")
         q_err = q - q_des
 
         # Compute commands.
@@ -272,6 +274,7 @@ class Gripper(articulated_body.ArticulatedBody):
         current = q[0] / self._torque_multipliers[0]
         q_command = self._position_multipliers * current
 
+        # print(f"Apply torques: {tau}, q_command: {q_command}")
         self.apply_torques(tau)
         self.apply_positions(q_command)
 

@@ -63,6 +63,7 @@ class GripperRos(sim_gripper.Gripper):
         )
 
         self._status = articulated_body.ControlStatus.UNINITIALIZED
+        self._sim_status = articulated_body.ControlStatus.UNINITIALIZED
 
         super().__init__(
             physics_id=physics_id,
@@ -101,7 +102,7 @@ class GripperRos(sim_gripper.Gripper):
         Returns:
             Joint positions and velocities (q, dq).
         """
-        pass
+        super().get_joint_state(joints)
         # if joints != self.joints:
         #     raise NotImplementedError
         # b_gripper_pos = self._redis.get(self._redis_keys.sensor_pos)
@@ -114,19 +115,18 @@ class GripperRos(sim_gripper.Gripper):
         # return q, np.zeros_like(q)
 
     def reset_joints(self, q: np.ndarray, joints: List[int]) -> None:
-        raise NotImplementedError
+        super().reset_joints(q, joints)
 
     def apply_torques(self, torques: np.ndarray, joints: Optional[List[int]] = None) -> None:
-        raise NotImplementedError
+        super().apply_torques(torques, joints)
 
     def reset(self) -> bool:
         """Removes any grasp constraint and resets the gripper to the open position."""
-        self.remove_grasp_constraint()
-        self._gripper_state = sim_gripper.GripperState()
+        super().reset()
+        # self._gripper_state = sim_gripper.GripperState()
         # self.set_grasp(0)
         # while self.update_torques() == articulated_body.ControlStatus.IN_PROGRESS:
         #     continue
-
         return True
 
     def is_object_grasped(self, body_id: int) -> bool:
@@ -143,6 +143,9 @@ class GripperRos(sim_gripper.Gripper):
         return (
             self._status == articulated_body.ControlStatus.POS_CONVERGED
             or self._status == articulated_body.ControlStatus.VEL_CONVERGED
+        ) and (
+            self._sim_status == articulated_body.ControlStatus.POS_CONVERGED
+            or self._sim_status == articulated_body.ControlStatus.VEL_CONVERGED
         )
 
     def set_grasp(
@@ -152,9 +155,10 @@ class GripperRos(sim_gripper.Gripper):
         timeout: Optional[float] = None,
     ) -> None:
         super().set_grasp(command, pos_gains, timeout)
-        self._gripper_state.torque_control = False
-        self._gripper_command_pub.publish(command > 0.0)
+        # self._gripper_state.torque_control = True
         self._status = articulated_body.ControlStatus.IN_PROGRESS
+        self._sim_status = articulated_body.ControlStatus.IN_PROGRESS
+        self._gripper_command_pub.publish(command > 0.0)
 
     def update_torques(self) -> articulated_body.ControlStatus:
         """Gets the latest status from the Redis gripper controller.
@@ -176,8 +180,18 @@ class GripperRos(sim_gripper.Gripper):
         #     return articulated_body.ControlStatus.IN_PROGRESS
         # # TODO: Timeout
         # return articulated_body.ControlStatus.VEL_CONVERGED
+        self._sim_status = super().update_torques()
         rospy.sleep(SIMULATION_TIME_STEP)
-        return self._status
+        # print(f"Sim status: {self._sim_status}, Real status: {self._status}")
+        return (
+            self._status
+            if (
+                self._sim_status == articulated_body.ControlStatus.POS_CONVERGED
+                or self._sim_status == articulated_body.ControlStatus.VEL_CONVERGED
+            )
+            else self._sim_status
+        )
 
     def set_state(self, state: Dict[str, Any]) -> None:
-        raise NotImplementedError
+        # self.set_grasp(0)
+        super().set_state(state)

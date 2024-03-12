@@ -211,6 +211,7 @@ class CEMPlanner(planners.Planner):
             ]
 
             for idx_iter in range(self.num_iterations):
+                print(f"CEM iteration {idx_iter + 1}/{self.num_iterations}")
                 # Sample from distribution.
                 # samples = self.sample_from_nan(mean, std, torch.Size((num_samples,)))
                 samples = self.sample_from_elites(elites, elites_scores, std, num_samples)
