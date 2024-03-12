@@ -210,6 +210,11 @@ class SafeArm(Arm):
 
         self.apply_torques(torques)
 
+        # Return timeout.
+        if self._arm_state.iter_timeout % 100 == 0:
+            self._shield.set_goal(self._shield.goal_qpos)
+        if self._arm_state.iter_timeout <= 0:
+            return articulated_body.ControlStatus.TIMEOUT
         # Check if goal joint position is reached
         self.ab.q, self.ab.dq = self.get_joint_state(self.torque_joints)
         # Only count safe steps towards timeout.# Get current orientation.
@@ -220,11 +225,6 @@ class SafeArm(Arm):
             and np.linalg.norm(self.ab.q - qpos_desired) < 2e-2
         ):
             return articulated_body.ControlStatus.POS_CONVERGED
-        # Return timeout.
-        if self._arm_state.iter_timeout % 100 == 0:
-            self._shield.set_goal(self._shield.goal_qpos)
-        if self._arm_state.iter_timeout <= 0:
-            return articulated_body.ControlStatus.TIMEOUT
         return articulated_body.ControlStatus.IN_PROGRESS
 
     def get_state(self) -> Dict[str, Any]:
