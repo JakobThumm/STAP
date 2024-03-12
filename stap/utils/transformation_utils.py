@@ -538,6 +538,20 @@ def rotate_vector_by_axis_angle(vector: torch.Tensor, axis_angle: torch.Tensor) 
     return quaternion_apply(axis_angle_to_quaternion(axis_angle), vector)
 
 
+def rotate_vector_by_rotation_matrix(vector: torch.Tensor, matrix: torch.Tensor) -> torch.Tensor:
+    """
+    Rotate a vector by the given rotation matrix.
+
+    Args:
+        vector: Vector to rotate, of shape (..., 3).
+        matrix: Rotation matrix of shape (..., 3, 3).
+
+    Returns:
+        The vector after the rotation, of shape (..., 3).
+    """
+    return torch.matmul(matrix, vector.unsqueeze(-1)).squeeze(-1)
+
+
 def get_object_vector_from_axis_angle(axis_angle: torch.Tensor) -> torch.Tensor:
     """Rotate the x-axis by the given axis-angle vector.
 

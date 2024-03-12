@@ -2,6 +2,7 @@ from typing import List, Optional, Union
 
 import numpy as np
 from ctrlutils import eigen
+from scipy.spatial.transform import Rotation
 
 from stap.envs.pybullet.sim import math
 
@@ -11,9 +12,12 @@ class ObjectState:
         "x": (-0.3, 0.9),
         "y": (-0.5, 0.5),
         "z": (-0.1, 1.0),
-        "wx": (-np.pi, np.pi),
-        "wy": (-np.pi, np.pi),
-        "wz": (-np.pi, np.pi),
+        "R11": (-1, 1),
+        "R21": (-1, 1),
+        "R31": (-1, 1),
+        "R12": (-1, 1),
+        "R22": (-1, 1),
+        "R32": (-1, 1),
         "box_size_x": (0.0, 0.4),
         "box_size_y": (0.0, 0.4),
         "box_size_z": (0.0, 0.2),
@@ -25,9 +29,12 @@ class ObjectState:
         "x": {"dynamic"},
         "y": {"dynamic"},
         "z": {"dynamic"},
-        "wx": {"dynamic"},
-        "wy": {"dynamic"},
-        "wz": {"dynamic"},
+        "R11": {"dynamic"},
+        "R21": {"dynamic"},
+        "R31": {"dynamic"},
+        "R12": {"dynamic"},
+        "R22": {"dynamic"},
+        "R32": {"dynamic"},
         "box_size_x": {"static"},
         "box_size_y": {"static"},
         "box_size_z": {"static"},
@@ -47,6 +54,8 @@ class ObjectState:
     def __init__(self, vector: Optional[np.ndarray] = None):
         if vector is None:
             vector = np.zeros(len(self.RANGES), dtype=np.float32)
+            vector[3] = 1.0
+            vector[7] = 1.0
         elif vector.shape[-1] != len(self.RANGES):
             vector = vector.reshape(
                 (
@@ -66,50 +75,64 @@ class ObjectState:
         self.vector[..., :3] = pos
 
     @property
+    def rot_mat(self) -> np.ndarray:
+        a_1 = self.vector[..., 3:6]
+        a_2 = self.vector[..., 6:9]
+        b_1 = a_1 / np.linalg.norm(a_1, axis=-1, keepdims=True)
+        u_2 = a_2 - np.sum(a_2 * b_1, axis=-1, keepdims=True) * b_1
+        b_2 = u_2 / np.linalg.norm(u_2, axis=-1, keepdims=True)
+        b_3 = np.cross(b_1, b_2)
+        return np.stack((b_1, b_2, b_3), axis=-1)
+
+    @rot_mat.setter
+    def rot_mat(self, rot_mat: np.ndarray) -> None:
+        self.vector[..., 3:9] = rot_mat[:, :2].reshape(6, order="F")
+
+    @property
     def aa(self) -> np.ndarray:
-        return self.vector[..., 3:6]
+        return Rotation.from_matrix(self.rot_mat).as_rotvec()
 
     @aa.setter
     def aa(self, aa: np.ndarray) -> None:
-        self.vector[..., 3:6] = aa
+        self.rot_mat = Rotation.from_rotvec(aa).as_matrix()
 
     @property
     def box_size(self) -> np.ndarray:
-        return self.vector[..., 6:9]
+        return self.vector[..., 9:12]
 
     @box_size.setter
     def box_size(self, box_size: np.ndarray) -> None:
-        self.vector[..., 6:9] = box_size
+        self.vector[..., 9:12] = box_size
 
     @property
     def head_length(self) -> Union[float, np.ndarray]:
         if self.vector.ndim > 1:
-            return self.vector[..., 9:10]
-        return self.vector[9]
+            return self.vector[..., 12:13]
+        return self.vector[12]
 
     @head_length.setter
     def head_length(self, head_length: Union[float, np.ndarray]) -> None:
-        self.vector[..., 9:10] = head_length
+        self.vector[..., 12:13] = head_length
 
     @property
     def handle_length(self) -> Union[float, np.ndarray]:
         if self.vector.ndim > 1:
-            return self.vector[..., 10:11]
-        return self.vector[10]
+            return self.vector[..., 13:14]
+        return self.vector[13]
 
     @handle_length.setter
     def handle_length(self, handle_length: Union[float, np.ndarray]) -> None:
-        self.vector[..., 10:11] = handle_length
+        self.vector[..., 13:14] = handle_length
 
     @property
     def handle_y(self) -> Union[float, np.ndarray]:
         if self.vector.ndim > 1:
-            return self.vector[..., 11:12]
-        return self.vector[11]
+            return self.vector[..., 14:15]
+        return self.vector[14]
 
     @handle_y.setter
     def handle_y(self, handle_y: Union[float, np.ndarray]) -> None:
-        self.vector[..., 11:12] = handle_y
+        self.vector[..., 15:16] = handle_y
 
     @classmethod
     def range(cls) -> np.ndarray:

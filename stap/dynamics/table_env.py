@@ -1,16 +1,15 @@
-from dataclasses import field
 import pathlib
 from typing import Any, Dict, List, Optional, Sequence, Type, Union
 
 import gym
 import numpy as np
-from stap.envs.pybullet.table.objects import Rack
-from stap.envs.pybullet.table.primitives import ACTION_CONSTRAINTS
-from stap.envs.pybullet.table_env import TableEnv
 import torch
 
 from stap import agents, envs, networks
 from stap.dynamics.latent import LatentDynamics
+from stap.envs.pybullet.table.objects import Rack
+from stap.envs.pybullet.table.primitives import ACTION_CONSTRAINTS
+from stap.envs.pybullet.table_env import TableEnv
 
 
 class TableEnvDynamics(LatentDynamics):
@@ -56,12 +55,8 @@ class TableEnvDynamics(LatentDynamics):
         else:
             observation_space = self.env.observation_space
 
-        self._observation_mid = torch.from_numpy(
-            (observation_space.low[0] + observation_space.high[0]) / 2
-        )
-        self._observation_range = torch.from_numpy(
-            observation_space.high[0] - observation_space.low[0]
-        )
+        self._observation_mid = torch.from_numpy((observation_space.low[0] + observation_space.high[0]) / 2)
+        self._observation_range = torch.from_numpy(observation_space.high[0] - observation_space.low[0])
 
         self._observation_space = observation_space
         flat_observation_space = gym.spaces.Box(
@@ -156,9 +151,7 @@ class TableEnvDynamics(LatentDynamics):
             return observation
 
         assert policy_args is not None
-        observation = networks.encoders.TableEnvEncoder.rearrange_observation(
-            observation, policy_args, randomize=False
-        )
+        observation = networks.encoders.TableEnvEncoder.rearrange_observation(observation, policy_args, randomize=False)
 
         dynamics_state = self._normalize_state(observation)
 
@@ -179,9 +172,16 @@ class TableEnvDynamics(LatentDynamics):
     def _unnormalize_state(self, state: torch.Tensor) -> torch.Tensor:
         # Unflatten state if planning.
         state = state.reshape(-1, *self.state_space.shape)
-
+        if len(state.size()) == 2 and state.size(1) > self._observation_range.size(0):
+            assert state.size(1) % self._observation_range.size(0) == 0
+            N = state.size(1) // self._observation_range.size(0)
+            observation_range = self._observation_range.repeat(N)
+            observation_mid = self._observation_mid.repeat(N)
+        else:
+            observation_range = self._observation_range
+            observation_mid = self._observation_mid
         # Scale from [-0.5, 0.5].
-        state = state * self._observation_range + self._observation_mid
+        state = state * observation_range + observation_mid
 
         return state
 
@@ -198,9 +198,7 @@ class TableEnvDynamics(LatentDynamics):
         Returns:
             Decoded observation.
         """
-        return self.policies[primitive.idx_policy].encoder.encode(
-            state, policy_args=primitive.get_policy_args()
-        )
+        return self.policies[primitive.idx_policy].encoder.encode(state, policy_args=primitive.get_policy_args())
 
     def _apply_handcrafted_dynamics(
         self,
@@ -227,22 +225,18 @@ class TableEnvDynamics(LatentDynamics):
             Z_IDX = 2
             target_object_idx = policy_args["observation_indices"][1]
 
-            new_predicted_next_state[
-                ..., target_object_idx, Z_IDX
-            ] = ACTION_CONSTRAINTS["max_lift_height"]
+            new_predicted_next_state[..., target_object_idx, Z_IDX] = ACTION_CONSTRAINTS["max_lift_height"]
             # TODO(klin) the following moves the EE to an awkward position;
             # may need to do quaternion computation for accurate x-y positions
             if "box" in primitive_str:
-                new_predicted_next_state[
-                    ..., TableEnv.EE_OBSERVATION_IDX, Z_IDX
-                ] = ACTION_CONSTRAINTS["max_lift_height"]
+                new_predicted_next_state[..., TableEnv.EE_OBSERVATION_IDX, Z_IDX] = ACTION_CONSTRAINTS[
+                    "max_lift_height"
+                ]
                 target_object_original_state = state[..., target_object_idx, :]
-                new_predicted_next_state[
-                    ..., TableEnv.EE_OBSERVATION_IDX, :Z_IDX
-                ] = target_object_original_state[..., :Z_IDX]
-                new_predicted_next_state[
-                    ..., target_object_idx, :Z_IDX
-                ] = target_object_original_state[..., :Z_IDX]
+                new_predicted_next_state[..., TableEnv.EE_OBSERVATION_IDX, :Z_IDX] = target_object_original_state[
+                    ..., :Z_IDX
+                ]
+                new_predicted_next_state[..., target_object_idx, :Z_IDX] = target_object_original_state[..., :Z_IDX]
 
         if "place" in primitive_str:
             SRC_OBJ_IDX = 1
@@ -267,9 +261,7 @@ class TableEnvDynamics(LatentDynamics):
                 return new_predicted_next_state
 
             new_predicted_next_state[..., source_object_idx, 2] = (
-                destination_object_state[..., 2]
-                + destination_object_surface_offset
-                + median_object_height / 2
+                destination_object_state[..., 2] + destination_object_surface_offset + median_object_height / 2
             )
 
         return new_predicted_next_state
@@ -309,9 +301,7 @@ class TableEnvDynamics(LatentDynamics):
         dynamics_state = self._normalize_state(env_state[..., idx_args, :])
 
         # Dynamics state -> dynamics state.
-        next_dynamics_state = self.forward(
-            dynamics_state, action, primitive.idx_policy, policy_args
-        )
+        next_dynamics_state = self.forward(dynamics_state, action, primitive.idx_policy, policy_args)
         next_dynamics_state = next_dynamics_state.clamp(-0.5, 0.5)
 
         # Update env state with new unnormalized observation.

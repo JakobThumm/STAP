@@ -94,4 +94,5 @@ gripper_kwargs:
 
   pos_gains: [400, 40]
   pos_threshold: 0.001
+  vel_threshold: 0.01
   timeout: 1.0

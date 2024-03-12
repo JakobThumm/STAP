@@ -362,10 +362,8 @@ class Arm(articulated_body.ArticulatedBody):
         else:
             rot = Rotation.from_quat([0.0, 0.0, 0.0, 1.0])
         desired_ee_pos = pos + rot.apply(self.ee_offset)
-        if isinstance(quat, eigen.Quaterniond):
-            quat = np.array([quat.w, quat.z, -quat.y, -quat.x])
-        elif isinstance(quat, np.ndarray):
-            quat = np.array([quat[3], -quat[2], -quat[1], -quat[0]])
+        rot_world_to_ee = Rotation.from_quat([1.0, 0.0, 0.0, 0.0])
+        quat = (rot * rot_world_to_ee).as_quat()
         desired_q_pos, close_enough = self.accurate_calculate_inverse_kinematics(
             target_pos=desired_ee_pos,
             target_quat=quat,
@@ -375,6 +373,18 @@ class Arm(articulated_body.ArticulatedBody):
             prior=prior,
             ignore_last_half_rotation=ignore_last_half_rotation,
         )
+        if not close_enough and ignore_last_half_rotation and quat is not None:
+            # Try the other half rotation.
+            other_target_quat = (rot * Rotation.from_euler("XYZ", [0, 0, np.pi]) * rot_world_to_ee).as_quat()
+            desired_q_pos, close_enough = self.accurate_calculate_inverse_kinematics(
+                target_pos=desired_ee_pos,
+                target_quat=other_target_quat,
+                positional_precision=positional_precision,
+                orientational_precision=orientational_precision,
+                max_iter=max_iter,
+                prior=prior,
+                ignore_last_half_rotation=ignore_last_half_rotation,
+            )
         if not close_enough:
             return desired_q_pos, False
         return desired_q_pos, self.check_joint_limits(desired_q_pos, ignore_last_half_rotation)

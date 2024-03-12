@@ -11,7 +11,7 @@ from scipy.spatial.transform import Rotation
 from stap.envs import base as envs
 from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.sim.robot import ControlException, Robot
-from stap.envs.pybullet.table import object_state, primitive_actions, utils
+from stap.envs.pybullet.table import primitive_actions, utils
 from stap.envs.pybullet.table.objects import Box, Hook, Null, Object, Rack, Screwdriver
 from stap.utils.macros import SIMULATION_FREQUENCY, SIMULATION_TIME_STEP
 
@@ -67,7 +67,7 @@ def initialize_robot_pose(robot: Robot) -> bool:
         xy = np.random.uniform(xy_min, xy_max)
         if np.linalg.norm(xy) < ACTION_CONSTRAINTS["max_lift_radius"]:
             break
-    theta = np.random.uniform(*object_state.ObjectState.RANGES["wz"])
+    theta = np.random.uniform(-np.pi, np.pi)
 
     pos = np.append(xy, ACTION_CONSTRAINTS["max_lift_height"])
     aa = eigen.AngleAxisd(theta, np.array([0.0, 0.0, 1.0]))
@@ -325,7 +325,7 @@ class Pick(Primitive):
                 pos = np.array([random_x, 0, 0.01])
             theta = 0.0
         elif obj.isinstance(Box):
-            pos = np.array([0.0, 0.0, obj.size[2] / 2.0])
+            pos = np.array([0.0, 0.0, obj.size[2] / 2.0 - 0.01])
             theta = 0.0  # if random.random() <= 0.5 else np.pi / 2
         else:
             pos = np.array([0.0, 0.0, 0.0])

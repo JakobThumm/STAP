@@ -262,9 +262,8 @@ def evaluate_trajectory(
             if custom_fns is not None and custom_fns[t] is not None and action_skeleton is not None:
                 if clip_success:
                     p_successes[:, t] = torch.clip(p_successes[:, t], min=0, max=1)
-                p_successes[:, t] = p_successes[:, t] * custom_fns[t](
-                    states[:, t], action, states[:, t + 1], action_skeleton[t]
-                )  # type: ignore
+                custom_values = custom_fns[t](states[:, t], action, states[:, t + 1], action_skeleton[t])  # type: ignore
+                p_successes[:, t] = p_successes[:, t] * custom_values
     else:
         raise NotImplementedError
 
@@ -469,7 +468,6 @@ def run_closed_loop_planning(
     t_planner: Optional[List[float]] = None if timer is None else []
     for t, primitive in enumerate(action_skeleton):
         env.set_primitive(primitive)
-
         # Plan.
         if timer is not None:
             timer.tic("planner")
@@ -477,8 +475,25 @@ def run_closed_loop_planning(
         if t_planner is not None and timer is not None:
             t_planner.append(timer.toc("planner"))
 
-        # Execute first action.
-        observation, reward, _, _, _ = env.step(plan.actions[0, : env.action_space.shape[0]])
+        next_observation, reward, _, _, _ = env.step(plan.actions[0, : env.action_space.shape[0]])
+
+        # DEBUG: Find observation difference to transition prediction
+        """
+        next_state_predicted = plan.states[1]
+        next_state_observed = next_observation
+        state_diff = next_state_observed - next_state_predicted
+        sum_state_diff_first_arg_obj = np.sum(np.abs(state_diff[1, :]))
+        custom_fn = planner.custom_fns[type(primitive)]  # type: ignore
+        state = torch.Tensor(plan.states[0][np.newaxis, :])
+        next_state_predicted_Tensor = torch.Tensor(next_state_predicted[np.newaxis, :])
+        next_state_observed_Tensor = torch.Tensor(next_state_observed[np.newaxis, :])
+        predicted_value = custom_fn(
+            state, torch.Tensor(plan.actions[0, : env.action_space.shape[0]]), next_state_predicted_Tensor, primitive
+        )  # type: ignore
+        observed_value = custom_fn(
+            state, torch.Tensor(plan.actions[0, : env.action_space.shape[0]]), next_state_observed_Tensor, primitive
+        )  # type: ignore
+        """
 
         rewards[t] = reward
         visited_actions[t, t:] = plan.actions
@@ -496,7 +511,8 @@ def run_closed_loop_planning(
         states[t : t + 1] = plan.states[:1]
         values[t] = plan.values[0]
         # ensure last state has something in it
-        states[t + 1 : t + 2] = observation
+        states[t + 1 : t + 2] = next_observation
+        observation = next_observation
 
     p_success = np.exp(np.log(values).sum())
 

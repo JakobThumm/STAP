@@ -87,6 +87,22 @@ user=${1:-user}
 gpu=${2:-cpu}
 PRIMITIVE=${3:-pick}
 
+if [ "$PRIMITIVE" = "pick" ]
+then
+    TRAIN_SEEDS=($(seq 0 15))
+    VALIDATION_SEEDS=($(seq 16 19))
+elif [ "$PRIMITIVE" = "place" ]
+then
+    TRAIN_SEEDS=($(seq 20 35))
+    VALIDATION_SEEDS=($(seq 36 39))
+elif [ "$PRIMITIVE" = "static_handover" ]
+then
+    TRAIN_SEEDS=($(seq 40 55))
+    VALIDATION_SEEDS=($(seq 56 59))
+else
+    echo "Primitive unknown. Please choose pick or place"
+fi
+
 if [ "$user" = "root" ]
     then
     STAP_PATH="/root"
@@ -107,8 +123,6 @@ exp_name="value_fns_irl"
 VALUE_OUTPUT_PATH="${output_path}/${exp_name}"
 
 SYMBOLIC_ACTION_TYPE="valid"
-TRAIN_SEEDS=($(seq 0 15))
-VALIDATION_SEEDS=($(seq 16 19))
 DATA_CHECKPOINT_PATH="${input_path}/datasets"
 
 # Details: 1M episodes, Logistic Regression loss for Q-networks, ensemble of 8 Q-networks.

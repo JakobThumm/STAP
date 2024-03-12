@@ -101,9 +101,9 @@ class PolicyDatasetGenerationConfig:
             "left_hand": "actor",
             "screwdriver": "tool",
             # "rack": "receptacle",
-            "hook": "tool",
+            # "hook": "tool",
             "milk": "box",
-            "yogurt": "box",
+            # "yogurt": "box",
             "icecream": "box",
             "salt": "box",
         }
