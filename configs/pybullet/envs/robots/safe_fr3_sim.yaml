@@ -17,7 +17,7 @@ arm_kwargs:
   ee_offset: [0.0, 0.0, 0.105]
 
   pos_gains: [[1000.0, 1000.0, 1000.0, 1000.0, 100.0, 100.0, 100.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
-  damping_ratio: [5.0, 5.0, 5.0, 5.0, 10.0, 10.0, 10.0]
+  damping_ratio: [50.0, 50.0, 50.0, 50.0, 10.0, 10.0, 10.0]
   ori_gains: [0, 0]
   nullspace_joint_gains: [10, 10]
   nullspace_joint_indices: [2, 4]
@@ -31,7 +31,7 @@ arm_kwargs:
 
   pos_threshold: [0.01, 0.01]
   ori_threshold: [0.01, 0.01]
-  joint_pos_threshold: 0.1
+  joint_pos_threshold: 0.01
   timeout: 10.0
 
   # shield settings
@@ -92,6 +92,7 @@ gripper_kwargs:
     com: [0, 0, 0.11]
     inertia: [0.001, 0.0025, 0.0017, 0, 0, 0]
 
-  pos_gains: [400, 40]
+  pos_gains: [400, 4]
   pos_threshold: 0.001
+  vel_threshold: 0.0001
   timeout: 1.0

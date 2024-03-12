@@ -20,8 +20,8 @@ class GripperState:
     grasp_constraint_id: Optional[int] = None
     grasp_body_id: Optional[int] = None
     grasp_T_body_to_ee: Optional[math.Pose] = None
-    dq_avg = 0.0
-    iter_timeout = 0
+    dq_avg: float = 0.0
+    iter_timeout: int = 0
 
 
 class Gripper(articulated_body.ArticulatedBody):
@@ -43,6 +43,7 @@ class Gripper(articulated_body.ArticulatedBody):
         pos_threshold: float,
         timeout: float,
         q_home: Optional[List[float]] = None,
+        vel_threshold: float = 0.0001,
     ):
         """Constructs the arm from yaml config.
 
@@ -97,6 +98,7 @@ class Gripper(articulated_body.ArticulatedBody):
 
         self.pos_gains = pos_gains
         self.pos_threshold = pos_threshold
+        self.vel_threshold = vel_threshold
 
         self._gripper_state = GripperState()
         self._q_home = q_home if q_home is not None else self.get_joint_state(self.joints)[0]
@@ -141,7 +143,7 @@ class Gripper(articulated_body.ArticulatedBody):
         Returns:
             True if the body is grasped.
         """
-        CONTACT_NORMAL_ALIGNMENT = 0.98  # Allows roughly 10 deg error.
+        CONTACT_NORMAL_ALIGNMENT = 0.95  # Allows roughly 10 deg error.
 
         for finger_link_id, finger_contact_normal in zip(self.finger_links, self.finger_contact_normals):
             contacts = p.getContactPoints(
@@ -281,7 +283,7 @@ class Gripper(articulated_body.ArticulatedBody):
             return articulated_body.ControlStatus.POS_CONVERGED
 
         # Return velocity converged.
-        if self._gripper_state.dq_avg < 0.0001:
+        if self._gripper_state.dq_avg < self.vel_threshold:
             return articulated_body.ControlStatus.VEL_CONVERGED
 
         # Return timeout.

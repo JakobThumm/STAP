@@ -41,7 +41,8 @@ class PickAction(PrimitiveAction):
         "x": (-0.2, 0.2),
         "y": (-0.1, 0.1),
         "z": (-0.07, 0.07),
-        "theta": (-0.25 * np.pi, 0.75 * np.pi),
+        "theta": (-0.05 * np.pi, 0.05 * np.pi),
+        # "theta": (-0.25 * np.pi, 0.75 * np.pi),
     }
 
     def __init__(

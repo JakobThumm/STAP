@@ -304,14 +304,14 @@ class Pick(Primitive):
             screwdriver: Screwdriver = obj  # type: ignore
             action_range = self.Action.range()
             random_x = np.random.uniform(low=-screwdriver.head_length, high=screwdriver.handle_length)
-            # random_x = np.random.uniform(low=0.0, high=screwdriver.handle_length)
+            # random_x = np.random.uniform(low=0.02, high=screwdriver.handle_length)
             if random_x > 0.02:
-                pos = np.array([random_x, 0, 0.01])
+                pos = np.array([random_x, 0, 0.0])
             else:
                 pos = np.array([random_x, 0, 0.00])
             theta = 0.0
         elif obj.isinstance(Box):
-            pos = np.array([0.0, 0.0, obj.size[2] / 2.0])
+            pos = np.array([0.0, 0.0, obj.size[2] / 2.0 - 0.01])
             theta = 0.0  # if random.random() <= 0.5 else np.pi / 2
         else:
             pos = np.array([0.0, 0.0, 0.0])

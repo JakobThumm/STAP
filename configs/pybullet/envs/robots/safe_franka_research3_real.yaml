@@ -31,7 +31,7 @@ arm_kwargs:
 
   pos_threshold: [0.01, 0.01]
   ori_threshold: [0.01, 0.01]
-  joint_pos_threshold: 0.1
+  joint_pos_threshold: 0.01
   timeout: 10.0
 
   # shield settings
@@ -92,4 +92,5 @@ gripper_kwargs:
 
   pos_gains: [400, 40]
   pos_threshold: 0.001
+  vel_threshold: 0.01
   timeout: 1.0

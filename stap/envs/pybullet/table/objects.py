@@ -481,7 +481,7 @@ class Screwdriver(Object):
         head_length: float = 0.09,
         handle_length: float = 0.075,
         head_radius: float = 0.02,
-        handle_radius: float = 0.0025,
+        handle_radius: float = 0.005,
         mass: float = 0.3,
         is_active: bool = False,
     ):
@@ -497,9 +497,8 @@ class Screwdriver(Object):
                 quat=eigen.Quaterniond(eigen.AngleAxisd(angle=np.pi / 2, axis=np.array([0.0, 1.0, 0.0]))).coeffs,
             ),
         )
-        handle = shapes.Cylinder(
-            radius=handle_radius,
-            length=handle_length,
+        handle = shapes.Box(
+            size=np.array([2 * handle_radius, 2 * handle_radius, handle_length]),
             mass=0.3 * mass,
             color=np.array([0.5, 0.5, 0.5, 1.0]),
             pose=math.Pose(
