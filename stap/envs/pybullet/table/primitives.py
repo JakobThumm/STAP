@@ -653,13 +653,13 @@ class StaticHandover(Primitive):
 
         assert isinstance(self.env, HumanTableEnv)
 
-        SUCCESS_DISTANCE = 0.5
-        SUCCESS_TIME = 1.0
+        SUCCESS_DISTANCE = 1.0
+        SUCCESS_TIME = 0.3
         FIRST_MOVEMENT_TIMEOUT = 2.0
         WAIT_TIMEOUT = 15
         ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
-        POSITIONAL_PRECISION = 0.1
-        ORIENTATIONAL_PRECISION = 0.1
+        POSITIONAL_PRECISION = 0.05
+        ORIENTATIONAL_PRECISION = 0.03
         success = False
         self.success_counter = 0
         # Parse action.
@@ -693,13 +693,16 @@ class StaticHandover(Primitive):
             if not success:
                 raise ControlException("Handover failed: Human hand not within reach")
             obj.freeze()
+            obj_pose_after_grip = obj.pose()
             robot.grasp(0)
+            obj.set_pose(obj_pose_after_grip)
             # Once the gripper is opened, we assume the handover was a success.
             success = True
             if not allow_collisions and did_non_args_move():
                 raise ControlException("Robot.grasp(0) collided")
 
             robot.goto_configuration(robot.arm.q_home)
+            obj.set_pose(obj_pose_after_grip)
             if not allow_collisions and did_non_args_move():
                 raise ControlException("Robot.goto_pose() collided")
         except ControlException as e:
