@@ -576,6 +576,7 @@ class TableEnv(PybulletEnv):
         if image:
             raise NotImplementedError
 
+        self.step_simulation()
         obj_states = self.object_states()
         default_state = object_state.ObjectState().vector
         observation = np.repeat(default_state[np.newaxis, :], self.MAX_NUM_OBJECTS, axis=0)

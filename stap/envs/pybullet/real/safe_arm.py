@@ -134,7 +134,7 @@ class SafeArm(SafeArmSim):
                 torque control to achieve them.
             time: Simulation time
         """
-        print("Setting joint configuration goal: ", q)
+        # print("Setting joint configuration goal: ", q)
         self._q_d = q
         msg = Float32MultiArray()
         msg.data = q
@@ -170,7 +170,7 @@ class SafeArm(SafeArmSim):
         Returns:
             True if the goal is set successfully.
         """
-        print("Setting pose goal: ", pos, quat)
+        # print("Setting pose goal: ", pos, quat)
         if pos is None:
             return False
         if quat is None:

@@ -249,7 +249,7 @@ class Pick(Primitive):
         if obj.isinstance(Screwdriver):
             screwdriver: Screwdriver = obj  # type: ignore
             if a.pos[0] > 0.01:
-                a.pos[2] = 0.005
+                a.pos[2] = 0.00
             else:
                 a.pos[2] = 0.0
             # We have to put the screwdriver a bit higher to avoid collision with the table
@@ -285,7 +285,7 @@ class Pick(Primitive):
             )
 
             q, _ = robot.arm.get_joint_state(robot.arm.joints)
-            print(f"EE pose: {robot.arm.ee_pose()}, joint positions: {q}")
+            # print(f"EE pose: {robot.arm.ee_pose()}, joint positions: {q}")
 
             if not robot.grasp_object(obj, timeout=3.0, realistic=False):
                 raise ControlException(f"Robot.grasp_object({obj}) failed")
@@ -296,7 +296,7 @@ class Pick(Primitive):
             print("Pick.execute():\n", e)
             return ExecutionResult(success=False, truncated=True)
 
-        print("Wait until stable...")
+        # print("Wait until stable...")
         self.env.wait_until_stable()  # handle pick failures
         print("Pick primitive finished.")
         return ExecutionResult(success=True, truncated=False)
@@ -730,10 +730,11 @@ class StaticHandover(Primitive):
         except ControlException as e:
             # If robot fails before grasp(0), object may still be grasped.
             print("StaticHandover.execute():\n", e)
+            robot.arm.set_shield_mode("PFL")
             return ExecutionResult(success=False, truncated=True)
 
         self.env.wait_until_stable()
-
+        robot.arm.set_shield_mode("PFL")
         return ExecutionResult(success=success, truncated=False)
 
     def calculate_command_pose(

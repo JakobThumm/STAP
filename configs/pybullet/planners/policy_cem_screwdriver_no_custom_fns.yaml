@@ -1,8 +1,8 @@
 planner: CEMPlanner
 planner_kwargs:
-  num_samples: 10000
-  num_iterations: 5
-  num_elites: 100
+  num_samples: 1000
+  num_iterations: 3
+  num_elites: 20
   keep_elites_fraction: 1.0
   standard_deviation: 0.3
   std_decay: 0.7
@@ -16,6 +16,6 @@ agent_configs:
 dynamics_config: "{DYNAMICS_CONFIG}"
 
 custom_fns:
-  pick: "ScrewdriverPickActionFn"
+  pick: null
   place: null
-  static_handover: "HandoverOrientationFn"
+  static_handover: null

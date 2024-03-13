@@ -471,17 +471,20 @@ def run_closed_loop_planning(
     t_planner: Optional[List[float]] = None if timer is None else []
     for t, primitive in enumerate(action_skeleton):
         env.set_primitive(primitive)
-        observation = env.get_observation()
-        # Plan.
-        if timer is not None:
-            timer.tic("planner")
-        plan = planner.plan(observation, action_skeleton[t:])
-        if t_planner is not None and timer is not None:
-            t_planner.append(timer.toc("planner"))
-
-        input("Press Enter to continue...")
-        print(f"Observed state: {observation}")
-        next_observation, reward, _, _, _ = env.step(plan.actions[0, : env.action_space.shape[0]])
+        # input("Press Enter to continue...")
+        # print(f"Observed state: {observation}")
+        for _ in range(5):
+            observation = env.get_observation()
+            # Plan.
+            if timer is not None:
+                timer.tic("planner")
+            plan = planner.plan(observation, action_skeleton[t:])
+            if t_planner is not None and timer is not None:
+                t_planner.append(timer.toc("planner"))
+            print(f"Executing primitive {primitive} with action {plan.actions[0]}")
+            next_observation, reward, _, _, _ = env.step(plan.actions[0, : env.action_space.shape[0]])
+            if reward == 1.0:
+                break
 
         # DEBUG: Find observation difference to transition prediction
         next_state_predicted = plan.states[1]
@@ -505,7 +508,7 @@ def run_closed_loop_planning(
                 next_state_observed_Tensor,
                 primitive,
             )  # type: ignore
-        print(f"Predicted preference value: {predicted_value}, observed preference value: {observed_value}")
+            print(f"Predicted preference value: {predicted_value}, observed preference value: {observed_value}")
 
         rewards[t] = reward
         visited_actions[t, t:] = plan.actions
