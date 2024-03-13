@@ -45,7 +45,7 @@ env_kwargs:
           head_length: 0.09
           handle_length: 0.075
           head_radius: 0.012
-          handle_radius: 0.0025
+          handle_radius: 0.008
           mass: 0.1
           color: [0.95, 0.6, 0.15, 1.0]
     - configs/pybullet/envs/assets/milk.yaml

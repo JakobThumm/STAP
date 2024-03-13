@@ -204,6 +204,31 @@ def ScrewdriverPickFn(
     return position_value
 
 
+def ScrewdriverPickActionFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the position of the pick primitive.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    MIN_VALUE = 0.0
+    MAX_VALUE = 1.0
+    threshold_greater = 0.2
+    position_value_1 = MAX_VALUE * (action[:, 0] > threshold_greater) + MIN_VALUE * (action[:, 0] < threshold_greater)
+    threshold_smaller = 0.9
+    position_value_2 = MAX_VALUE * (action[:, 0] < threshold_smaller) + MIN_VALUE * (action[:, 0] > threshold_smaller)
+    position_value = position_value_1 * position_value_2
+    return position_value
+
+
 def HandoverPositionFn(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
@@ -268,7 +293,7 @@ def HandoverOrientationFn(
     angle_difference = torch.acos(torch.clip(dot_product, -1.0, 1.0))
     MIN_VALUE = 0.0
     MAX_VALUE = 1.0
-    ANGLE_RANGE = torch.pi
+    ANGLE_RANGE = torch.pi / 2.0
     orientation_value = MIN_VALUE + (ANGLE_RANGE - angle_difference) / ANGLE_RANGE * (MAX_VALUE - MIN_VALUE)
     assert not torch.any(torch.isnan(orientation_value))
     return orientation_value
@@ -277,6 +302,7 @@ def HandoverOrientationFn(
 CUSTOM_FNS = {
     "HookHandoverOrientationFn": HookHandoverOrientationFn,
     "ScrewdriverPickFn": ScrewdriverPickFn,
+    "ScrewdriverPickActionFn": ScrewdriverPickActionFn,
     "HandoverPositionFn": HandoverPositionFn,
     "HandoverOrientationFn": HandoverOrientationFn,
 }
