@@ -489,22 +489,24 @@ def run_closed_loop_planning(
         state_diff = next_state_observed - next_state_predicted
         sum_state_diff_first_arg_obj = np.sum(np.abs(state_diff[1, :]))
         custom_fn = planner.custom_fns[type(primitive)]  # type: ignore
+        state = torch.Tensor(plan.states[0][np.newaxis, :])
+        next_state_predicted_Tensor = torch.Tensor(next_state_predicted[np.newaxis, :])
+        next_state_observed_Tensor = torch.Tensor(next_state_observed[np.newaxis, :])
         if custom_fn is not None:
-            state = torch.Tensor(plan.states[0][np.newaxis, :])
-            next_state_predicted_Tensor = torch.Tensor(next_state_predicted[np.newaxis, :])
-            next_state_observed_Tensor = torch.Tensor(next_state_observed[np.newaxis, :])
             predicted_value = custom_fn(
                 state,
-                torch.Tensor(plan.actions[0, : env.action_space.shape[0]]),
+                torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),
                 next_state_predicted_Tensor,
                 primitive,
             )  # type: ignore
             observed_value = custom_fn(
-                state, torch.Tensor(plan.actions[0, : env.action_space.shape[0]]), next_state_observed_Tensor, primitive
+                state,
+                torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),
+                next_state_observed_Tensor,
+                primitive,
             )  # type: ignore
-            print(
-                f"State difference [1]: {state_diff[1]}, predicted value: {predicted_value}, observed value: {observed_value}"
-            )
+        print(f"Predicted preference value: {predicted_value}, observed preference value: {observed_value}")
+
         rewards[t] = reward
         visited_actions[t, t:] = plan.actions
         visited_states[t, t:] = plan.states
