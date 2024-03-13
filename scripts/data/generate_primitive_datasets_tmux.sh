@@ -10,7 +10,6 @@ PRIMITIVE=${1:-pick}
 DEVICE="cpu"
 EXP_NAME="datasets"
 SYMBOLIC_ACTION_TYPE="valid"
-PRIMITIVE="pick"
 N_JOBS=20
 if [ "$PRIMITIVE" = "pick" ]
 then
