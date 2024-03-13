@@ -468,6 +468,7 @@ def run_closed_loop_planning(
     t_planner: Optional[List[float]] = None if timer is None else []
     for t, primitive in enumerate(action_skeleton):
         env.set_primitive(primitive)
+        observation = env.get_observation()
         # Plan.
         if timer is not None:
             timer.tic("planner")
@@ -478,7 +479,6 @@ def run_closed_loop_planning(
         next_observation, reward, _, _, _ = env.step(plan.actions[0, : env.action_space.shape[0]])
 
         # DEBUG: Find observation difference to transition prediction
-        """
         next_state_predicted = plan.states[1]
         next_state_observed = next_observation
         state_diff = next_state_observed - next_state_predicted
@@ -487,13 +487,19 @@ def run_closed_loop_planning(
         state = torch.Tensor(plan.states[0][np.newaxis, :])
         next_state_predicted_Tensor = torch.Tensor(next_state_predicted[np.newaxis, :])
         next_state_observed_Tensor = torch.Tensor(next_state_observed[np.newaxis, :])
-        predicted_value = custom_fn(
-            state, torch.Tensor(plan.actions[0, : env.action_space.shape[0]]), next_state_predicted_Tensor, primitive
-        )  # type: ignore
-        observed_value = custom_fn(
-            state, torch.Tensor(plan.actions[0, : env.action_space.shape[0]]), next_state_observed_Tensor, primitive
-        )  # type: ignore
-        """
+        if custom_fn is not None:
+            predicted_value = custom_fn(
+                state,
+                torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),
+                next_state_predicted_Tensor,
+                primitive,
+            )  # type: ignore
+            observed_value = custom_fn(
+                state,
+                torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),
+                next_state_observed_Tensor,
+                primitive,
+            )  # type: ignore
 
         rewards[t] = reward
         visited_actions[t, t:] = plan.actions
