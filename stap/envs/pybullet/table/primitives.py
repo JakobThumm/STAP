@@ -767,6 +767,10 @@ class StaticHandover(Primitive):
     def action(cls, action: np.ndarray) -> primitive_actions.PrimitiveAction:
         return primitive_actions.PlaceAction(action)
 
+    def __str__(self) -> str:
+        args = "" if self.arg_objects is None else ", ".join(map(str, self.arg_objects))
+        return f"static_handover({args})"
+
 
 class Pull(Primitive):
     action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(4,))
