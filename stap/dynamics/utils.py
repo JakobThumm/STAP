@@ -174,8 +174,7 @@ def batch_rotations_6D_to_matrix(batch: torch.Tensor) -> torch.Tensor:
 
     Args:
         batch: Batch of rotations in shape [B, H, 6], where each rotation is
-            represented by the entries R11, R12, R21, R22, R31, R32.
-        H: The number of 6D rotations per batch element.
+            represented by the entries R11, R21, R31, R21, R22, R23.
 
     Returns:
         A tensor of rotation matrices with shape [B, H, 3, 3].
@@ -202,6 +201,85 @@ def batch_rotations_6D_to_matrix(batch: torch.Tensor) -> torch.Tensor:
     rotations = torch.stack([b1, b2, b3], dim=-1)  # [B, H, 3, 3], stack along the last dimension
 
     return rotations
+
+
+def batch_axis_angle_to_matrix(batch: torch.Tensor) -> torch.Tensor:
+    """Converts a batch of axis-angle rotations into rotation matrices.
+
+    Axis-angle representation is a 3D vector where the direction of the vector and its magnitude represent the angle.
+
+    Args:
+        batch: Batch of rotations in shape [B, H, 3], where each rotation is
+            represented by the axis-angle vector.
+    Returns:
+        A tensor of rotation matrices with shape [B, H, 3, 3].
+    """
+    B, H, d = batch.shape
+    assert d == 3, f"Expected batch to have shape [{B}, {H}, 3], but got {batch.shape}"
+
+    # Unpack the axis-angle representation into the angle and axis
+    angle = batch.norm(dim=-1, keepdim=True)  # Shape [B, H, 1]
+    axis = batch / angle  # Shape [B, H, 3]
+
+    # Compute the skew-symmetric cross product matrix of the axis
+    skew_symmetric = torch.zeros(B, H, 3, 3, device=batch.device, dtype=batch.dtype)
+    skew_symmetric[..., 0, 1] = -axis[..., 2]
+    skew_symmetric[..., 0, 2] = axis[..., 1]
+    skew_symmetric[..., 1, 2] = -axis[..., 0]
+    skew_symmetric[..., 1, 0] = axis[..., 2]
+    skew_symmetric[..., 2, 0] = -axis[..., 1]
+    skew_symmetric[..., 2, 1] = axis[..., 0]
+
+    # Compute the rotation matrix using the Rodrigues' formula
+    rotation_matrix = (
+        torch.eye(3, device=batch.device, dtype=batch.dtype).unsqueeze(0).unsqueeze(0)
+        + skew_symmetric * torch.sin(angle)
+        + torch.matmul(skew_symmetric, skew_symmetric) * (1 - torch.cos(angle))
+    )
+
+    return rotation_matrix
+
+
+def matrix_to_6D_rotations(matrix: torch.Tensor) -> torch.Tensor:
+    """Converts a batch of rotation matrices into 6D representation.
+
+    Args:
+        matrix: Batch of rotation matrices with shape [B, H, 3, 3].
+    Returns:
+        A tensor of 6D rotations with shape [B, H, 6].
+    """
+    return matrix.transpose(-1, -2).flatten(start_dim=2)[..., 0:6]
+
+
+def matrix_to_axis_angle(matrix: torch.Tensor) -> torch.Tensor:
+    """Converts a batch of rotation matrices into axis-angle representation.
+
+    Args:
+        matrix: Batch of rotation matrices with shape [B, H, 3, 3].
+    Returns:
+        A tensor of axis-angle representations with shape [B, H, 3].
+    """
+    B, H, d1, d2 = matrix.shape
+    assert d1 == 3 and d2 == 3, f"Expected batch to have shape [{B}, {H}, 3, 3], but got {matrix.shape}"
+
+    # Unpack the rotation matrix into the skew-symmetric matrix
+    skew_symmetric = matrix - matrix.transpose(-1, -2)  # [B, H, 3, 3]
+
+    # Compute the axis-angle representation using the Rodrigues' formula
+    angle = torch.acos((matrix.diagonal(dim1=-2, dim2=-1).sum(-1) - 1) / 2)  # [B, H]
+    axis = torch.stack(
+        [
+            skew_symmetric[..., 2, 1],
+            skew_symmetric[..., 0, 2],
+            skew_symmetric[..., 1, 0],
+        ],
+        dim=-1,
+    )  # [B, H, 3]
+
+    # Normalize the axis-angle representation
+    axis = axis / axis.norm(dim=-1, keepdim=True)  # [B, H, 3]
+
+    return angle * axis
 
 
 def batch_rotations_6D_squashed_to_matrix(batch: torch.Tensor, H: int) -> torch.Tensor:

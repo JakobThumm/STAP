@@ -2,14 +2,14 @@
 
 import argparse
 import pathlib
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
 import tqdm
 
 from stap import agents, envs
-from stap.dynamics import Dynamics
+from stap.dynamics import Dynamics, TableEnvDynamics
 from stap.dynamics.utils import batch_rotations_6D_to_matrix, geodesic_loss
 from stap.dynamics.utils import load as load_dynamics
 from stap.utils import random, tensors
@@ -53,7 +53,7 @@ def evaluate_episode(
     verbose: bool = False,
     debug: bool = False,
     record: bool = False,
-) -> List[float]:
+) -> Tuple[List[float], Dict[str, Any]]:
     """Evaluates the policy on one episode."""
     observation, reset_info = env.reset(seed=seed)
     if verbose:
@@ -63,10 +63,6 @@ def evaluate_episode(
     if record:
         env.record_start()
 
-    t_pos = 0
-    t_neg = 0
-    f_pos = 0
-    f_neg = 0
     rewards = []
     obs_diffs = []
     done = False
@@ -126,7 +122,6 @@ def evaluate_episodes(
     )
     rewards_lst = []
     obs_diffs = []
-    t_pos, t_neg, f_pos, f_neg = 0, 0, 0, 0
     for i in pbar:
         # Evaluate episode.
         rewards, info = evaluate_episode(dynamics, env, verbose=verbose, debug=False, record=True)
@@ -197,7 +192,10 @@ def evaluate_dynamics(
     env = envs.load(env_config, **env_kwargs)
     # Load policy.
     dynamics = load_dynamics(checkpoint=dynamics_checkpoint, env=env, device=device)
-    dynamics.plan_mode()
+    # DEBUG
+    if isinstance(dynamics, TableEnvDynamics):
+        dynamics._hand_crafted = True
+        dynamics.plan_mode()
 
     if debug_results is not None:
         # Load reset seed.
