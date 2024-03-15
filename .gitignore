@@ -4,6 +4,7 @@ models_*.zip
 datasets_*.zip
 juno
 models/
+models_fast/
 plots/
 scripts/train/train_juno.sh
 scripts/train/train_juno_cpu.sh

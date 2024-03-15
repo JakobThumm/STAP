@@ -287,7 +287,7 @@ def HandoverOrientationFn(
     hand_direction = hand_position - object_position
     hand_direction = hand_direction / torch.norm(hand_direction, dim=1, keepdim=True)
     hand_direction = torch.zeros_like(hand_direction)
-    hand_direction[:, 1] = -1
+    hand_direction[:, 1] = 1
     # Calculate great circle distance between the two vectors
     dot_product = torch.sum(new_direction_vector[..., :3] * hand_direction[..., :3], dim=1)
     angle_difference = torch.acos(torch.clip(dot_product, -1.0, 1.0))

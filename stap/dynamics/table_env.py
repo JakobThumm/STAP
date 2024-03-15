@@ -285,11 +285,11 @@ class TableEnvDynamics(LatentDynamics):
             )
         # Create z-rotation matrix batch with angle theta.
         z_rot_mat = torch.zeros_like(current_object_rot_mat)
-        z_rot_mat[..., 0, 0] = torch.cos(theta)
-        z_rot_mat[..., 0, 1] = -torch.sin(theta)
-        z_rot_mat[..., 1, 0] = torch.sin(theta)
-        z_rot_mat[..., 1, 1] = torch.cos(theta)
-        z_rot_mat[..., 2, 2] = 1.0
+        z_rot_mat[:, 0, 0, 0] = torch.cos(theta)
+        z_rot_mat[:, 0, 0, 1] = -torch.sin(theta)
+        z_rot_mat[:, 0, 1, 0] = torch.sin(theta)
+        z_rot_mat[:, 0, 1, 1] = torch.cos(theta)
+        z_rot_mat[:, 0, 2, 2] = 1.0
         # Multiply current rotation matrix with z-rotation matrix.
         new_rot_mat = torch.matmul(current_object_rot_mat, z_rot_mat)
         if self._has_6D_rot_state:
@@ -431,13 +431,13 @@ class TableEnvDynamics(LatentDynamics):
                     rotation_IDX_start:rotation_IDX_end,
                 ]
             )
-        R_T = torch.linalg.solve(R_eef_current, R_eef_desired, left=False)
-        R_obj_next = torch.matmul(R_T, R_obj_current)
+        R_T = torch.linalg.solve(R_eef_current[:, 0, ...], R_eef_desired, left=False)
+        R_obj_next = torch.matmul(R_T, R_obj_current[:, 0, ...])
         if self._has_6D_rot_state:
-            rotation_entries = matrix_to_6D_rotations(R_obj_next)
+            rotation_entries = matrix_to_6D_rotations(R_obj_next.unsqueeze(1))
         else:
-            rotation_entries = matrix_to_axis_angle(R_obj_next)
-        predicted_next_state[..., object_idx, rotation_IDX_start:rotation_IDX_end] = rotation_entries
+            rotation_entries = matrix_to_axis_angle(R_obj_next.unsqueeze(1))
+        predicted_next_state[..., object_idx : object_idx + 1, rotation_IDX_start:rotation_IDX_end] = rotation_entries
         return predicted_next_state
 
     def forward_eval(
