@@ -199,7 +199,7 @@ def batch_rotations_6D_to_matrix(batch: torch.Tensor) -> torch.Tensor:
     b3 = torch.cross(b1, b2, dim=-1)  # Make sure the cross product is taken along the correct dim
 
     # Stack b1, b2, and b3 to form the rotation matrices
-    rotations = torch.stack([b1, b2, b3], dim=-2)  # [B, H, 3, 3], stack along the second last dimension
+    rotations = torch.stack([b1, b2, b3], dim=-1)  # [B, H, 3, 3], stack along the last dimension
 
     return rotations
 
