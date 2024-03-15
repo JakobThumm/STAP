@@ -71,9 +71,12 @@ def evaluate_episode(
     obs_diffs = []
     done = False
     while not done:
+        observation, reset_info = env.reset(seed=seed)
         primitive = env.get_primitive()
         action = primitive.sample()
         new_observation, reward, terminated, truncated, step_info = env.step(action)
+        if reward < 1.0:
+            continue
         obs_tensor = torch.from_numpy(observation[np.newaxis, ...]).to(dynamics.device)
         action_tensor = torch.from_numpy(action[np.newaxis, ...]).to(dynamics.device)
         predicted_new_observation = dynamics.forward_eval(obs_tensor, action_tensor, primitive)
