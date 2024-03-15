@@ -7,9 +7,17 @@ import torch
 
 from stap import agents, envs, networks
 from stap.dynamics.latent import LatentDynamics
+from stap.dynamics.utils import (
+    batch_axis_angle_to_matrix,
+    batch_rotations_6D_to_matrix,
+    matrix_to_6D_rotations,
+    matrix_to_axis_angle,
+)
+from stap.envs.base import Primitive
 from stap.envs.pybullet.table.objects import Rack
 from stap.envs.pybullet.table.primitives import ACTION_CONSTRAINTS
 from stap.envs.pybullet.table_env import TableEnv
+from stap.utils.transformation_utils import euler_angles_to_matrix
 
 
 class TableEnvDynamics(LatentDynamics):
@@ -219,59 +227,225 @@ class TableEnvDynamics(LatentDynamics):
         Returns:
             Prediction of next state.
         """
-        new_predicted_next_state = predicted_next_state
         primitive_str = str(primitive).lower()
         if "pick" in primitive_str:
-            Z_IDX = 2
             target_object_idx = policy_args["observation_indices"][1]
-
-            new_predicted_next_state[..., target_object_idx, Z_IDX] = ACTION_CONSTRAINTS["max_lift_height"]
-            # TODO(klin) the following moves the EE to an awkward position;
-            # may need to do quaternion computation for accurate x-y positions
-            if "box" in primitive_str:
-                new_predicted_next_state[..., TableEnv.EE_OBSERVATION_IDX, Z_IDX] = ACTION_CONSTRAINTS[
-                    "max_lift_height"
-                ]
-                target_object_original_state = state[..., target_object_idx, :]
-                new_predicted_next_state[..., TableEnv.EE_OBSERVATION_IDX, :Z_IDX] = target_object_original_state[
-                    ..., :Z_IDX
-                ]
-                new_predicted_next_state[..., target_object_idx, :Z_IDX] = target_object_original_state[..., :Z_IDX]
-
-        if "place" in primitive_str:
+            new_predicted_next_state = self._handcrafted_dynamics_pick(
+                target_object_idx, state, predicted_next_state, action, primitive
+            )
+        elif "place" in primitive_str:
             SRC_OBJ_IDX = 1
             DEST_OBJ_IDX = 2
             source_object_idx = policy_args["observation_indices"][SRC_OBJ_IDX]
             destination_object_idx = policy_args["observation_indices"][DEST_OBJ_IDX]
-            destination_object_state = state[..., destination_object_idx, :]
-
-            if "table" in primitive_str:
-                destination_object_surface_offset = 0
-            elif "rack" in primitive_str:
-                destination_object_surface_offset = Rack.TOP_THICKNESS
-            else:
-                return new_predicted_next_state
-
-            # hardcoded object heights
-            if "box" in primitive_str:
-                median_object_height = 0.08
-            elif "hook" in primitive_str:
-                median_object_height = 0.04
-            else:
-                return new_predicted_next_state
-
-            new_predicted_next_state[..., source_object_idx, 2] = (
-                destination_object_state[..., 2] + destination_object_surface_offset + median_object_height / 2
+            new_predicted_next_state = self._handcrafted_dynamics_place(
+                source_object_idx, destination_object_idx, state, predicted_next_state, action, primitive
             )
+        elif "static_handover" in primitive_str:
+            SRC_OBJ_IDX = 1
+            DEST_OBJ_IDX = 2
+            source_object_idx = policy_args["observation_indices"][SRC_OBJ_IDX]
+            destination_object_idx = policy_args["observation_indices"][DEST_OBJ_IDX]
+            new_predicted_next_state = self._handcrafted_dynamics_static_handover(
+                source_object_idx, destination_object_idx, state, predicted_next_state, action, primitive
+            )
+        else:
+            return predicted_next_state
 
         return new_predicted_next_state
+
+    def _handcrafted_dynamics_pick(
+        self,
+        target_object_idx: int,
+        current_state: torch.Tensor,
+        predicted_next_state: torch.Tensor,
+        action: torch.Tensor,
+        primitive: Primitive,
+    ) -> torch.Tensor:
+        X_IDX = 0
+        Z_IDX = 2
+        rotation_IDX_start = 3
+        rotation_IDX_end = rotation_IDX_start + 6 if self._has_6D_rot_state else rotation_IDX_start + 3
+        assert self.env is not None
+
+        action_range = torch.from_numpy(primitive.action_scale.high - primitive.action_scale.low).to(self.device)
+        action_min = torch.from_numpy(primitive.action_scale.low).to(self.device)
+        action_0_1 = (action + 1.0) / 2.0
+        unnormalized_action = action_0_1 * action_range + action_min
+
+        # Calculate rotations
+        theta = unnormalized_action[..., 3]
+        if self._has_6D_rot_state:
+            current_object_rot_mat = batch_rotations_6D_to_matrix(
+                current_state[:, target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end]
+            )
+        else:
+            current_object_rot_mat = batch_axis_angle_to_matrix(
+                current_state[:, target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end]
+            )
+        # Create z-rotation matrix batch with angle theta.
+        z_rot_mat = torch.zeros_like(current_object_rot_mat)
+        z_rot_mat[:, 0, 0, 0] = torch.cos(theta)
+        z_rot_mat[:, 0, 0, 1] = -torch.sin(theta)
+        z_rot_mat[:, 0, 1, 0] = torch.sin(theta)
+        z_rot_mat[:, 0, 1, 1] = torch.cos(theta)
+        z_rot_mat[:, 0, 2, 2] = 1.0
+        # Multiply current rotation matrix with z-rotation matrix.
+        new_rot_mat = torch.matmul(current_object_rot_mat, z_rot_mat)
+        if self._has_6D_rot_state:
+            new_rotation_entries = matrix_to_6D_rotations(new_rot_mat)
+        else:
+            new_rotation_entries = matrix_to_axis_angle(new_rot_mat)
+        predicted_next_state[:, target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end] = (
+            new_rotation_entries
+        )
+        predicted_next_state[
+            ..., TableEnv.EE_OBSERVATION_IDX : TableEnv.EE_OBSERVATION_IDX + 1, rotation_IDX_start:rotation_IDX_end
+        ] = predicted_next_state[..., target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end]
+
+        # Calculate x- and y-position
+        # The object stays where it was
+        predicted_next_state[..., target_object_idx, X_IDX:Z_IDX] = current_state[..., target_object_idx, X_IDX:Z_IDX]
+        # The end effector moves in the x-y plane by the given action
+        displacement = unnormalized_action[..., :3]
+        displacement[..., 2] = 0
+        displacement_rotated = torch.matmul(new_rot_mat[:, 0, ...], displacement.unsqueeze(-1)).squeeze(-1)
+        predicted_next_state[..., TableEnv.EE_OBSERVATION_IDX, X_IDX:Z_IDX] = (
+            current_state[..., target_object_idx, X_IDX:Z_IDX] + displacement_rotated[..., 0:2]
+        )
+
+        # Calculate z-position
+        predicted_next_state[..., TableEnv.EE_OBSERVATION_IDX, Z_IDX] = (
+            ACTION_CONSTRAINTS["max_lift_height"] + self.env.robot.arm.ee_offset[Z_IDX]
+        )
+        predicted_next_state[..., target_object_idx, Z_IDX] = (
+            ACTION_CONSTRAINTS["max_lift_height"] - unnormalized_action[..., 2]
+        )
+        return predicted_next_state
+
+    def _handcrafted_dynamics_place(
+        self,
+        source_object_idx: int,
+        destination_object_idx: int,
+        current_state: torch.Tensor,
+        predicted_next_state: torch.Tensor,
+        action: torch.Tensor,
+        primitive: Primitive,
+    ) -> torch.Tensor:
+        primitive_str = str(primitive).lower()
+        destination_object_state = predicted_next_state[..., destination_object_idx, :]
+
+        if "table" in primitive_str:
+            destination_object_surface_offset = 0
+        elif "rack" in primitive_str:
+            destination_object_surface_offset = Rack.TOP_THICKNESS
+        else:
+            return predicted_next_state
+
+        # hardcoded object heights
+        if "box" in primitive_str:
+            median_object_height = 0.08
+        elif "hook" in primitive_str:
+            median_object_height = 0.04
+        elif "screwdriver" in primitive_str:
+            median_object_height = 0.02
+        else:
+            return predicted_next_state
+
+        predicted_next_state[..., source_object_idx, 2] = (
+            destination_object_state[..., 2] + destination_object_surface_offset + median_object_height / 2
+        )
+        return predicted_next_state
+
+    def _handcrafted_dynamics_static_handover(
+        self,
+        object_idx: int,
+        target_idx: int,
+        current_state: torch.Tensor,
+        predicted_next_state: torch.Tensor,
+        action: torch.Tensor,
+        primitive: Primitive,
+    ) -> torch.Tensor:
+        assert self.env is not None
+        assert hasattr(self.env.robot.arm, "base_pos")
+        ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
+        pos_IDX = 0
+        rotation_IDX_start = 3
+        rotation_IDX_end = rotation_IDX_start + 6 if self._has_6D_rot_state else rotation_IDX_start + 3
+        # Action: [pitch, yaw, distance, height]
+        action_range = torch.from_numpy(primitive.action_scale.high - primitive.action_scale.low).to(self.device)
+        action_min = torch.from_numpy(primitive.action_scale.low).to(self.device)
+        action_0_1 = (action + 1.0) / 2.0
+        unnormalized_action = action_0_1 * action_range + action_min
+        target_pos = current_state[:, target_idx, pos_IDX : pos_IDX + 3]
+        pitch = unnormalized_action[..., 0]
+        yaw = unnormalized_action[..., 1]
+        distance = unnormalized_action[..., 2]
+        height = unnormalized_action[..., 3]
+        # Set height
+        target_pos[..., 2] = height
+        base_pos = self.env.robot.arm.base_pos + ADDITIONAL_OFFSET  # type: ignore
+        height = torch.min(target_pos[..., 2] - base_pos[2], distance)
+
+        # Mathematics convention:
+        # Phi is the polar angle https://en.wikipedia.org/wiki/Spherical_coordinate_system#/media/File:3D_Spherical_2.svg
+        phi = torch.arccos(height / torch.clamp(distance, min=0.1))
+        # Theta angle is the azimuthal angle https://en.wikipedia.org/wiki/Spherical_coordinate_system#/media/File:3D_Spherical_2.svg
+        theta = torch.arctan2(target_pos[..., 1] - base_pos[1], target_pos[..., 0] - base_pos[0])
+        command_pos = torch.zeros_like(target_pos)
+        command_pos[..., 0] = base_pos[0] + torch.sin(phi) * distance * torch.cos(theta)
+        command_pos[..., 1] = base_pos[1] + torch.sin(phi) * distance * torch.sin(theta)
+        command_pos[..., 2] = base_pos[2] + height
+        predicted_next_state[..., object_idx, pos_IDX : pos_IDX + 3] = command_pos
+        # Calculate resulting rotation
+        R_eef_desired = euler_angles_to_matrix(
+            torch.stack([yaw, pitch, torch.zeros_like(yaw)], dim=-1), convention="ZYX"
+        )
+        if self._has_6D_rot_state:
+            R_eef_current = batch_rotations_6D_to_matrix(
+                current_state[
+                    :,
+                    TableEnv.EE_OBSERVATION_IDX : TableEnv.EE_OBSERVATION_IDX + 1,
+                    rotation_IDX_start:rotation_IDX_end,
+                ]
+            )
+            R_obj_current = batch_rotations_6D_to_matrix(
+                current_state[
+                    :,
+                    object_idx : object_idx + 1,
+                    rotation_IDX_start:rotation_IDX_end,
+                ]
+            )
+        else:
+            R_eef_current = batch_axis_angle_to_matrix(
+                current_state[
+                    :,
+                    TableEnv.EE_OBSERVATION_IDX : TableEnv.EE_OBSERVATION_IDX + 1,
+                    rotation_IDX_start:rotation_IDX_end,
+                ]
+            )
+            R_obj_current = batch_axis_angle_to_matrix(
+                current_state[
+                    :,
+                    object_idx : object_idx + 1,
+                    rotation_IDX_start:rotation_IDX_end,
+                ]
+            )
+        R_T = torch.linalg.solve(R_eef_current[:, 0, ...], R_eef_desired, left=False)
+        R_obj_next = torch.matmul(R_T, R_obj_current[:, 0, ...])
+        if self._has_6D_rot_state:
+            rotation_entries = matrix_to_6D_rotations(R_obj_next.unsqueeze(1))
+        else:
+            rotation_entries = matrix_to_axis_angle(R_obj_next.unsqueeze(1))
+        predicted_next_state[..., object_idx : object_idx + 1, rotation_IDX_start:rotation_IDX_end] = rotation_entries
+        return predicted_next_state
 
     def forward_eval(
         self,
         state: torch.Tensor,
         action: torch.Tensor,
         primitive: envs.Primitive,
-        use_handcrafted_dynamics_primitives: Optional[List[str]] = None,
+        use_handcrafted_dynamics_primitives: Optional[List[str]] = ["pick", "place", "static_handover"],
     ) -> torch.Tensor:
         """Predicts the next state for planning.
 
@@ -314,11 +488,8 @@ class TableEnvDynamics(LatentDynamics):
             next_env_state[..., idx_feats] = env_state[..., idx_feats]
 
         # Apply hand-crafted touch-ups to dynamics.
-        if self._hand_crafted:
+        if self._hand_crafted and use_handcrafted_dynamics_primitives is not None:
             idx_feats = self.env.dynamic_feature_indices
-
-            if use_handcrafted_dynamics_primitives is None:
-                use_handcrafted_dynamics_primitives = ["pick", "place"]
 
             for primitive_name in use_handcrafted_dynamics_primitives:
                 if primitive_name in str(primitive).lower():

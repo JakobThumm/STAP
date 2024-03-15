@@ -6,6 +6,7 @@ import numpy as np
 import tqdm
 
 from stap import agents, dynamics, envs, planners
+from stap.dynamics import TableEnvDynamics
 from stap.envs.pybullet.table import primitives as table_primitives
 from stap.utils import recording, timing
 
@@ -95,6 +96,7 @@ def evaluate_planners(
     path: Union[str, pathlib.Path],
     closed_loop: int,
     verbose: bool,
+    use_informed_dynamics: bool = False,
     load_path: Optional[Union[str, pathlib.Path]] = None,
     grid_resolution: Optional[int] = None,
     seed: Optional[int] = None,
@@ -116,6 +118,8 @@ def evaluate_planners(
         dynamics_checkpoint=dynamics_checkpoint,
         device=device,
     )
+    if isinstance(planner.dynamics, TableEnvDynamics) and use_informed_dynamics:
+        planner.dynamics._hand_crafted = True
     path = pathlib.Path(path) / pathlib.Path(config).stem
     path.mkdir(parents=True, exist_ok=True)
 
@@ -247,6 +251,9 @@ if __name__ == "__main__":
     parser.add_argument("--policy-checkpoints", "-p", nargs="+", help="Policy checkpoints")
     parser.add_argument("--scod-checkpoints", "-s", nargs="+", help="SCOD checkpoints")
     parser.add_argument("--dynamics-checkpoint", "-d", help="Dynamics checkpoint")
+    parser.add_argument(
+        "--use_informed_dynamics", default=1, type=int, help="Uses the informed dynamics if available in planning."
+    )
     parser.add_argument("--device", default="auto", help="Torch device")
     parser.add_argument("--num-eval", "-n", type=int, default=1, help="Number of eval iterations")
     parser.add_argument("--path", default="plots", help="Path for output plots")

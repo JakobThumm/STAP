@@ -11,7 +11,6 @@ from stap import datasets, processors
 from stap.utils import logging, metrics, tensors, timing
 from stap.utils.typing import ModelType, Scalar
 
-
 DatasetBatchType = TypeVar("DatasetBatchType", bound=Mapping)
 ModelBatchType = TypeVar("ModelBatchType", bound=Mapping)
 
@@ -190,14 +189,9 @@ class Trainer(abc.ABC, Generic[ModelType, ModelBatchType, DatasetBatchType]):
             "dataset_size": len(self.dataset),
             "eval_dataset_size": len(self.eval_dataset),
         }
-        state_dict["optimizers"] = {
-            key: optimizer.state_dict() for key, optimizer in self.optimizers.items()
-        }
+        state_dict["optimizers"] = {key: optimizer.state_dict() for key, optimizer in self.optimizers.items()}
         if self.schedulers is not None:
-            state_dict["schedulers"] = {
-                key: scheduler.state_dict()
-                for key, scheduler in self.schedulers.items()
-            }
+            state_dict["schedulers"] = {key: scheduler.state_dict() for key, scheduler in self.schedulers.items()}
         state_dict.update(self.model.state_dict())
         return state_dict
 
@@ -291,19 +285,14 @@ class Trainer(abc.ABC, Generic[ModelType, ModelBatchType, DatasetBatchType]):
         time_metrics = self.profiler.collect_profiles()
         time_metrics["epoch"] = self.epoch
         if "log_interval" in self.timer.keys():
-            time_metrics["steps_per_second"] = self.log_freq / self.timer.toc(
-                "log_interval", set_tic=True
-            )
+            time_metrics["steps_per_second"] = self.log_freq / self.timer.toc("log_interval", set_tic=True)
         else:
             self.timer.tic("log_interval")
         return time_metrics
 
     def get_lr_metrics(self) -> Dict[str, float]:
         """Gets learning rate metrics for logging."""
-        return {
-            key: scheduler.get_last_lr()[0]
-            for key, scheduler in self.schedulers.items()
-        }
+        return {key: scheduler.get_last_lr()[0] for key, scheduler in self.schedulers.items()}
 
     def profile_step(self) -> None:
         """Enables or disables profiling for the current step."""
@@ -324,13 +313,9 @@ class Trainer(abc.ABC, Generic[ModelType, ModelBatchType, DatasetBatchType]):
         """
         with self.profiler.profile("train"):
             model_batch = self.process_batch(batch)
-            return self.model.train_step(
-                step, model_batch, self.optimizers, self.schedulers
-            )
+            return self.model.train_step(step, model_batch, self.optimizers, self.schedulers)
 
-    def log_step(
-        self, metrics_list: List[Mapping[str, float]], stage: str = "train"
-    ) -> List[Mapping[str, float]]:
+    def log_step(self, metrics_list: List[Mapping[str, float]], stage: str = "train") -> List[Mapping[str, float]]:
         """Logs the metrics to Tensorboard if enabled for the current step.
 
         Args:
@@ -352,9 +337,7 @@ class Trainer(abc.ABC, Generic[ModelType, ModelBatchType, DatasetBatchType]):
 
         return []
 
-    def post_evaluate_step(
-        self, eval_metrics_list: List[Mapping[str, Union[Scalar, np.ndarray]]]
-    ) -> None:
+    def post_evaluate_step(self, eval_metrics_list: List[Mapping[str, Union[Scalar, np.ndarray]]]) -> None:
         """Logs the eval results and saves checkpoints.
 
         Args:
@@ -372,10 +355,7 @@ class Trainer(abc.ABC, Generic[ModelType, ModelBatchType, DatasetBatchType]):
 
         # Save best model.
         eval_score = np.mean(eval_metrics[self.eval_metric])
-        is_eval_better = (
-            metrics.best_metric(self.eval_metric, eval_score, self.best_eval_score)
-            == eval_score
-        )
+        is_eval_better = metrics.best_metric(self.eval_metric, eval_score, self.best_eval_score) == eval_score
         if is_eval_better:
             self._best_eval_score = eval_score
             self.save(self.path, "best_trainer")

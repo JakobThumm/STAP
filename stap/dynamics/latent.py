@@ -239,6 +239,9 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
             "rotational_loss": rotational_loss.item(),
             "loss": total_loss.item(),
         }
+        if self._use_geodesic_loss:
+            for i_policy, _ in enumerate(self.policies):
+                metrics[f"geodesic_loss_{i_policy}"] = rotational_losses[i_policy == idx_policy].mean().item()
 
         """This is only for computing metrics on the individual policies. It is not used for training.
         # Compute per-policy L2 losses.
