@@ -132,6 +132,7 @@ class CEMPlanner(planners.Planner):
                 std[t, 3] = 1.0 * self.standard_deviation * 0.5 * action_range[3]
             elif isinstance(primitive, StaticHandover):
                 mean[t, :] = torch.zeros_like(mean[t, :], device=self.device)
+                std[t, :] = 2.0 * self.standard_deviation * 0.5 * action_range
         return mean.to(self.device), std.to(self.device)
 
     def plan(

@@ -399,6 +399,10 @@ class TableEnv(PybulletEnv):
         """Returns an iterator over the non-null objects."""
         return (obj for obj in self.objects.values() if not obj.isinstance(Null))
 
+    def get_object_id_from_name(self, name: str) -> int:
+        """Returns the object id from the object name."""
+        return list(self.objects.keys()).index(name)
+
     def get_object_state_from_observation(self, observation: np.ndarray, identifier: str) -> object_state.ObjectState:
         """Returns the object state from the observation matrix."""
         assert identifier in self.objects
