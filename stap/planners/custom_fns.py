@@ -4,19 +4,25 @@ Author: Jakob Thumm
 Date: 2024-01-02
 """
 
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 
 import torch
 
-from stap.dynamics.utils import batch_rotations_6D_to_matrix
-from stap.envs.base import Primitive
+from stap.envs.base import Env, Primitive
 from stap.envs.pybullet.table import object_state
+from stap.envs.pybullet.table_env import TableEnv
 from stap.utils.transformation_utils import (
     matrix_to_axis_angle,
-    rotate_vector_by_rotation_matrix,
+    matrix_to_quaternion,
+    quaternion_apply,
+    quaternion_invert,
+    quaternion_multiply,
+    quaternion_to_axis_angle,
+    rotation_6d_to_matrix,
 )
 
 
+################### UTILITY FUNCTIONS ###################
 def get_object_position(observation: torch.Tensor, id: int) -> torch.Tensor:
     r"""Returns the position of the object.
 
@@ -45,7 +51,7 @@ def get_object_orientation(observation: torch.Tensor, id: int) -> torch.Tensor:
         id: ID of the object.
 
     Returns:
-        Orientation of the object [batch_size, 3].
+        Orientation of the object [batch_size, 3, 3].
     """
     idxR11 = list(object_state.ObjectState.RANGES.keys()).index("R11")
     idxR21 = list(object_state.ObjectState.RANGES.keys()).index("R21")
@@ -53,12 +59,204 @@ def get_object_orientation(observation: torch.Tensor, id: int) -> torch.Tensor:
     idxR12 = list(object_state.ObjectState.RANGES.keys()).index("R12")
     idxR22 = list(object_state.ObjectState.RANGES.keys()).index("R22")
     idxR32 = list(object_state.ObjectState.RANGES.keys()).index("R32")
-    rotations = batch_rotations_6D_to_matrix(
-        observation[:, id : id + 1, [idxR11, idxR21, idxR31, idxR12, idxR22, idxR32]]
-    )
+    rotations = rotation_6d_to_matrix(observation[:, id : id + 1, [idxR11, idxR21, idxR31, idxR12, idxR22, idxR32]])
     return rotations[:, 0, :, :]
 
 
+############## HELPER FUNCTIONS FOR THE CUSTOM FNS ##############
+def get_object_id_from_name(name: str, env: Env) -> int:
+    """Return the object identifier from a given object name."""
+    assert isinstance(env, TableEnv)
+    return env.get_object_id_from_name(name)
+
+
+def get_object_id_from_primitive(arg_id: int, primitive: Primitive) -> int:
+    """Return the object identifier from a primitive and its argument id.
+
+    Example: The primitive `Place` has two argument ids: `object` with `arg_id = 0` and `target` with `arg_id = 1`.
+    """
+    arg_object_ids = primitive.get_policy_args_ids()
+    return arg_object_ids[arg_id]
+
+
+def get_pose(state: torch.Tensor, object_id: int, frame: int = -1) -> torch.Tensor:
+    """Return the pose of an object in the requested frame.
+
+    Args:
+        state: state (observation) to extract the pose from.
+        object_id: number identifying the obect. Can be retrieved with `get_object_id_from_name()` and
+            `get_object_id_from_primitive()`.
+        frame: the frame to represent the pose in. Default is `-1`, which is world frame. In our simulation, the base
+            frame equals the world frame. Give the object id for other frames, e.g., `0` for end effector frame.
+    Returns:
+        The pose in shape [..., 7] with format [x, y, z, qw, qx, qy, qz], with the rotation represented as a quaternion.
+    """
+    object_pose = torch.zeros([state.shape[0], 7], device=state.device)
+    object_pose[:, :3] = get_object_position(state, object_id)
+    object_rotation_matrix = get_object_orientation(state, object_id)
+    if frame == -1:
+        object_pose[:, 3:] = matrix_to_quaternion(object_rotation_matrix)
+    else:
+        assert frame >= 0, "Unknown frame."
+        frame_position = get_object_position(state, frame)
+        frame_rotation_matrix = get_object_orientation(state, frame)
+        # Compute the inverse of the object's rotation matrix
+        R_frame_inv = frame_rotation_matrix.transpose(-2, -1)
+        # Calculate the relative position
+        relative_position = torch.matmul(R_frame_inv, (object_pose[:, :3] - frame_position).unsqueeze(-1)).squeeze(-1)
+        object_pose[:, :3] = relative_position
+        # Calculate relative orientation
+        relative_rotation_matrix = torch.matmul(R_frame_inv, object_rotation_matrix)
+        object_pose[:, 3:] = matrix_to_quaternion(relative_rotation_matrix)
+        # Calculate the relative position in object frame
+
+    return object_pose
+
+
+def position_norm_metric(
+    pose_1: torch.Tensor, pose_2: torch.Tensor, norm: str = "L2", axes: Sequence[str] = ["x", "y", "z"]
+) -> torch.Tensor:
+    """Calculate the norm of the positional difference of two poses along the given axes.
+
+    Args:
+        pose_{1, 2}: the poses of the two objects.
+        norm: which norm to calculate. Choose from 'L1', 'L2', and 'Linf'. Defaults to `L2`.
+        axes: calculate the norm along the given axes and ignore all other axes. Choose entries from `{'x', 'y', 'z'}`.
+    Returns:
+        The norm in shape [..., 1]
+    """
+    assert norm in ["L1", "L2", "Linf"], "Unknown norm."
+    assert all([axis in ["x", "y", "z"] for axis in axes]), "Unknown axis."
+    assert len(axes) > 0, "No axes given."
+    axes_binary = [1 if axis in axes else 0 for axis in ["x", "y", "z"]]
+    position_diff = pose_1[..., :3] - pose_2[..., :3]
+    position_diff = position_diff * torch.tensor(axes_binary, device=position_diff.device)
+    if norm == "L1":
+        return torch.norm(position_diff, p=1, dim=-1, keepdim=True)
+    elif norm == "L2":
+        return torch.norm(position_diff, p=2, dim=-1, keepdim=True)
+    elif norm == "Linf":
+        return torch.norm(position_diff, p=float("inf"), dim=-1, keepdim=True)
+    else:
+        raise NotImplementedError()
+
+
+def great_circle_distance_metric(pose_1: torch.Tensor, pose_2: torch.Tensor) -> torch.Tensor:
+    """Calculate the difference in orientation in radians of two poses using the great circle distance.
+
+    Assumes that the position entries of the poses are direction vectors `v1` and `v2`.
+    The great circle distance is then `d = arccos(dot(v1, v2))` in radians.
+    """
+    eps = 1e-6
+    v1 = pose_1[..., :3] / torch.norm(pose_1[..., :3], dim=-1, keepdim=True)
+    v2 = pose_2[..., :3] / torch.norm(pose_2[..., :3], dim=-1, keepdim=True)
+    return torch.acos(torch.clip(torch.sum(v1 * v2, dim=-1, keepdim=True), -1.0 + eps, 1.0 - eps))
+
+
+def pointing_in_direction_metric(
+    pose_1: torch.Tensor, pose_2: torch.Tensor, main_axis: Sequence[float] = [1, 0, 0]
+) -> torch.Tensor:
+    """Evaluate if an object is pointing in a given direction.
+
+    Rotates the given main axis by the rotation of pose_1 and calculates the `great_circle_distance()`
+    between the rotated axis and pose_2.position.
+    Args:
+        pose_1: the orientation of this pose is used to rotate the `main_axis`.
+        pose_2: compare the rotated `main_axis` with the position vector of this pose.
+        main_axis: axis describing in which direction an object is pointing in its default configuration.
+    Returns:
+        The great circle distance in radians between the rotated `main_axis` and the position part of `pose_2`.
+    """
+    main_axis = torch.FloatTensor(main_axis).to(pose_1.device)  # type: ignore
+    norm_main_axis = main_axis / torch.norm(main_axis, dim=-1, keepdim=True)
+    new_pose = torch.zeros_like(pose_1)
+    new_pose[..., :3] = quaternion_apply(pose_1[..., 3:], norm_main_axis)
+    return great_circle_distance_metric(new_pose, pose_2)
+
+
+def rotation_angle_metric(pose_1: torch.Tensor, pose_2: torch.Tensor, axis: Sequence[float]) -> torch.Tensor:
+    """Calculate the rotational difference between pose_1 and pose_2 around the given axis.
+
+    Example: The orientation 1 is not rotated and the orientation 2 is rotated around the z-axis by 90 degree.
+        Then if the given axis is [0, 0, 1], the function returns pi/2.
+        If the given axis is [1, 0, 0], the function returns 0, as there is no rotation around the x-axis.
+
+    Args:
+        pose_{1, 2}: the orientations of the two poses are used to calculate the rotation angle.
+        axis: The axis of interest to rotate around.
+
+    Returns:
+        The angle difference in radians along the given axis.
+    """
+    relative_rotation = quaternion_multiply(quaternion_invert(pose_1[..., 3:]), pose_2[..., 3:])
+    relative_rotation_rot_vec = quaternion_to_axis_angle(relative_rotation)
+    rotation_axis = torch.zeros_like(relative_rotation_rot_vec)
+    rotation_axis[..., 0] = axis[0]
+    rotation_axis[..., 1] = axis[1]
+    rotation_axis[..., 2] = axis[2]
+    # dot product of the rotation axis and the relative rotation axis
+    dot_product = torch.sum(rotation_axis * relative_rotation_rot_vec, dim=-1, keepdim=True)
+    return dot_product
+
+
+def threshold_probability(metric: torch.Tensor, threshold: float, is_smaller_then: bool = True) -> torch.Tensor:
+    """If `is_smaller_then`: return `1.0` if `metric < threshold` and `0.0` otherwise.
+    If not `is_smaller_then`: return `1.0` if `metric >= threshold` and `0.0` otherwise.
+    """
+    cdf = torch.where(metric < threshold, 1.0, 0.0)[:, 0]
+    if not is_smaller_then:
+        cdf = 1.0 - cdf
+    return cdf
+
+
+def linear_probability(
+    metric: torch.Tensor, lower_threshold: float, upper_threshold: float, is_smaller_then: bool = True
+) -> torch.Tensor:
+    """Return the linear probility given a metric and two thresholds.
+
+    If `is_smaller_then` return:
+        - `1.0` if `metric < lower_threshold`
+        - `0.0` if `metric < upper_threshold`
+        - linearly interpolate between 0 and 1 otherwise.
+    If not `is_smaller_then` return:
+        - `1.0` if `metric >= upper_threshold`
+        - `0.0` if `metric < lower_threshold`
+        - linearly interpolate between 1 and 0 otherwise.
+    """
+    cdf = torch.clip((metric - lower_threshold) / (upper_threshold - lower_threshold), 0.0, 1.0)[:, 0]
+    if is_smaller_then:
+        cdf = 1.0 - cdf
+    return cdf
+
+
+def normal_probability(metric: torch.Tensor, mean: float, std_dev: float, is_smaller_then: bool = True) -> torch.Tensor:
+    """Return a probability function based on the cummulative distribution function with `mean` and `std_dev`.
+
+    Args:
+        metric: the metric to calculate the value for.
+        mean: the mean of the cummulative distribution function.
+        std_dev: the standard deviation of the cummulative distribution function.
+        is_smaller_then: if true, invert the return value with `(1-p)`.
+    Returns:
+        `cdf(metric, mean, std_dev)`
+    """
+    cdf = 0.5 * (1 + torch.erf((metric - mean) / (std_dev * torch.sqrt(torch.tensor(2.0, device=metric.device)))))[:, 0]
+    if is_smaller_then:
+        cdf = 1.0 - cdf
+    return cdf
+
+
+def probability_intersection(p_1: torch.Tensor, p_2: torch.Tensor) -> torch.Tensor:
+    """Calculate the intersection of two probabilities `p = p_1 * p_2`."""
+    return p_1 * p_2
+
+
+def probability_union(p_1: torch.Tensor, p_2: torch.Tensor) -> torch.Tensor:
+    """Calculate the union of two probabilities `p = max(p_1, p_2)`."""
+    return torch.max(p_1, p_2)
+
+
+################ OLD FUNCTIONS #################
 def get_object_head_length(observation: torch.Tensor, id: int) -> torch.Tensor:
     r"""Returns the head length of the object.
 
@@ -132,7 +330,6 @@ def get_eef_pose_in_object_frame(
     # Calculate relative orientation
     R_relative = torch.matmul(R_object_inv, R_eef)
 
-    # Assuming a function to convert rotation matrices back to axis-angle format is available
     relative_orientation = matrix_to_axis_angle(R_relative)
     return (relative_position, relative_orientation)
 
@@ -176,6 +373,8 @@ def ScrewdriverPickFn(
 ) -> torch.Tensor:
     r"""Evaluates the position of the pick primitive.
 
+    We want to grasp the screwdirver at the rod, so that the human can easily grab the handle.
+
     Args:
         state [batch_size, state_dim]: Current state.
         action [batch_size, action_dim]: Action.
@@ -186,22 +385,18 @@ def ScrewdriverPickFn(
         Evaluation of the performed handover [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
-    arg_object_ids = primitive.get_policy_args_ids()
-    idx = arg_object_ids[0]
-    MIN_VALUE = 0.0
-    MAX_VALUE = 1.0
-    eef_pos, eef_aa = get_eef_pose_in_object_frame(next_state, idx, 0)
-    # We want to grab the handle.
-    # The handle has its center at [0.5 * handle_length, 0.0, 0.0] in the object frame.
-    handle_length = get_object_handle_length(next_state, idx)
-    handle_center = torch.zeros_like(eef_pos, device=state.device)
-    handle_center[:, 0] = 1.5 * handle_length
-    threshold_greater = 0.02
-    position_value_1 = MAX_VALUE * (eef_pos[:, 0] > threshold_greater) + MIN_VALUE * (eef_pos[:, 0] < threshold_greater)
-    threshold_smaller = handle_length * 0.9
-    position_value_2 = MAX_VALUE * (eef_pos[:, 0] < threshold_smaller) + MIN_VALUE * (eef_pos[:, 0] > threshold_smaller)
-    position_value = position_value_1 * position_value_2
-    return position_value
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    end_effector_id = get_object_id_from_name("end_effector", env)
+    # Get the pose of the end effector in the object frame
+    next_end_effector_pose = get_pose(next_state, end_effector_id, object_id)
+    # Assumes the rod length is 0.075 and the rod in the positive x direction in object frame.
+    preferred_grasp_pose = torch.FloatTensor([0.075 / 2.0, 0, 0, 1, 0, 0, 0]).to(next_state.device)
+    # Calculate the positional norm metric
+    position_metric = position_norm_metric(next_end_effector_pose, preferred_grasp_pose, norm="L2", axes=["x"])
+    # Calculate the probability
+    probability_grasp_handle = threshold_probability(position_metric, 0.075 / 2.0, is_smaller_then=True)
+    return probability_grasp_handle
 
 
 def ScrewdriverPickActionFn(
@@ -273,34 +468,21 @@ def HandoverOrientationFn(
         Evaluation of the performed handover [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
-    arg_object_ids = primitive.get_policy_args_ids()
-    idx_obj = arg_object_ids[0]
-    idx_hand = arg_object_ids[1]
-    object_position = get_object_position(next_state, idx_obj)
-    hand_position = get_object_position(state, idx_hand)
-    R_obj = get_object_orientation(next_state, idx_obj)
-    # The head of the screwdriver points in negative x-direction in the object frame.
-    x_axis = torch.zeros([R_obj.shape[0], 3], device=R_obj.device)
-    x_axis[..., 0] = -1.0
-    new_direction_vector = rotate_vector_by_rotation_matrix(x_axis, R_obj)
-    # Hand direction before the handover
-    hand_direction = hand_position
-    hand_direction[:, 2] = 0.0
-    hand_direction = hand_direction / torch.norm(hand_direction, dim=1, keepdim=True)
-<<<<<<< HEAD
-=======
-    hand_direction = torch.zeros_like(hand_direction)
-    hand_direction[:, 1] = 1
->>>>>>> main
-    # Calculate great circle distance between the two vectors
-    dot_product = torch.sum(new_direction_vector[..., :3] * hand_direction[..., :3], dim=1)
-    angle_difference = torch.acos(torch.clip(dot_product, -1.0, 1.0))
-    MIN_VALUE = 0.0
-    MAX_VALUE = 1.0
-    ANGLE_RANGE = torch.pi / 2.0
-    orientation_value = MIN_VALUE + (ANGLE_RANGE - angle_difference) / ANGLE_RANGE * (MAX_VALUE - MIN_VALUE)
-    assert not torch.any(torch.isnan(orientation_value))
-    return orientation_value
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing towards the hand position after the handover action.
+    orientation_metric = pointing_in_direction_metric(next_object_pose, current_hand_pose, handle_main_axis)
+    lower_threshold = torch.pi / 6.0
+    upper_threshold = torch.pi / 4.0
+    # Calculate the probability
+    probability_handover_orientation = linear_probability(
+        orientation_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    return probability_handover_orientation
 
 
 CUSTOM_FNS = {

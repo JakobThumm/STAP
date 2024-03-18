@@ -45,6 +45,9 @@ class Primitive:
     def __str__(self) -> str:
         return f"{type(self).__name__}()"
 
+    def full_description(self) -> str:
+        return str(self)
+
 
 class Env(gym.Env[np.ndarray, np.ndarray]):
     """Base env class with a separate state space for dynamics."""

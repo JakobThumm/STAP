@@ -7,12 +7,12 @@ import torch
 
 from stap import agents, networks
 from stap.dynamics.base import Dynamics
-from stap.dynamics.utils import (
-    batch_rotations_6D_squashed_to_matrix,
-    batch_rotations_6D_to_matrix,
-    geodesic_loss,
-)
+from stap.dynamics.utils import geodesic_loss
 from stap.utils import configs
+from stap.utils.transformation_utils import (
+    batch_rotations_6D_squashed_to_matrix,
+    rotation_6d_to_matrix,
+)
 from stap.utils.typing import DynamicsBatch, Model, Scalar
 
 
@@ -223,7 +223,7 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
                 predicted_R = batch_rotations_6D_squashed_to_matrix(
                     next_obs_predicted[:, geodesic_indices], observation.shape[1]
                 )
-                true_R = batch_rotations_6D_to_matrix(next_observation[:, :, 3:9])
+                true_R = rotation_6d_to_matrix(next_observation[:, :, 3:9])
             else:
                 raise NotImplementedError("Only 6D rotations are supported.")
             rotational_losses = geodesic_loss(predicted_R, true_R)

@@ -217,6 +217,9 @@ class Object(body.Body):
     def shapes(self) -> Sequence[shapes.Shape]:
         return []
 
+    def full_description(self) -> str:
+        return f"An object of type {str(self.type())} with name {self.name}."
+
     def __str__(self) -> str:
         return self.name
 
@@ -249,6 +252,12 @@ class Urdf(Object):
     def bbox(self) -> np.ndarray:
         return self._bbox
 
+    def full_description(self) -> str:
+        return (
+            f"An object loaded from an URDF with name {self.name} and bounding box "
+            f"[{self.size[0]:.3f}, {self.size[1]:.3f}, {self.size[2]:.3f}]."
+        )
+
 
 class Box(Object):
     def __init__(
@@ -280,6 +289,13 @@ class Box(Object):
     @property
     def shapes(self) -> Sequence[shapes.Shape]:
         return [self._shape]
+
+    def full_description(self) -> str:
+        return (
+            f"A box named {self.name}. "
+            f"The box has dimensions width (x) = {self.size[0]:.3f} x depth (y) = {self.size[1]:.3f} x height (z) = {self.size[2]:.3f}. "
+            f"The object frame has its origin in its center. "
+        )
 
 
 class VisualCapsule(Object):
@@ -458,6 +474,16 @@ class Hook(Object):
 
         return vertices
 
+    def full_description(self) -> str:
+        return (
+            f"A hook named {self.name} with a handle and a head. "
+            f"The handle points in the y direction `main_axis = [0, 1, 0]`, "
+            f"the head in the z direction `main_axis = [0, 0, 1]` of the object in the object frame. "
+            f"The object frame has its origin at the point where the head and the handle meet. "
+            f"The object properties are: handle_length={self.head_length:.3f}, rod_length={self.handle_length:.3f}, "
+            f"radius={self.radius:.3f})."
+        )
+
     @property
     def shapes(self) -> Sequence[shapes.Shape]:
         return self._shapes
@@ -549,6 +575,10 @@ class Screwdriver(Object):
     def bbox(self) -> np.ndarray:
         return self._bbox
 
+    @property
+    def shapes(self) -> Sequence[shapes.Shape]:
+        return self._shapes
+
     def convex_hulls(
         self,
         world_frame: bool = True,
@@ -578,9 +608,16 @@ class Screwdriver(Object):
 
         return vertices
 
-    @property
-    def shapes(self) -> Sequence[shapes.Shape]:
-        return self._shapes
+    def full_description(self) -> str:
+        return (
+            f"A screwdriver named {self.name} with a rod and a handle. "
+            f"The screwdriver can be picked both at the rod and the handle. "
+            f"The handle points in negative x direction `main_axis = [-1, 0, 0]`, "
+            f"the rod in the positive x direction `main_axis = [1, 0, 0]` of the object in the object frame. "
+            f"The object frame has its origin at the point where the rod and the handle meet. "
+            f"The object properties are: handle_length={self.head_length:.3f}, rod_length={self.handle_length:.3f}, "
+            f"handle_radius={self.head_radius:.3f}, rod_radius={self.handle_radius:.3f}."
+        )
 
     # def aabb(self) -> np.ndarray:
     #     raise NotImplementedError
@@ -672,6 +709,12 @@ class Rack(Object):
     def shapes(self) -> Sequence[shapes.Shape]:
         return self._shapes
 
+    def full_description(self) -> str:
+        return (
+            f"A rack named {self.name}, where items can be placed on. "
+            f"The rack has size width (x) = {self.size[0]:.3f} x depth (y) = {self.size[1]:.3f} x height (z) = {self.size[2]:.3f}."
+        )
+
 
 class BodyPart(Object):
     def __init__(
@@ -701,6 +744,9 @@ class BodyPart(Object):
 
     def unfreeze(self) -> bool:
         return False
+
+    def full_description(self) -> str:
+        return f"A human body part named {self.name}. "
 
 
 class Null(Object):
@@ -967,6 +1013,9 @@ class WrapperObject(Object):
         assert isinstance(self.body, Hook)
         return self.body.radius
 
+    def full_description(self) -> str:
+        return self.body.full_description()
+
 
 class ObjectGroup:
     def __init__(self, physics_id: int, name: str, objects: List[Dict[str, Any]]):
@@ -1050,6 +1099,12 @@ class ObjectGroup:
             obj.freeze()
 
         return num_objects
+
+    def full_description(self) -> str:
+        descriptions = "A group of objects with descriptions:\n"
+        for obj in self.objects:
+            descriptions += f"- {obj.full_description()}\n"
+        return descriptions
 
     def pop_index(
         self,
@@ -1166,6 +1221,9 @@ class Variant(WrapperObject):
     @property
     def variants(self) -> Union[List[Object], ObjectGroup]:
         return self._variants
+
+    def full_description(self) -> str:
+        return self.body.full_description()
 
     def set_variant(
         self,
