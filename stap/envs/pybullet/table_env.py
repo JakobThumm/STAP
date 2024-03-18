@@ -395,13 +395,33 @@ class TableEnv(PybulletEnv):
     def objects(self) -> Dict[str, Object]:
         return self._objects
 
+    def get_scene_description(self, verbose: bool = True) -> str:
+        """Return a detailed description of the current scene."""
+        description = "====== Scene Description ======\n"
+        description += "There are the following objects in the scene:\n"
+        for obj in self.real_objects():
+            description += obj.full_description() + "\n"
+        description += "The objects have the following predicate:\n"
+        for predicate in self.task.initial_state:
+            description += str(predicate) + "\n"
+        description += "===== Task Description =====\n"
+        description += "The sequence of skills to execute is as follows:\n"
+        for primitive in self.action_skeleton:
+            description += primitive.full_description() + "\n"
+        if verbose:
+            print(description)
+        return description
+
     def real_objects(self) -> Generator[Object, None, None]:
         """Returns an iterator over the non-null objects."""
         return (obj for obj in self.objects.values() if not obj.isinstance(Null))
 
     def get_object_id_from_name(self, name: str) -> int:
         """Returns the object id from the object name."""
-        return list(self.objects.keys()).index(name)
+        if name == "end_effector":
+            return 0
+        else:
+            return list(self.objects.keys()).index(name)
 
     def get_object_state_from_observation(self, observation: np.ndarray, identifier: str) -> object_state.ObjectState:
         """Returns the object state from the observation matrix."""
@@ -807,6 +827,8 @@ class TableEnv(PybulletEnv):
         }
         self._seed = seed
         task_sampling_trials += 1
+
+        info["scene_description"] = self.get_scene_description(verbose=True)
 
         return self.get_observation(), info
 

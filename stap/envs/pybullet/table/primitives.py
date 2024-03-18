@@ -208,6 +208,15 @@ class Primitive(envs.Primitive, abc.ABC):
 
         return did_non_args_move
 
+    def full_description(self) -> str:
+        """Return a string fully describing the primitive."""
+        # description = f"Primitve {str(self)} with action ranges: ["
+        # for key in self.Action.RANGES.keys():
+        #     description += f"{key}: [{self.Action.RANGES[key][0]:.3f}, {self.Action.RANGES[key][1]:.3f}], "
+        # description = description[:-2] + "]."
+        # return description
+        return str(self)
+
     def __eq__(self, other) -> bool:
         if isinstance(other, Primitive):
             return str(self) == str(other)
@@ -224,6 +233,12 @@ class Pick(Primitive):
     action_scale = gym.spaces.Box(*primitive_actions.PickAction.range())
     Action = primitive_actions.PickAction
     ALLOW_COLLISIONS = False
+
+    def full_description(self) -> str:
+        """Return a string fully describing the primitive."""
+        description = super().full_description()
+        description += " This primitive is used to pick up objects with the robot gripper."
+        return description
 
     def execute(self, action: np.ndarray, real_world: bool = False) -> ExecutionResult:
         from stap.envs.pybullet.table_env import TableEnv
@@ -325,6 +340,13 @@ class Place(Primitive):
     action_scale = gym.spaces.Box(*primitive_actions.PlaceAction.range())
     Action = primitive_actions.PlaceAction
     ALLOW_COLLISIONS = False
+
+    def full_description(self) -> str:
+        """Return a string fully describing the primitive."""
+        description = super().full_description()
+        # description += " Here, the action describes the position to place the object in world frame and the z-rotation of the end-effector."
+        description += " This primitive is used to place objects that are in the gripper onto other objects."
+        return description
 
     def execute(self, action: np.ndarray, real_world: bool = False, verbose: bool = False) -> ExecutionResult:
         from stap.envs.pybullet.table_env import TableEnv
@@ -633,9 +655,10 @@ class Handover(Primitive):
 class StaticHandover(Primitive):
     """Handover primitive that is not adapting to the human.
 
-    The action is three-dimensional, where the first dimension is the pitch angle of the end-effector, the second
-    dimension is the distance to the human hand, and third dimension is the height at which the object should be handed
-    over. The distance hereby defines the distance in which the EEF should be placed from the base.
+    The action is four-dimensional, where the first dimension is the pitch angle of the end-effector, the second
+    dimension is the yaw angle of the end-effector, the third is the distance to the human hand,
+    and fourth dimension is the height at which the object should be handed over.
+    The distance hereby defines the distance in which the EEF should be placed from the base.
     The robot will always try to move to a position, such that the end-effector is pointing towards the human hand.
     E.g, pitch=0: e   pitch=pi/2: x <----- e
                   |                 |-----|
@@ -647,6 +670,16 @@ class StaticHandover(Primitive):
     action_scale = gym.spaces.Box(*primitive_actions.HandoverAction.range())
     Action = primitive_actions.HandoverAction
     ALLOW_COLLISIONS = False
+
+    def full_description(self) -> str:
+        """Return a string fully describing the primitive."""
+        description = super().full_description()
+        # description += " Here, a pitch of -pi/2 means that the end effector is pointing towards the human and a pitch of 0 means that the end effector is pointing downwards."
+        # description += " A yaw of 0 means that the end effector is pointing towards the human and a yaw of pi/2 means that the end effector is pointing to the right of the human."
+        # description += " The distance defines the distance in which the EEF should be placed from the base."
+        # description += " The height defines the height at which the object should be handed over."
+        description += " This primitive is used to hand over objects to the human. The next state describes the position and orientation of the object at the exact time of the handover."
+        return description
 
     def execute(self, action: np.ndarray, real_world: bool = False, verbose: bool = False) -> ExecutionResult:
         from stap.envs.pybullet.human_table_env import HumanTableEnv
