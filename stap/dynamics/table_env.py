@@ -7,17 +7,17 @@ import torch
 
 from stap import agents, envs, networks
 from stap.dynamics.latent import LatentDynamics
-from stap.dynamics.utils import (
-    batch_axis_angle_to_matrix,
-    batch_rotations_6D_to_matrix,
-    matrix_to_6D_rotations,
-    matrix_to_axis_angle,
-)
 from stap.envs.base import Primitive
 from stap.envs.pybullet.table.objects import Rack
 from stap.envs.pybullet.table.primitives import ACTION_CONSTRAINTS
 from stap.envs.pybullet.table_env import TableEnv
-from stap.utils.transformation_utils import euler_angles_to_matrix
+from stap.utils.transformation_utils import (
+    axis_angle_to_matrix,
+    euler_angles_to_matrix,
+    matrix_to_axis_angle,
+    matrix_to_rotation_6d,
+    rotation_6d_to_matrix,
+)
 
 
 class TableEnvDynamics(LatentDynamics):
@@ -276,11 +276,11 @@ class TableEnvDynamics(LatentDynamics):
         # Calculate rotations
         theta = unnormalized_action[..., 3]
         if self._has_6D_rot_state:
-            current_object_rot_mat = batch_rotations_6D_to_matrix(
+            current_object_rot_mat = rotation_6d_to_matrix(
                 current_state[:, target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end]
             )
         else:
-            current_object_rot_mat = batch_axis_angle_to_matrix(
+            current_object_rot_mat = axis_angle_to_matrix(
                 current_state[:, target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end]
             )
         # Create z-rotation matrix batch with angle theta.
@@ -293,7 +293,7 @@ class TableEnvDynamics(LatentDynamics):
         # Multiply current rotation matrix with z-rotation matrix.
         new_rot_mat = torch.matmul(current_object_rot_mat, z_rot_mat)
         if self._has_6D_rot_state:
-            new_rotation_entries = matrix_to_6D_rotations(new_rot_mat)
+            new_rotation_entries = matrix_to_rotation_6d(new_rot_mat)
         else:
             new_rotation_entries = matrix_to_axis_angle(new_rot_mat)
         predicted_next_state[:, target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end] = (
@@ -402,14 +402,14 @@ class TableEnvDynamics(LatentDynamics):
             torch.stack([yaw, pitch, torch.zeros_like(yaw)], dim=-1), convention="ZYX"
         )
         if self._has_6D_rot_state:
-            R_eef_current = batch_rotations_6D_to_matrix(
+            R_eef_current = rotation_6d_to_matrix(
                 current_state[
                     :,
                     TableEnv.EE_OBSERVATION_IDX : TableEnv.EE_OBSERVATION_IDX + 1,
                     rotation_IDX_start:rotation_IDX_end,
                 ]
             )
-            R_obj_current = batch_rotations_6D_to_matrix(
+            R_obj_current = rotation_6d_to_matrix(
                 current_state[
                     :,
                     object_idx : object_idx + 1,
@@ -417,14 +417,14 @@ class TableEnvDynamics(LatentDynamics):
                 ]
             )
         else:
-            R_eef_current = batch_axis_angle_to_matrix(
+            R_eef_current = axis_angle_to_matrix(
                 current_state[
                     :,
                     TableEnv.EE_OBSERVATION_IDX : TableEnv.EE_OBSERVATION_IDX + 1,
                     rotation_IDX_start:rotation_IDX_end,
                 ]
             )
-            R_obj_current = batch_axis_angle_to_matrix(
+            R_obj_current = axis_angle_to_matrix(
                 current_state[
                     :,
                     object_idx : object_idx + 1,
@@ -434,7 +434,7 @@ class TableEnvDynamics(LatentDynamics):
         R_T = torch.linalg.solve(R_eef_current[:, 0, ...], R_eef_desired, left=False)
         R_obj_next = torch.matmul(R_T, R_obj_current[:, 0, ...])
         if self._has_6D_rot_state:
-            rotation_entries = matrix_to_6D_rotations(R_obj_next.unsqueeze(1))
+            rotation_entries = matrix_to_rotation_6d(R_obj_next.unsqueeze(1))
         else:
             rotation_entries = matrix_to_axis_angle(R_obj_next.unsqueeze(1))
         predicted_next_state[..., object_idx : object_idx + 1, rotation_IDX_start:rotation_IDX_end] = rotation_entries

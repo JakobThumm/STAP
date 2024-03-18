@@ -569,6 +569,9 @@ def rotation_6d_to_matrix(d6: torch.Tensor) -> torch.Tensor:
     """
     Converts 6D rotation representation by Zhou et al. [1] to rotation matrix
     using Gram--Schmidt orthogonalization per Section B of [1].
+
+    IMPORTANT: The first 3 entries of 6D is the first column of the rotation matrix, the second 3, the second column.
+
     Args:
         d6: 6D rotation representation, of size (*, 6)
 
@@ -586,13 +589,16 @@ def rotation_6d_to_matrix(d6: torch.Tensor) -> torch.Tensor:
     b2 = a2 - (b1 * a2).sum(-1, keepdim=True) * b1
     b2 = F.normalize(b2, dim=-1)
     b3 = torch.cross(b1, b2, dim=-1)
-    return torch.stack((b1, b2, b3), dim=-2)
+    return torch.stack((b1, b2, b3), dim=-1)
 
 
 def matrix_to_rotation_6d(matrix: torch.Tensor) -> torch.Tensor:
     """
     Converts rotation matrices to 6D rotation representation by Zhou et al. [1]
-    by dropping the last row. Note that 6D representation is not unique.
+    by dropping the last column. Note that 6D representation is not unique.
+
+    IMPORTANT: The first 3 entries of 6D is the first column of the rotation matrix, the second 3, the second column.
+
     Args:
         matrix: batch of rotation matrices of size (*, 3, 3)
 
@@ -604,5 +610,59 @@ def matrix_to_rotation_6d(matrix: torch.Tensor) -> torch.Tensor:
     IEEE Conference on Computer Vision and Pattern Recognition, 2019.
     Retrieved from http://arxiv.org/abs/1812.07035
     """
-    batch_dim = matrix.size()[:-2]
-    return matrix[..., :2, :].clone().reshape(batch_dim + (6,))
+    return matrix.transpose(-1, -2).flatten(start_dim=-2)[..., 0:6]
+
+
+def batch_axis_angle_to_matrix(batch: torch.Tensor) -> torch.Tensor:
+    """Converts a batch of axis-angle rotations into rotation matrices.
+
+    Axis-angle representation is a 3D vector where the direction of the vector and its magnitude represent the angle.
+
+    Args:
+        batch: Batch of rotations in shape [B, H, 3], where each rotation is
+            represented by the axis-angle vector.
+    Returns:
+        A tensor of rotation matrices with shape [B, H, 3, 3].
+    """
+    B, H, d = batch.shape
+    assert d == 3, f"Expected batch to have shape [{B}, {H}, 3], but got {batch.shape}"
+
+    # Unpack the axis-angle representation into the angle and axis
+    angle = batch.norm(dim=-1, keepdim=True)  # Shape [B, H, 1]
+    axis = batch / angle  # Shape [B, H, 3]
+
+    # Compute the skew-symmetric cross product matrix of the axis
+    skew_symmetric = torch.zeros(B, H, 3, 3, device=batch.device, dtype=batch.dtype)
+    skew_symmetric[..., 0, 1] = -axis[..., 2]
+    skew_symmetric[..., 0, 2] = axis[..., 1]
+    skew_symmetric[..., 1, 2] = -axis[..., 0]
+    skew_symmetric[..., 1, 0] = axis[..., 2]
+    skew_symmetric[..., 2, 0] = -axis[..., 1]
+    skew_symmetric[..., 2, 1] = axis[..., 0]
+
+    # Compute the rotation matrix using the Rodrigues' formula
+    rotation_matrix = (
+        torch.eye(3, device=batch.device, dtype=batch.dtype).unsqueeze(0).unsqueeze(0)
+        + skew_symmetric * torch.sin(angle)
+        + torch.matmul(skew_symmetric, skew_symmetric) * (1 - torch.cos(angle))
+    )
+
+    return rotation_matrix
+
+
+def batch_rotations_6D_squashed_to_matrix(batch: torch.Tensor, H: int) -> torch.Tensor:
+    """Converts a batch of 6D rotations into rotation matrices.
+
+    Args:
+        batch: Batch of rotations in shape [B, H*6], where each rotation is
+            represented by the entries R11, R12, R21, R22, R31, R32.
+        H: The number of 6D rotations per batch element.
+
+    Returns:
+        A tensor of rotation matrices with shape [B, H, 3, 3].
+    """
+    B, Z = batch.shape
+    assert Z == H * 6, f"Expected batch to have shape [{B}, {H*6}], but got {batch.shape}"
+    # Reshape to [B, H, 6] to separate each rotation
+    batch = batch.view(B, H, 6)
+    return rotation_6d_to_matrix(batch)

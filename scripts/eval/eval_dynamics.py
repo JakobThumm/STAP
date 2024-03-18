@@ -10,9 +10,10 @@ import tqdm
 
 from stap import agents, envs
 from stap.dynamics import Dynamics, TableEnvDynamics
-from stap.dynamics.utils import batch_rotations_6D_to_matrix, geodesic_loss
+from stap.dynamics.utils import geodesic_loss
 from stap.dynamics.utils import load as load_dynamics
 from stap.utils import random, tensors
+from stap.utils.transformation_utils import rotation_6d_to_matrix
 
 
 @tensors.numpy_wrap
@@ -78,8 +79,8 @@ def evaluate_episode(
         predicted_new_observation = dynamics.forward_eval(obs_tensor, action_tensor, primitive)
         observation_difference = predicted_new_observation.cpu().detach().numpy() - new_observation
         observation_difference_norm = np.linalg.norm(observation_difference)
-        obj_1_rot_pred = batch_rotations_6D_to_matrix(predicted_new_observation[0:1, 1:2, 3:9])
-        obj_1_rot_observed = batch_rotations_6D_to_matrix(
+        obj_1_rot_pred = rotation_6d_to_matrix(predicted_new_observation[0:1, 1:2, 3:9])
+        obj_1_rot_observed = rotation_6d_to_matrix(
             torch.from_numpy(new_observation[1, 3:9][np.newaxis, np.newaxis, :]).to(dynamics.device)
         )
         rotational_loss = geodesic_loss(obj_1_rot_pred, obj_1_rot_observed)[0, 0].cpu().detach().numpy()

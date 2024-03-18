@@ -8,12 +8,12 @@ from typing import Optional, Tuple
 
 import torch
 
-from stap.dynamics.utils import batch_rotations_6D_to_matrix
 from stap.envs.base import Primitive
 from stap.envs.pybullet.table import object_state
 from stap.utils.transformation_utils import (
     matrix_to_axis_angle,
     rotate_vector_by_rotation_matrix,
+    rotation_6d_to_matrix,
 )
 
 
@@ -53,9 +53,7 @@ def get_object_orientation(observation: torch.Tensor, id: int) -> torch.Tensor:
     idxR12 = list(object_state.ObjectState.RANGES.keys()).index("R12")
     idxR22 = list(object_state.ObjectState.RANGES.keys()).index("R22")
     idxR32 = list(object_state.ObjectState.RANGES.keys()).index("R32")
-    rotations = batch_rotations_6D_to_matrix(
-        observation[:, id : id + 1, [idxR11, idxR21, idxR31, idxR12, idxR22, idxR32]]
-    )
+    rotations = rotation_6d_to_matrix(observation[:, id : id + 1, [idxR11, idxR21, idxR31, idxR12, idxR22, idxR32]])
     return rotations[:, 0, :, :]
 
 
