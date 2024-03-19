@@ -1,11 +1,11 @@
 planner: CEMPlanner
 planner_kwargs:
-  num_samples: 1000
-  num_iterations: 3
+  num_samples: 10000
+  num_iterations: 5
   num_elites: 20
   keep_elites_fraction: 1.0
   standard_deviation: 0.3
-  std_decay: 0.7
+  std_decay: 0.6
 
 agent_configs:
   - "{AGENT_CONFIG}"
