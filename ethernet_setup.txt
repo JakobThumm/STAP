@@ -1,0 +1,26 @@
+Summary:
+	enp5s0: Manual
+	enp13s0f1: VRPN OptiTrack
+	enp13s0f0: Franka
+
+Looking at the desktop from behind:
+Top port: Ethernet enp5s0 (Internet connection):
+	- plug in blue cable and connect it to your laptop. 
+	- in your laptop activate wifi forwarding and allow forwarding in through your firewall. Something like this (requires sudo):
+```
+iptables -I FORWARD -i enp0s31f6 -o wlp0s20f3 -j ACCEPT
+iptables -I FORWARD -i wlp0s20f3 -o enp0s31f6 -m state --state RELATED,ESTABLISHED -j ACCEPT
+```
+	- on this PC, select the ethernet connection "Manual"
+
+Ethernet card:
+1. from left: enp13s0f1
+	- connect the black cable, which goes to the router above the fume hood.
+	- select the ethernet connection "VRPN OptiTrack"
+	 
+2. from left: enp13s0f0
+	- connect the yellow cable, which goes into the ethernet port of the Franka control box
+	- select the ethernet connection "Franka"
+3. from left:
+4. from left:
+
