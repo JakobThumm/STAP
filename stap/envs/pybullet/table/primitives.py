@@ -210,12 +210,12 @@ class Primitive(envs.Primitive, abc.ABC):
 
     def full_description(self) -> str:
         """Return a string fully describing the primitive."""
-        # description = f"Primitve {str(self)} with action ranges: ["
-        # for key in self.Action.RANGES.keys():
-        #     description += f"{key}: [{self.Action.RANGES[key][0]:.3f}, {self.Action.RANGES[key][1]:.3f}], "
-        # description = description[:-2] + "]."
-        # return description
-        return str(self)
+        description = f"Primitve {str(self)} with action ranges: ["
+        for key in self.Action.RANGES.keys():
+            description += f"{key}: [{self.Action.RANGES[key][0]:.3f}, {self.Action.RANGES[key][1]:.3f}], "
+        description = description[:-2] + "]."
+        return description
+        # return str(self)
 
     def __eq__(self, other) -> bool:
         if isinstance(other, Primitive):

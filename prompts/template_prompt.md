@@ -28,19 +28,6 @@ def {Primitive.name}PreferenceFn(
     """
     ...
 ```
-====== Scene Description ======
-There are the following objects in the scene:
-An object loaded from an URDF with name table and bounding box [3.000, 2.730, 0.050].
-A screwdriver named screwdriver with a rod and a handle. The screwdriver can be picked both at the rod and the handle. The handle points in negative x direction `main_axis = [-1, 0, 0]`, the rod in the positive x direction `main_axis = [1, 0, 0]` of the object in the object frame. The object frame has its origin at the point where the rod and the handle meet. The object properties are: handle_length=0.090, rod_length=0.075, handle_radius=0.020, rod_radius=0.008.
-A human body part named left_hand. 
-A human body part named right_hand. 
-The objects have the following predicate:
-free(screwdriver)
-on(screwdriver, table)
-===== Task Description =====
-The sequence of skills to execute is as follows:
-Pick(screwdriver) This primitive is used to pick up objects with the robot gripper.
-static_handover(screwdriver, right_hand) This primitive is used to hand over objects to the human. The next state describes the position and orientation of the object at the exact time of the handover.
 ===== Helper Functions =====
 You can call the following helper functions in your custom preference function:
 get_object_id_from_name(name: str, env: Env) -> int:
