@@ -828,7 +828,7 @@ class TableEnv(PybulletEnv):
         self._seed = seed
         task_sampling_trials += 1
 
-        info["scene_description"] = self.get_scene_description(verbose=True)
+        info["scene_description"] = self.get_scene_description(verbose=False)
 
         return self.get_observation(), info
 

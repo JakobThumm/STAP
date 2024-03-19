@@ -257,7 +257,7 @@ class PushAction(PrimitiveAction):
 
 class HandoverAction(PrimitiveAction):
     RANGES = {
-        "pitch": (-2.0, 0),
+        "pitch": (-np.pi / 2.0, np.pi / 2),
         "yaw": (-np.pi, np.pi),
         "distance": (0.4, 0.9),
         "height": (0.2, 0.7),

@@ -686,13 +686,13 @@ class StaticHandover(Primitive):
 
         assert isinstance(self.env, HumanTableEnv)
 
-        SUCCESS_DISTANCE = 1.0
+        SUCCESS_DISTANCE = 0.7
         SUCCESS_TIME = 0.3
-        FIRST_MOVEMENT_TIMEOUT = 2.0
+        FIRST_MOVEMENT_TIMEOUT = 5.0
         WAIT_TIMEOUT = 15
         ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
-        POSITIONAL_PRECISION = 0.05
-        ORIENTATIONAL_PRECISION = 0.03
+        POSITIONAL_PRECISION = 0.07
+        ORIENTATIONAL_PRECISION = 0.05
         success = False
         self.success_counter = 0
         # Parse action.
