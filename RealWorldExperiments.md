@@ -48,7 +48,8 @@ This document describes all steps necessary to run the real-world experiments.
     6. Repeat 3.-5. with the `1.1.2. Intermediate parameters` and `1.1.3. Expert parameters`.
     7. Let the users fill out the first part of the [form](https://docs.google.com/forms/d/e/1FAIpQLSfkcrM-pZIDTupZSPF4uZ3kpkSjptmCOHNRKgOpXUtLXgL_pw/viewform?usp=sf_link).
 
-### Phase 2: Screwdriver Handover task without motion preferences
+### Phase 2: Screwdriver Handover task *without* motion preferences
+The robot picks the screwdriver, where it's the most feasible and hands the object over in a position, where there is a high chance that the inverse kinematics is successful.
  - Partner A wears the marker suite and positions himself at the desk.
  - Make sure the robot is in blue mode.
  - Place the screwdriver on the little black foam block with the handle pointing the door, the two marker pads should be up. This guarantees good detection and high planning feasibility. Other poses are possible though.
@@ -58,3 +59,10 @@ This document describes all steps necessary to run the real-world experiments.
         ```
         python scripts/eval/eval_planners.py  --planner-config configs/pybullet/planners/policy_cem_screwdriver_no_custom_fns.yaml --env-config configs/pybullet/envs/official/real_domains/screwdriver_handover/task0.yaml --policy-checkpoints models/policies_irl/pick/final_model.pt models/policies_irl/place/final_model.pt models/policies_irl/static_handover/final_model.pt --dynamics-checkpoint models/dynamics_irl/pick_place_static_handover_dynamics/final_model.pt --seed 0 --gui 1 --closed-loop 1 --num-eval 1 --path plots/planning/screwdriver_handover/task0 --verbose 1
         ```
+
+### Phase 3: Screwdriver Handover task *with* motion preferences
+The robot picks the screwdriver at the rod and hands the object over in a position, so that the handle points towards the human.
+Same as Phase 2 but execute this on *STAP Laptop* instead:
+```
+python scripts/eval/eval_planners.py  --planner-config configs/pybullet/planners/policy_cem_screwdriver_custom_fns.yaml --env-config configs/pybullet/envs/official/real_domains/screwdriver_handover/task0.yaml --policy-checkpoints models/policies_irl/pick/final_model.pt models/policies_irl/place/final_model.pt models/policies_irl/static_handover/final_model.pt --dynamics-checkpoint models/dynamics_irl/pick_place_static_handover_dynamics/final_model.pt --seed 0 --gui 1 --closed-loop 1 --num-eval 1 --path plots/planning/screwdriver_handover/task0 --verbose 1
+```
