@@ -250,6 +250,11 @@ class CEMPlanner(planners.Planner):
                 if n_success == 0:
                     print("No successful plan found.")
                     n_success = 1
+                    # Increase standard deviation
+                    std = torch.clip(std * (1 + self.std_decay), 1e-8)
+                else:
+                    # Reduce standard deviation
+                    std = torch.clip(std * (1 - self.std_decay), 1e-8)
                 if n_success < idx_elites.shape[0]:
                     idx_elites = idx_elites[:n_success]
                 elites = samples[idx_elites]
@@ -264,9 +269,6 @@ class CEMPlanner(planners.Planner):
                     best_states = states[idx_best].cpu().numpy()
                     best_values = values[idx_best].cpu().numpy()
                     best_values_unc = values_unc[idx_best].cpu().numpy()
-
-                # Update standard deviation
-                std = torch.clip(std * (1 - self.std_decay), 1e-8)
 
                 # Decay population size.
                 num_samples = int(self.population_decay * num_samples + 0.5)
