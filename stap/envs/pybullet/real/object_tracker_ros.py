@@ -100,9 +100,14 @@ class ObjectTrackerRos(ObjectTracker):
         object_transform[:3, 3] = np.array(
             [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z - SAFETY_OFFSET]
         )
-        object_transform[:3, :3] = Rotation.from_quat(
+        quat = np.array(
             [msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w]
-        ).as_matrix()
+        )
+        if object_name == "screwdriver":
+            quat[0:2] = 0.0
+            quat = quat / np.linalg.norm(quat)
+        # Deactivate rotations
+        object_transform[:3, :3] = Rotation.from_quat(quat).as_matrix()
         if self._object_transform[object_name] is None:
             self._object_transform[object_name] = object_transform
         # object_transform_diff = np.clip(
