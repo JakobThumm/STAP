@@ -5,6 +5,7 @@
 # to store training results outside the docker.
 
 user=${1:-user}
+gpu=${2:-gpu}
 bash_command="/bin/bash"
 docker_command="docker run -it"
 
@@ -28,7 +29,14 @@ options="--shm-size=10.24gb
          -e ROS_MASTER_URI=http://10.42.0.69:11311
          -e ROS_IP=10.42.0.1
          -e ROS_HOSTNAME=10.42.0.1
+
 image="stap-ros"
+
+if [ "$gpu" = "gpu" ]
+then
+    options="${options} --gpus all"
+    image="${image}-gpu"
+fi
 
 if [ "$user" = "root" ]
     then

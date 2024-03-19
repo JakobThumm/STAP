@@ -3,7 +3,8 @@
 # Root mode creates a "classic" root user in docker.
 
 user=${1:-user}
-cache=${2:-cache}
+gpu=${2:-gpu}
+cache=${3:-cache}
 echo "Chosen mode: $user"
 
 command="docker build"
@@ -11,7 +12,14 @@ options=""
 dockerfile="Dockerfile"
 image="stap-ros"
 
-dockerfile="${dockerfile}.ros"
+if [ "$gpu" = "gpu" ]
+then
+    image="${image}-gpu"
+    # dockerfile="${dockerfile}121.gpu"
+    dockerfile="${dockerfile}118.ros"
+else
+    dockerfile="${dockerfile}.ros"
+fi
 
 if [ "$user" = "root" ]
     then
