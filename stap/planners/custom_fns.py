@@ -485,10 +485,92 @@ def HandoverOrientationFn(
     return probability_handover_orientation
 
 
+def HandoverOrientationAndPositionnFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the orientation and position of the screwdriver handover.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+    next_hand_pose = get_pose(next_state, hand_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing towards the hand position after the handover action.
+    orientation_metric = pointing_in_direction_metric(next_object_pose, current_hand_pose, handle_main_axis)
+    lower_threshold = torch.pi / 6.0
+    upper_threshold = torch.pi / 4.0
+    # Calculate the probability
+    probability_handover_orientation = linear_probability(
+        orientation_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    # We want to be close to the human hand.
+    position_metric = position_norm_metric(next_object_pose, next_hand_pose, norm="L2", axes=["x", "y", "z"])
+    # Handing over the object an arm length ~0.8m away is considered a failure and close ~0.2m is preferred.
+    lower_threshold = 0.2
+    upper_threshold = 0.8
+    probability_handover_position = linear_probability(
+        position_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    total_probability = probability_intersection(probability_handover_position, probability_handover_orientation)
+    return total_probability
+
+
+def HandoverVerticalOrientationFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the if the screwdriver is facing upwards or downwards during handover.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing upwards or downwards after the handover action.
+    direction = torch.zeros_like(next_object_pose)
+    direction[:, 2] = 1.0
+    orientation_metric_up = pointing_in_direction_metric(next_object_pose, direction, handle_main_axis)
+    direction[:, 2] = -1.0
+    orientation_metric_down = pointing_in_direction_metric(next_object_pose, direction, handle_main_axis)
+    lower_threshold = torch.pi / 6.0
+    upper_threshold = torch.pi / 4.0
+    # Calculate the probability
+    probability_handover_up = linear_probability(
+        orientation_metric_up, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    probability_handover_down = linear_probability(
+        orientation_metric_down, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    total_probability = probability_union(probability_handover_up, probability_handover_down)
+    return total_probability
+
+
 CUSTOM_FNS = {
     "HookHandoverOrientationFn": HookHandoverOrientationFn,
     "ScrewdriverPickFn": ScrewdriverPickFn,
     "ScrewdriverPickActionFn": ScrewdriverPickActionFn,
     "HandoverPositionFn": HandoverPositionFn,
     "HandoverOrientationFn": HandoverOrientationFn,
+    "HandoverOrientationAndPositionnFn": HandoverOrientationAndPositionnFn,
+    "HandoverVerticalOrientationFn": HandoverVerticalOrientationFn,
 }
