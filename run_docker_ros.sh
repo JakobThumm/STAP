@@ -49,6 +49,7 @@ if [ "$user" = "root" ]
         --volume="$(pwd)/configs/:/root/catkin_ws/src/stap-ros-pkg/configs/" 
         --volume="$(pwd)/scripts/:/root/catkin_ws/src/stap-ros-pkg/scripts/" 
         --volume="$(pwd)/launch/:/root/catkin_ws/src/stap-ros-pkg/launch/"
+        --volume="$(pwd)/prompts/:/root/catkin_ws/src/stap-ros-pkg/prompts/"
     "
     image="${image}/root:v2"
 elif [ "$user" = "user" ]
@@ -62,6 +63,7 @@ elif [ "$user" = "user" ]
         --volume="$(pwd)/configs/:/home/$USER/catkin_ws/src/stap-ros-pkg/configs/" 
         --volume="$(pwd)/scripts/:/home/$USER/catkin_ws/src/stap-ros-pkg/scripts/" 
         --volume="$(pwd)/launch/:/home/$USER/catkin_ws/src/stap-ros-pkg/launch/" 
+        --volume="$(pwd)/prompts/:/home/$USER/catkin_ws/src/stap-ros-pkg/prompts/" 
         --user=$USER"
     image="${image}/$USER:v2"
 else

@@ -2,7 +2,7 @@
 This document describes all steps necessary to run the real-world experiments.
 
 ## General Setup
-### Setting up the workstations
+### Setting up the lab PC
  1. Boot the lab PC with real-time kernel activated: choose in the boot menu `Advanced Options` > `RC-20`  (second from the bottom).
  2. Turn on the control PC (black box on the desk) at the poser switch in the back.
  3. Connectivity -> see the `ethernet_setup.txt` file on the desktop or in this repo:
@@ -63,6 +63,19 @@ The robot picks the screwdriver, where it's the most feasible and hands the obje
 ### Phase 3: Screwdriver Handover task *with* motion preferences
 The robot picks the screwdriver at the rod and hands the object over in a position, so that the handle points towards the human.
 Same as Phase 2 but execute this on *STAP Laptop* instead:
+```
+python scripts/eval/eval_planners.py  --planner-config configs/pybullet/planners/policy_cem_screwdriver_custom_fns.yaml --env-config configs/pybullet/envs/official/real_domains/screwdriver_handover/task0.yaml --policy-checkpoints models/policies_irl/pick/final_model.pt models/policies_irl/place/final_model.pt models/policies_irl/static_handover/final_model.pt --dynamics-checkpoint models/dynamics_irl/pick_place_static_handover_dynamics/final_model.pt --seed 0 --gui 1 --closed-loop 1 --num-eval 1 --path plots/planning/screwdriver_handover/task0 --verbose 1
+```
+
+### Phase 4
+
+Generate prompt
+```
+python scripts/prompts/generate_prompt.py --env-config configs/pybullet/envs/official/real_domains/screwdriver_handover/task0.yaml --prompt-template prompts/template_prompt.md
+```
+
+Add the custom fn to `custom_fns.py`, and adapt the `CUSTOM_FNS` dict.
+Then change the custom function in `policy_cem_screwdriver_custom_fns.yaml`.
 ```
 python scripts/eval/eval_planners.py  --planner-config configs/pybullet/planners/policy_cem_screwdriver_custom_fns.yaml --env-config configs/pybullet/envs/official/real_domains/screwdriver_handover/task0.yaml --policy-checkpoints models/policies_irl/pick/final_model.pt models/policies_irl/place/final_model.pt models/policies_irl/static_handover/final_model.pt --dynamics-checkpoint models/dynamics_irl/pick_place_static_handover_dynamics/final_model.pt --seed 0 --gui 1 --closed-loop 1 --num-eval 1 --path plots/planning/screwdriver_handover/task0 --verbose 1
 ```

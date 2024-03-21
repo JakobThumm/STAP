@@ -287,7 +287,9 @@ class Pick(Primitive):
 
             robot.arm.set_shield_mode("SSM")
 
+            robot.arm._joint_pos_threshold *= 2.0
             robot.goto_pose(pre_pos, command_quat, positional_precision=0.02, orientational_precision=0.07)
+            robot.arm._joint_pos_threshold *= 0.5
             if not allow_collisions and did_non_args_move():
                 raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
 
@@ -304,7 +306,9 @@ class Pick(Primitive):
 
             if not robot.grasp_object(obj, timeout=3.0, realistic=False):
                 raise ControlException(f"Robot.grasp_object({obj}) failed")
+            robot.arm._joint_pos_threshold *= 2.0
             robot.goto_pose(pre_pos, command_quat, positional_precision=0.02, orientational_precision=0.05)
+            robot.arm._joint_pos_threshold *= 0.5
             if not allow_collisions and did_non_args_move():
                 raise ControlException(f"Robot.goto_pose({pre_pos}, {command_quat}) collided")
         except ControlException as e:

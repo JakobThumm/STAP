@@ -16,6 +16,6 @@ agent_configs:
 dynamics_config: "{DYNAMICS_CONFIG}"
 
 custom_fns:
-  pick: "ScrewdriverPickFn"
+  pick: "PickScrewdriverPreferenceFnRobin2"
   place: null
-  static_handover: "HandoverOrientationFn"
+  static_handover: "StaticHandoverScrewdriverPreferenceFn"

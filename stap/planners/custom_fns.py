@@ -565,6 +565,215 @@ def HandoverVerticalOrientationFn(
     return total_probability
 
 
+def StaticHandoverPreferenceFnChris(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+    next_hand_pose = get_pose(next_state, hand_id)
+
+    orientation_metric = pointing_in_direction_metric(next_object_pose, current_hand_pose, main_axis=[-1, 0, 0])
+    position_metric = position_norm_metric(next_object_pose, next_hand_pose, norm="L2", axes=["x", "y", "z"])
+
+    # Considering the human preference to have the handover closer
+    lower_threshold_orientation = torch.pi / 6.0
+    upper_threshold_orientation = torch.pi / 4.0
+    lower_threshold_distance = 0.4  # Preference for closer handover than 0.2m
+    upper_threshold_distance = 0.8  # Upper bound reduced from an arm's length
+
+    probability_orientation = linear_probability(
+        orientation_metric, lower_threshold_orientation, upper_threshold_orientation, is_smaller_then=True
+    )
+    probability_distance = linear_probability(
+        position_metric, lower_threshold_distance, upper_threshold_distance, is_smaller_then=True
+    )
+
+    total_probability = probability_intersection(probability_orientation, probability_distance)
+    return total_probability
+
+
+def HandoverParallelAndOrientationFnCaroline(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the orientation of the screwdriver handover ensuring it is also parallel to the table.
+
+    Please make sure that the screwdriver is parallel to the table when handing it over. It was tilted a few times.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: Optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+
+    handle_main_axis = [-1.0, 0.0, 0.0]  # Main axis for orientation towards the hand
+    table_normal = [0.0, 0.0, 1.0]  # Normal vector for the table (z-axis in world frame is upwards)
+
+    # Orientation towards the hand
+    orientation_metric = pointing_in_direction_metric(next_object_pose, current_hand_pose, handle_main_axis)
+    orientation_prob = linear_probability(orientation_metric, torch.pi / 6.0, torch.pi / 4.0, is_smaller_then=True)
+
+    # Checking if parallel to the table by ensuring the main axis of the screwdriver (z-axis) is aligned with the table's normal
+    parallel_metric = pointing_in_direction_metric(
+        next_object_pose, torch.tensor(table_normal).to(next_state.device), [0.0, 0.0, 1.0]
+    )
+    parallel_prob = threshold_probability(parallel_metric, torch.pi / 18.0)  # ~10 degrees of allowance
+
+    # Combining both probabilities
+    total_probability = probability_intersection(orientation_prob, parallel_prob)
+
+    return total_probability
+
+
+def StaticHandoverCloseProximityFnBenedikt(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    """
+    Evaluates the orientation and position of the screwdriver during a static handover to the right hand, focusing on
+    close proximity to the human partner as per request.
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_name("right_hand", env)
+    next_object_pose = get_pose(next_state, object_id)
+    next_hand_pose = get_pose(next_state, hand_id)
+
+    # Orienting the handle to be easily graspable by the human hand
+    handle_main_axis = [-1.0, 0.0, 0.0]  # Considering default handle orientation
+    orientation_metric = pointing_in_direction_metric(next_object_pose, next_hand_pose, handle_main_axis)
+    orientation_prob = linear_probability(orientation_metric, torch.pi / 6.0, torch.pi / 4.0, is_smaller_then=True)
+
+    # Ensuring closer proximity during handover
+    position_metric = position_norm_metric(next_object_pose, next_hand_pose, norm="L2", axes=["x", "y", "z"])
+    # Adjusting for closer proximity preference by the human partner
+    closer_lower_threshold = 0.2  # Desired closer starting point of proximity
+    closer_upper_threshold = 0.5  # Reducing the acceptable maximum distance for better comfort
+    proximity_prob = linear_probability(
+        position_metric, closer_lower_threshold, closer_upper_threshold, is_smaller_then=True
+    )
+
+    # Combining both orientation and proximity preferences
+    total_preference = probability_intersection(proximity_prob, orientation_prob)
+    return total_preference
+
+
+def PickScrewdriverPreferenceFnRobin(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    """
+    Prefer picking the screwdriver by the rod, so its handle points away from the robot,
+    making it safer and more natural for the handover phase.
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    end_effector_id = get_object_id_from_name("end_effector", env)
+
+    next_end_effector_pose = get_pose(next_state, end_effector_id, object_id)
+
+    preferred_grasp_pose = torch.FloatTensor([0.075 / 2.0, 0, 0, 1, 0, 0, 0]).to(next_state.device)
+
+    position_metric = position_norm_metric(next_end_effector_pose, preferred_grasp_pose, norm="L2", axes=["x"])
+
+    probability_grasp = threshold_probability(position_metric, 0.075 / 2.0, is_smaller_then=True)
+
+    return probability_grasp
+
+
+def PickScrewdriverPreferenceFnRobin2(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    """
+    Adjusts the preference for picking the screwdriver to ensure a stable grip.
+    Prefers picking the screwdriver by the central part of the rod, away from the very tip,
+    to ensure stability while still allowing for a comfortable handover.
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    end_effector_id = get_object_id_from_name("end_effector", env)
+
+    next_end_effector_pose = get_pose(next_state, end_effector_id, object_id)
+
+    # Adjust preference to grasp closer to the central part of the rod for stability.
+    # Assume the rod's suitable grasp range starts 1/4th from the tip towards the handle.
+    rod_length = 0.075  # Total length of the rod
+    preferred_grasp_start = rod_length * 1 / 4  # Start of the preferred grasp region from the tip
+    preferred_grasp_end = rod_length * 3 / 4  # End of the preferred grasp region, closer to the handle
+
+    # Calculate the positional norm metric for the grasp position along the rod's length (x-axis in object frame).
+    position_metric = position_norm_metric(
+        next_end_effector_pose,
+        torch.FloatTensor([rod_length / 2.0, 0, 0, 1, 0, 0, 0]).to(next_state.device),
+        norm="L2",
+        axes=["x"],
+    )
+
+    # Use a linear probability distribution within the preferred grasp range.
+    probability_grasp_stability = linear_probability(
+        position_metric, preferred_grasp_start, preferred_grasp_end, is_smaller_then=False
+    )
+
+    return probability_grasp_stability
+
+
+def StaticHandoverScrewdriverPreferenceFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    """
+    Evaluates the orientation and position of the screwdriver during the handover to ensure the handle points towards
+    the human's right hand, and the rod points away for safety reasons.
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    screwdriver_id = get_object_id_from_primitive(0, primitive)
+    right_hand_id = get_object_id_from_primitive(1, primitive)
+
+    next_screwdriver_pose = get_pose(next_state, screwdriver_id)
+    current_right_hand_pose = get_pose(state, right_hand_id)
+
+    handle_main_axis = [-1.0, 0.0, 0.0]  # Assuming the handle points in the negative x direction in its frame
+
+    orientation_metric = pointing_in_direction_metric(next_screwdriver_pose, current_right_hand_pose, handle_main_axis)
+
+    # Setting conservative thresholds to ensure safety and natural handover motion
+    lower_threshold = torch.pi / 12.0  # Tighter threshold for more precision
+    upper_threshold = torch.pi / 6.0
+
+    probability_orientation = linear_probability(
+        orientation_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+
+    # Ensuring distance to right hand is within a comfortable range for handover
+    position_metric = position_norm_metric(
+        next_screwdriver_pose, current_right_hand_pose, norm="L2", axes=["x", "y", "z"]
+    )
+    distance_lower_threshold = 0.2  # Closer proximity is preferred
+    distance_upper_threshold = 0.5  # Beyond this distance, the orientation becomes less relevant
+
+    probability_position = linear_probability(
+        position_metric, distance_lower_threshold, distance_upper_threshold, is_smaller_then=True
+    )
+
+    # Using intersection to ensure both orientation and position are considered together for safety
+    total_probability = probability_intersection(probability_position, probability_orientation)
+
+    return total_probability
+
+
 CUSTOM_FNS = {
     "HookHandoverOrientationFn": HookHandoverOrientationFn,
     "ScrewdriverPickFn": ScrewdriverPickFn,
@@ -573,4 +782,8 @@ CUSTOM_FNS = {
     "HandoverOrientationFn": HandoverOrientationFn,
     "HandoverOrientationAndPositionnFn": HandoverOrientationAndPositionnFn,
     "HandoverVerticalOrientationFn": HandoverVerticalOrientationFn,
+    "StaticHandoverPreferenceFnChris": StaticHandoverPreferenceFnChris,
+    "PickScrewdriverPreferenceFnRobin": PickScrewdriverPreferenceFnRobin,
+    "PickScrewdriverPreferenceFnRobin2": PickScrewdriverPreferenceFnRobin2,
+    "StaticHandoverScrewdriverPreferenceFn": StaticHandoverScrewdriverPreferenceFn,
 }
