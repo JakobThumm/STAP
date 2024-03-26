@@ -22,7 +22,7 @@ from stap.dynamics import load as load_dynamics
 from stap.envs.base import Primitive
 from stap.envs.pybullet.table.primitives import PRIMITIVE_MATCHING, Null
 from stap.planners.custom_fns import CUSTOM_FNS
-from stap.utils import configs, recording, spaces, tensors, timing
+from stap.utils import configs, query_yes_no, recording, spaces, tensors, timing
 
 
 class PlannerFactory(configs.Factory):
@@ -462,6 +462,7 @@ def run_closed_loop_planning(
     visited_actions = spaces.null(planner.dynamics.action_space, batch_shape=(T, T))
     visited_states = spaces.null(planner.dynamics.state_space, batch_shape=(T, T + 1))
     p_visited_success = np.full(T, float("nan"), dtype=np.float32)
+    p_visited_preference = np.full(T, float("nan"), dtype=np.float32)
     visited_values = np.full((T, T), float("nan"), dtype=np.float32)
 
     observation = env.get_observation()
@@ -479,6 +480,10 @@ def run_closed_loop_planning(
             if timer is not None:
                 timer.tic("planner")
             plan = planner.plan(observation, action_skeleton[t:])
+            if plan.p_success == 0.0:
+                cont = query_yes_no("Planning failed. Do you want to execute the default action? [Y/N]")
+                if not cont:
+                    continue
             if t_planner is not None and timer is not None:
                 t_planner.append(timer.toc("planner"))
             print(f"Executing primitive {primitive} with action {plan.actions[0]}")
@@ -509,6 +514,7 @@ def run_closed_loop_planning(
                 primitive,
             )  # type: ignore
             print(f"Predicted preference value: {predicted_value}, observed preference value: {observed_value}")
+            p_visited_preference[t] = observed_value
 
         rewards[t] = reward
         visited_actions[t, t:] = plan.actions
@@ -528,6 +534,13 @@ def run_closed_loop_planning(
         # ensure last state has something in it
         states[t + 1 : t + 2] = next_observation
         observation = next_observation
+
+    print(f"Your observed preference values were {p_visited_preference}.")
+    print("=====================================")
+    print("=====================================")
+    print(f"Your total preference value was: {np.sum(np.nan_to_num(p_visited_preference))}")
+    print("=====================================")
+    print("=====================================")
 
     p_success = np.exp(np.log(values).sum())
 
