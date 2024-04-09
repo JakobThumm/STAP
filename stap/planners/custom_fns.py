@@ -774,6 +774,728 @@ def StaticHandoverScrewdriverPreferenceFn(
     return total_probability
 
 
+def ScrewdriverHandoverFnPriya(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver's handle is pointing upwards during the handover.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]  # The handle points in negative x direction in the object frame
+
+    # We want to know if the handle is pointing upwards after the handover action.
+    # Create a direction vector pointing upwards in the world frame
+    direction_upwards = torch.tensor([0.0, 0.0, 1.0], device=next_state.device).expand_as(next_object_pose[:, :3])
+
+    # Calculate the orientation metric for the handle pointing upwards
+    orientation_metric_up = pointing_in_direction_metric(next_object_pose, direction_upwards, handle_main_axis)
+
+    # Define thresholds for considering the handle to be sufficiently pointing upwards
+    lower_threshold = torch.pi / 4.0  # 30 degrees
+    upper_threshold = torch.pi / 3.0  # 45 degrees
+
+    # Calculate the probabilit  y that the handle is pointing upwards within the acceptable range
+    probability_handover_up = linear_probability(
+        orientation_metric_up, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+
+    return probability_handover_up
+
+
+def ScrewdriverHandoverFnBrandon(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the orientation and position of the screwdriver during handover to ensure the handle is handed over.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+    next_hand_pose = get_pose(next_state, hand_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]  # Assuming the handle points in negative x direction
+
+    # Ensure the handle is oriented towards the human's hand
+    orientation_metric = pointing_in_direction_metric(next_object_pose, current_hand_pose, handle_main_axis)
+    lower_threshold_orientation = torch.pi / 6.0  # 30 degrees
+    upper_threshold_orientation = torch.pi / 4.0  # 45 degrees
+    probability_handover_orientation = linear_probability(
+        orientation_metric, lower_threshold_orientation, upper_threshold_orientation, is_smaller_then=True
+    )
+
+    # Ensure the screwdriver is within a reachable distance to the human's hand
+    position_metric = position_norm_metric(next_object_pose, next_hand_pose, norm="L2", axes=["x", "y", "z"])
+    lower_threshold_position = 0.2  # Preferred close distance in meters
+    upper_threshold_position = 0.8  # Maximum acceptable distance in meters
+    probability_handover_position = linear_probability(
+        position_metric, lower_threshold_position, upper_threshold_position, is_smaller_then=True
+    )
+
+    # Combine the orientation and position probabilities
+    total_probability = probability_intersection(probability_handover_orientation, probability_handover_position)
+    return total_probability
+
+
+def ScrewdriverHandoverVerticalFnRobert(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver is presented vertically during the handover.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing vertically after the handover action.
+    # This is evaluated by checking if the handle's main axis is aligned with the global z-axis.
+    vertical_direction = torch.zeros_like(next_object_pose)
+    vertical_direction[:, 2] = 1.0  # Global z-axis
+    orientation_metric_vertical = pointing_in_direction_metric(next_object_pose, vertical_direction, handle_main_axis)
+    # Thresholds for considering the screwdriver to be vertical
+    lower_threshold = torch.pi / 3.0  # 30 degrees
+    upper_threshold = torch.pi / 2.0  # 45 degrees
+    # Calculate the probability
+    probability_handover_vertical = linear_probability(
+        orientation_metric_vertical, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    return probability_handover_vertical
+
+
+def ScrewdriverHandoverFnRobert2(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver tip is never pointing at the human during handover.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    human_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    human_pose = get_pose(state, human_id)
+    rod_main_axis = [1.0, 0.0, 0.0]  # The rod points in the positive x direction of the object frame
+    # We want to ensure the rod (tip) is never pointing at the human during handover.
+    orientation_metric = pointing_in_direction_metric(next_object_pose, human_pose, rod_main_axis)
+    # A threshold to consider the screwdriver as not pointing directly at the human.
+    # This threshold is somewhat arbitrary and could be adjusted based on safety requirements.
+    threshold = torch.pi / 4.0  # 45 degrees
+    # Calculate the probability
+    probability_not_pointing_at_human = threshold_probability(orientation_metric, threshold, is_smaller_then=True)
+    return probability_not_pointing_at_human
+
+
+def ScrewdriverHandoverFnJohn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver handle is pointing upwards during the handover.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing upwards after the handover action.
+    direction = torch.zeros_like(next_object_pose)
+    direction[:, 2] = 1.0  # Upwards direction in z-axis
+    orientation_metric_up = pointing_in_direction_metric(next_object_pose, direction, handle_main_axis)
+    lower_threshold = torch.pi / 6.0  # 30 degrees
+    upper_threshold = torch.pi / 3.0  # 45 degrees
+    # Calculate the probability
+    probability_handover_up = linear_probability(
+        orientation_metric_up, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    return probability_handover_up
+
+
+def ScrewdriverHandoverCloseFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the closeness of the screwdriver handover to the human's right hand.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+
+    # We want the handover to be as close as possible to the human's hand.
+    position_metric = position_norm_metric(next_object_pose, current_hand_pose, norm="L2", axes=["x", "y", "z"])
+
+    # Define thresholds for closeness. Closer than 0.2m is preferred, while further than 0.5m is less preferred.
+    lower_threshold = 0.1
+    upper_threshold = 0.8
+
+    # Calculate the probability based on the closeness metric.
+    probability_handover_closeness = linear_probability(
+        position_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+
+    return probability_handover_closeness
+
+
+def ScrewdriverHandoverFnSarah(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the handover of the screwdriver, ensuring it is close and the handle points downwards.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing downwards after the handover action.
+    direction = torch.zeros_like(next_object_pose)
+    direction[:, 2] = -1.0
+    orientation_metric_down = pointing_in_direction_metric(next_object_pose, direction, handle_main_axis)
+    lower_threshold = torch.pi / 6.0
+    upper_threshold = torch.pi / 3.0
+    # Calculate the probability for orientation
+    probability_handover_orientation = linear_probability(
+        orientation_metric_down, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    # We want to be close to the human hand.
+    position_metric = position_norm_metric(next_object_pose, current_hand_pose, norm="L2", axes=["x", "y", "z"])
+    # Handing over the object an arm length ~0.8m away is considered a failure and close ~0.2m is preferred.
+    lower_threshold = 0.2
+    upper_threshold = 0.8
+    probability_handover_position = linear_probability(
+        position_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    # Combine the probabilities for final evaluation
+    total_probability = probability_intersection(probability_handover_position, probability_handover_orientation)
+    return total_probability
+
+
+def ScrewdriverHandoverFnJakob1(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the orientation and position of the screwdriver handover to ensure the handle points towards the human and is closer.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing towards the hand position after the handover action.
+    orientation_metric = pointing_in_direction_metric(next_object_pose, current_hand_pose, handle_main_axis)
+    lower_threshold_orientation = torch.pi / 6.0
+    upper_threshold_orientation = torch.pi / 3.0
+    # Calculate the probability for orientation
+    probability_handover_orientation = linear_probability(
+        orientation_metric, lower_threshold_orientation, upper_threshold_orientation, is_smaller_then=True
+    )
+    # We want the handover to be closer to the human hand.
+    position_metric = position_norm_metric(next_object_pose, current_hand_pose, norm="L2", axes=["x", "y", "z"])
+    mean = 0.0  # Closer to the hand is preferred
+    std = 0.1  # standard deviation
+    # Calculate the probability for position
+    probability_handover_position = normal_probability(position_metric, mean, std, is_smaller_then=True)
+    # Combine the probabilities for orientation and position
+    total_probability = probability_intersection(probability_handover_orientation, probability_handover_position)
+    return total_probability
+
+
+def ScrewdriverHandoverFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver handle is pointing upwards and towards the human in a 45-degree angle during handover.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+
+    # Calculate if the handle is pointing upwards and towards the human in a 45-degree angle.
+    # Assuming the human is facing the robot, the direction towards the human would be along the negative y-axis.
+    direction_towards_human = torch.tensor([0.0, -1.0, 1.0]).to(next_state.device).normalize()
+    orientation_metric = pointing_in_direction_metric(next_object_pose, direction_towards_human, handle_main_axis)
+
+    # A 45-degree angle in radians.
+    target_angle = torch.pi / 4.0
+    # Allow a small margin around the 45-degree angle for practical reasons.
+    lower_threshold = target_angle - torch.pi / 12.0  # 45 degrees - 10 degrees
+    upper_threshold = target_angle + torch.pi / 12.0  # 45 degrees + 10 degrees
+
+    # Calculate the probability for orientation.
+    probability_orientation = linear_probability(
+        orientation_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+
+    # We want the screwdriver to be close to the human hand.
+    position_metric = position_norm_metric(next_object_pose, current_hand_pose, norm="L2", axes=["x", "y", "z"])
+    # Assuming a comfortable handover distance is within 0.2m to 0.4m.
+    mean = 0.0  # Closer to the hand is preferred
+    std = 0.1  # standard deviation
+    # Calculate the probability for position
+    probability_handover_position = normal_probability(position_metric, mean, std, is_smaller_then=True)
+
+    # Combine the probabilities for orientation and position.
+    total_probability = probability_intersection(probability_orientation, probability_handover_position)
+    return total_probability
+
+
+def ScrewdriverHandoverFnWuang(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver is handed over at a higher position.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    # Define the desired minimum height for the handover to be considered "higher"
+    desired_min_height = 0.45  # This value can be adjusted based on the specific requirements or environment setup
+
+    # Extract the z-coordinate (height) from the next object pose
+    z_coordinate = position_norm_metric(next_object_pose, torch.zeros_like(next_object_pose), norm="L2", axes=["z"])
+
+    # Calculate the probability based on whether the z-coordinate meets or exceeds the desired minimum height
+    # Here, we use a simple threshold-based approach for demonstration purposes
+    probability_handover_height = threshold_probability(z_coordinate, desired_min_height, is_smaller_then=False)
+
+    return probability_handover_height
+
+
+def ScrewdriverHandoverFnJoey(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver handle is pointing upwards during the handover.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing upwards after the handover action.
+    direction = torch.zeros_like(next_object_pose)
+    direction[:, 2] = 1.0  # Upwards direction in z-axis
+    orientation_metric_up = pointing_in_direction_metric(next_object_pose, direction, handle_main_axis)
+    lower_threshold = torch.pi / 6.0  # 30 degrees
+    upper_threshold = torch.pi / 3.0  # 45 degrees
+    # Calculate the probability
+    probability_handover_up = linear_probability(
+        orientation_metric_up, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    return probability_handover_up
+
+
+def ScrewdriverHandoverFnGiolle(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the handover with a focus on maximizing the distance between the end effector and the handle.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    end_effector_id = 0
+    next_object_pose = get_pose(next_state, object_id)
+    next_end_effector_pose = get_pose(next_state, end_effector_id)
+
+    # Calculate the distance between the end effector and the handle's origin point.
+    # Assuming the handle's origin is at the point where the rod and the handle meet.
+    distance_metric = position_norm_metric(next_end_effector_pose, next_object_pose, norm="L2", axes=["x", "y", "z"])
+
+    # Since we want to maximize this distance, we can use a threshold to ensure it's sufficiently large.
+    # The threshold can be adjusted based on the robot's reach and the user's comfort level.
+    threshold_distance = 0.1  # Example threshold, can be adjusted.
+
+    # Calculate the probability that the distance is greater than the threshold.
+    probability_distance = threshold_probability(distance_metric, threshold_distance, is_smaller_then=False)
+
+    return probability_distance
+
+
+def ScrewdriverPickFnDavide(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the preference for picking the screwdriver at the beginning of the handle.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed pick [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    end_effector_id = get_object_id_from_name("end_effector", env)
+    # Get the pose of the end effector in the object frame
+    next_end_effector_pose = get_pose(next_state, end_effector_id, object_id)
+    # Assumes the handle length is 0.090 and the handle in the negative x direction in object frame.
+    preferred_pick_pose = torch.FloatTensor([-0.090 / 2.0, 0, 0, 1, 0, 0, 0]).to(next_state.device)
+    # Calculate the positional norm metric
+    position_metric = position_norm_metric(next_end_effector_pose, preferred_pick_pose, norm="L2", axes=["x"])
+    # Calculate the probability
+    probability_pick_handle = threshold_probability(position_metric, 0.090 / 2.0, is_smaller_then=True)
+    return probability_pick_handle
+
+
+def ScrewdriverHandoverFnDavide(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver handle is pointing upwards during handover.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing upwards after the handover action.
+    direction = torch.zeros_like(next_object_pose)
+    direction[:, 2] = 1.0
+    orientation_metric_up = pointing_in_direction_metric(next_object_pose, direction, handle_main_axis)
+    lower_threshold = torch.pi / 6.0
+    upper_threshold = torch.pi / 4.0
+    # Calculate the probability
+    probability_handover_up = linear_probability(
+        orientation_metric_up, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    return probability_handover_up
+
+
+def ScrewdriverHandoverFnDistanceTableLow(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver is facing upwards or downwards during handover and ensures it's a bit lower.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    table_id = get_object_id_from_name("table", env)
+    table_pose = get_pose(state, table_id)
+
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing upwards or downwards after the handover action.
+    direction = torch.zeros_like(next_object_pose)
+    direction[:, 2] = 1.0
+    orientation_metric_up = pointing_in_direction_metric(next_object_pose, direction, handle_main_axis)
+    direction[:, 2] = -1.0
+    orientation_metric_down = pointing_in_direction_metric(next_object_pose, direction, handle_main_axis)
+    lower_threshold = torch.pi / 6.0
+    upper_threshold = torch.pi / 4.0
+    # Calculate the probability
+    probability_handover_up = linear_probability(
+        orientation_metric_up, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    probability_handover_down = linear_probability(
+        orientation_metric_down, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    orientation_probability = probability_union(probability_handover_up, probability_handover_down)
+
+    # Ensure the handover is a bit lower than before, closer to the table surface
+    z_distance_to_table = next_object_pose[:, 2] - table_pose[:, 2]
+    # Assuming the table height is 0.05 and we want the handover to be just above it
+    desired_z_distance = 0.25  # Table height + desired offset from the table
+    z_distance_metric = position_norm_metric(
+        next_object_pose, torch.zeros_like(next_object_pose), norm="L2", axes=["z"]
+    )
+    # Smaller distance is better, so we use a threshold probability
+    probability_z_distance = threshold_probability(z_distance_metric, desired_z_distance, is_smaller_then=True)
+
+    # Combine the orientation and z-distance probabilities
+    total_probability = probability_intersection(orientation_probability, probability_z_distance)
+    return total_probability
+
+
+def ScrewdriverPickFnHugo(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the preference for picking the screwdriver at the beginning of the handle.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed pick [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    # Get the pose of the screwdriver in the world frame
+    screwdriver_pose = get_pose(next_state, object_id)
+    # Define the preferred position for picking the screwdriver at the beginning of the handle
+    # Assuming the handle length is 0.090, we offset by a small amount in the negative x direction
+    preferred_pick_position = torch.FloatTensor([-0.005, 0, 0, 1, 0, 0, 0]).to(next_state.device)
+    # Calculate the positional norm metric
+    position_metric = position_norm_metric(screwdriver_pose, preferred_pick_position, norm="L2", axes=["x"])
+    # Define a threshold for how close the pick action needs to be to the preferred position
+    threshold = 0.02  # 1cm tolerance
+    # Calculate the probability
+    probability_pick_preference = threshold_probability(position_metric, threshold, is_smaller_then=True)
+    return probability_pick_preference
+
+
+def ScrewdriverHandoverFnDaniele(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver's handle is pointing upwards during the handover.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]  # The handle points in negative x direction in the object frame
+
+    # We want to know if the handle is pointing upwards after the handover action.
+    # Create a direction vector pointing upwards in the world frame
+    direction_upwards = torch.tensor([0.0, 0.0, 1.0], device=next_state.device).expand_as(next_object_pose[:, :3])
+
+    # Calculate the orientation metric for the handle pointing upwards
+    orientation_metric_up = pointing_in_direction_metric(next_object_pose, direction_upwards, handle_main_axis)
+
+    # Define thresholds for considering the handle to be sufficiently pointing upwards
+    lower_threshold = torch.pi / 6.0  # 30 degrees
+    upper_threshold = torch.pi / 3.0  # 45 degrees
+
+    # Calculate the probability that the handle is pointing upwards within the acceptable range
+    probability_handover_up = linear_probability(
+        orientation_metric_up, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+
+    return probability_handover_up
+
+
+def ScrewdriverHandoverFnDaniele2(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the screwdriver handle is pointing downwards during the handover.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing downwards after the handover action.
+    direction = torch.zeros_like(next_object_pose)
+    direction[:, 2] = -1.0  # Downwards direction in z-axis
+    orientation_metric_down = pointing_in_direction_metric(next_object_pose, direction, handle_main_axis)
+    lower_threshold = torch.pi / 6.0  # 30 degrees tolerance
+    upper_threshold = torch.pi / 3.0  # 45 degrees tolerance
+    # Calculate the probability
+    probability_handover_down = linear_probability(
+        orientation_metric_down, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    return probability_handover_down
+
+
+def ScrewdriverPickFn11(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the preference for picking the screwdriver further at the tip of the rod.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed pick [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    end_effector_id = get_object_id_from_name("end_effector", env)
+    next_end_effector_pose = get_pose(next_state, end_effector_id, object_id)
+    # Assuming the rod length is 0.075 and we want to grasp it further at the tip.
+    preferred_grasp_pose = torch.FloatTensor([0.075 * 0.75, 0, 0, 1, 0, 0, 0]).to(next_state.device)
+    position_metric = position_norm_metric(next_end_effector_pose, preferred_grasp_pose, norm="L2", axes=["x"])
+    # Calculate the probability
+    probability_grasp_tip = threshold_probability(position_metric, 0.075 * 0.5, is_smaller_then=True)
+    return probability_grasp_tip
+
+
+def ScrewdriverHandoverFn11(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the preference for handing over the screwdriver as close as possible to the human's right hand.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+    # We want the screwdriver to be as close as possible to the human hand.
+    position_metric = position_norm_metric(next_object_pose, current_hand_pose, norm="L2", axes=["x", "y", "z"])
+    # Calculate the probability
+    mean = 0.0  # Closer to the hand is preferred
+    std = 0.1  # standard deviation
+    # Calculate the probability for position
+    probability_handover_position = normal_probability(position_metric, mean, std, is_smaller_then=True)
+    return probability_handover_position
+
+
+def ScrewdriverHandoverFn12(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the handover of the screwdriver by the handle and proximity to the human hand.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    hand_id = get_object_id_from_primitive(1, primitive)
+    next_object_pose = get_pose(next_state, object_id)
+    current_hand_pose = get_pose(state, hand_id)
+    handle_main_axis = [-1.0, 0.0, 0.0]
+    # We want to know if the handle is pointing towards the hand position after the handover action.
+    orientation_metric = pointing_in_direction_metric(next_object_pose, current_hand_pose, handle_main_axis)
+    lower_threshold_orientation = torch.pi / 6.0
+    upper_threshold_orientation = torch.pi / 4.0
+    # Calculate the probability for orientation
+    probability_handover_orientation = linear_probability(
+        orientation_metric, lower_threshold_orientation, upper_threshold_orientation, is_smaller_then=True
+    )
+    # We want the handover to be as close to the human hand as possible.
+    position_metric = position_norm_metric(next_object_pose, current_hand_pose, norm="L2", axes=["x", "y", "z"])
+    # Calculate the probability
+    mean = 0.0  # Closer to the hand is preferred
+    std = 0.1  # standard deviation
+    # Calculate the probability for position
+    probability_handover_position = normal_probability(position_metric, mean, std, is_smaller_then=True)
+    # Combine the probabilities for orientation and position
+    total_probability = probability_intersection(probability_handover_orientation, probability_handover_position)
+    return total_probability
+
+
 CUSTOM_FNS = {
     "HookHandoverOrientationFn": HookHandoverOrientationFn,
     "ScrewdriverPickFn": ScrewdriverPickFn,
@@ -786,4 +1508,24 @@ CUSTOM_FNS = {
     "PickScrewdriverPreferenceFnRobin": PickScrewdriverPreferenceFnRobin,
     "PickScrewdriverPreferenceFnRobin2": PickScrewdriverPreferenceFnRobin2,
     "StaticHandoverScrewdriverPreferenceFn": StaticHandoverScrewdriverPreferenceFn,
+    "ScrewdriverHandoverFnPriya": ScrewdriverHandoverFnPriya,
+    "ScrewdriverHandoverFnBrandon": ScrewdriverHandoverFnBrandon,
+    "ScrewdriverHandoverVerticalFnRobert": ScrewdriverHandoverVerticalFnRobert,
+    "ScrewdriverHandoverFnRobert2": ScrewdriverHandoverFnRobert2,
+    "ScrewdriverHandoverFnJohn": ScrewdriverHandoverFnJohn,
+    "ScrewdriverHandoverCloseFn": ScrewdriverHandoverCloseFn,
+    "ScrewdriverHandoverFnSarah": ScrewdriverHandoverFnSarah,
+    "ScrewdriverHandoverFnJakob1": ScrewdriverHandoverFnJakob1,
+    "ScrewdriverHandoverFnWuang": ScrewdriverHandoverFnWuang,
+    "ScrewdriverHandoverFnJoey": ScrewdriverHandoverFnJoey,
+    "ScrewdriverHandoverFnGiolle": ScrewdriverHandoverFnGiolle,
+    "ScrewdriverPickFnDavide": ScrewdriverPickFnDavide,
+    "ScrewdriverHandoverFnDavide": ScrewdriverHandoverFnDavide,
+    "ScrewdriverHandoverFnDistanceTableLow": ScrewdriverHandoverFnDistanceTableLow,
+    "ScrewdriverPickFnHugo": ScrewdriverPickFnHugo,
+    "ScrewdriverHandoverFnDaniele": ScrewdriverHandoverFnDaniele,
+    "ScrewdriverHandoverFnDaniele2": ScrewdriverHandoverFnDaniele2,
+    "ScrewdriverPickFn11": ScrewdriverPickFn11,
+    "ScrewdriverHandoverFn11": ScrewdriverHandoverFn11,
+    "ScrewdriverHandoverFn12": ScrewdriverHandoverFn12,
 }

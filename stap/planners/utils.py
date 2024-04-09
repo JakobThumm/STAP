@@ -538,7 +538,7 @@ def run_closed_loop_planning(
     print(f"Your observed preference values were {p_visited_preference}.")
     print("=====================================")
     print("=====================================")
-    print(f"Your total preference value was: {np.sum(np.nan_to_num(p_visited_preference))}")
+    print(f"Your mean total preference value was: {np.mean(np.nan_to_num(p_visited_preference))}")
     print("=====================================")
     print("=====================================")
 

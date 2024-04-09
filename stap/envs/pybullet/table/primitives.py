@@ -713,7 +713,7 @@ class StaticHandover(Primitive):
         assert isinstance(self.env, HumanTableEnv)
 
         SUCCESS_DISTANCE = 0.6
-        SUCCESS_TIME = 0.7
+        SUCCESS_TIME = 0.55
         FIRST_MOVEMENT_TIMEOUT = 5.0
         WAIT_TIMEOUT = 30.0
         ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
