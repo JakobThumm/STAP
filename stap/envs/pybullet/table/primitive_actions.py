@@ -82,7 +82,7 @@ class PlaceAction(PrimitiveAction):
         "x": (-1.0, 1.0),
         "y": (-1.0, 1.0),
         "z": (0.0, 0.1),
-        "theta": (-0.25 * np.pi, 0.75 * np.pi),
+        "theta": (-np.pi, np.pi),
     }
 
     def __init__(

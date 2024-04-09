@@ -70,6 +70,18 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
         """Dynamics model network."""
         return self._network
 
+    @property
+    def has_6D_rot_state(self) -> bool:
+        return self._has_6D_rot_state
+
+    @property
+    def rotation_IDX_start(self) -> int:
+        return self._rot_pos_in_state
+
+    @property
+    def rotation_IDX_end(self) -> int:
+        return self.rotation_IDX_start + 6 if self.has_6D_rot_state else self.rotation_IDX_start + 3
+
     def load_state_dict(self, state_dict: Dict[str, OrderedDict[str, torch.Tensor]], strict: bool = True):
         """Loads the dynamics state dict.
 
@@ -163,10 +175,8 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
             Indices for the MSE loss and the geodesic loss in latent space (Z).
         """
 
-        # Calculating the index range for rotation in latent state
-        rot_end = self._rot_pos_in_state + 6 if self._has_6D_rot_state else self._rot_pos_in_state + 3
-        base_mse_indices = torch.cat((torch.arange(0, self._rot_pos_in_state), torch.arange(rot_end, W)))
-        base_geodesic_indices = torch.arange(self._rot_pos_in_state, rot_end)
+        base_mse_indices = torch.cat((torch.arange(0, self.rotation_IDX_start), torch.arange(self.rotation_IDX_end, W)))
+        base_geodesic_indices = torch.arange(self.rotation_IDX_start, self.rotation_IDX_end)
 
         # Repeat indices for each "layer" in H
         mse_indices = torch.cat([base_mse_indices + i * W for i in range(H)]).long()
@@ -223,7 +233,7 @@ class LatentDynamics(Dynamics, Model[DynamicsBatch]):
                 predicted_R = batch_rotations_6D_squashed_to_matrix(
                     next_obs_predicted[:, geodesic_indices], observation.shape[1]
                 )
-                true_R = rotation_6d_to_matrix(next_observation[:, :, 3:9])
+                true_R = rotation_6d_to_matrix(next_observation[:, :, self.rotation_IDX_start : self.rotation_IDX_end])
             else:
                 raise NotImplementedError("Only 6D rotations are supported.")
             rotational_losses = geodesic_loss(predicted_R, true_R)

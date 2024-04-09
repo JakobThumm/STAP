@@ -4,7 +4,14 @@ from typing import Any, Dict, List, Optional, Sequence, Union
 import torch
 
 from stap import agents, dynamics, envs
+from stap.envs.base import Primitive
 from stap.utils import configs
+from stap.utils.transformation_utils import (
+    axis_angle_to_matrix,
+    matrix_to_axis_angle,
+    matrix_to_rotation_6d,
+    rotation_6d_to_matrix,
+)
 
 
 class DynamicsFactory(configs.Factory):
@@ -193,3 +200,44 @@ def geodesic_loss(R1: torch.Tensor, R2: torch.Tensor) -> torch.Tensor:
     loss = torch.acos(t_clamp)
 
     return loss
+
+
+def unnormalize_action_tensor(action: torch.Tensor, primitive: Primitive) -> torch.Tensor:
+    """Unnormalize action tensor."""
+    action_range = torch.from_numpy(primitive.action_scale.high - primitive.action_scale.low).to(action.device)
+    action_min = torch.from_numpy(primitive.action_scale.low).to(action.device)
+    return (action + 1.0) / 2.0 * action_range + action_min
+
+
+def get_object_rotation_matrix_from_state(
+    state: torch.Tensor, object_idx: int, rotation_IDX_start: int, rotation_IDX_end: int, has_6D_rot_state: bool
+) -> torch.Tensor:
+    """Return the object rotation matrix from the state."""
+    if has_6D_rot_state:
+        object_rot_mat = rotation_6d_to_matrix(
+            state[:, object_idx : object_idx + 1, rotation_IDX_start:rotation_IDX_end]
+        )
+    else:
+        object_rot_mat = axis_angle_to_matrix(
+            state[:, object_idx : object_idx + 1, rotation_IDX_start:rotation_IDX_end]
+        )
+    return object_rot_mat
+
+
+def generate_rotation_entries_for_state(rotation_matrix: torch.Tensor, has_6D_rot_state: bool) -> torch.Tensor:
+    """Generate rotation entries for the state from the given rotation matrix."""
+    if has_6D_rot_state:
+        return matrix_to_rotation_6d(rotation_matrix)
+    else:
+        return matrix_to_axis_angle(rotation_matrix)
+
+
+def create_z_rot_mat_like(rot_mat: torch.Tensor, theta: torch.Tensor) -> torch.Tensor:
+    """Create a z rotation matrix in the same dimension as the given rotation matrix."""
+    z_rot_mat = torch.zeros_like(rot_mat)
+    z_rot_mat[:, 0, 0, 0] = torch.cos(theta)
+    z_rot_mat[:, 0, 0, 1] = -torch.sin(theta)
+    z_rot_mat[:, 0, 1, 0] = torch.sin(theta)
+    z_rot_mat[:, 0, 1, 1] = torch.cos(theta)
+    z_rot_mat[:, 0, 2, 2] = 1.0
+    return z_rot_mat

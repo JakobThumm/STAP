@@ -7,16 +7,19 @@ import torch
 
 from stap import agents, envs, networks
 from stap.dynamics.latent import LatentDynamics
+from stap.dynamics.utils import (
+    create_z_rot_mat_like,
+    generate_rotation_entries_for_state,
+    get_object_rotation_matrix_from_state,
+    unnormalize_action_tensor,
+)
 from stap.envs.base import Primitive
+from stap.envs.pybullet.table import utils
 from stap.envs.pybullet.table.objects import Rack
 from stap.envs.pybullet.table.primitives import ACTION_CONSTRAINTS
 from stap.envs.pybullet.table_env import TableEnv
 from stap.utils.transformation_utils import (
-    axis_angle_to_matrix,
     euler_angles_to_matrix,
-    matrix_to_axis_angle,
-    matrix_to_rotation_6d,
-    rotation_6d_to_matrix,
 )
 
 
@@ -40,6 +43,7 @@ class TableEnvDynamics(LatentDynamics):
         hand_crafted: bool = False,
         checkpoint: Optional[Union[str, pathlib.Path]] = None,
         device: str = "auto",
+        **kwargs,
     ):
         """Initializes the dynamics model network, dataset, and optimizer.
 
@@ -93,6 +97,7 @@ class TableEnvDynamics(LatentDynamics):
             action_space=None,
             checkpoint=checkpoint,
             device=device,
+            **kwargs,
         )
 
     @property
@@ -264,44 +269,34 @@ class TableEnvDynamics(LatentDynamics):
     ) -> torch.Tensor:
         X_IDX = 0
         Z_IDX = 2
-        rotation_IDX_start = 3
-        rotation_IDX_end = rotation_IDX_start + 6 if self._has_6D_rot_state else rotation_IDX_start + 3
         assert self.env is not None
 
-        action_range = torch.from_numpy(primitive.action_scale.high - primitive.action_scale.low).to(self.device)
-        action_min = torch.from_numpy(primitive.action_scale.low).to(self.device)
-        action_0_1 = (action + 1.0) / 2.0
-        unnormalized_action = action_0_1 * action_range + action_min
+        unnormalized_action = unnormalize_action_tensor(action, primitive)
 
         # Calculate rotations
         theta = unnormalized_action[..., 3]
-        if self._has_6D_rot_state:
-            current_object_rot_mat = rotation_6d_to_matrix(
-                current_state[:, target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end]
-            )
-        else:
-            current_object_rot_mat = axis_angle_to_matrix(
-                current_state[:, target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end]
-            )
+        current_object_rot_mat = get_object_rotation_matrix_from_state(
+            state=current_state,
+            object_idx=target_object_idx,
+            rotation_IDX_start=self.rotation_IDX_start,
+            rotation_IDX_end=self.rotation_IDX_end,
+            has_6D_rot_state=self.has_6D_rot_state,
+        )
         # Create z-rotation matrix batch with angle theta.
-        z_rot_mat = torch.zeros_like(current_object_rot_mat)
-        z_rot_mat[:, 0, 0, 0] = torch.cos(theta)
-        z_rot_mat[:, 0, 0, 1] = -torch.sin(theta)
-        z_rot_mat[:, 0, 1, 0] = torch.sin(theta)
-        z_rot_mat[:, 0, 1, 1] = torch.cos(theta)
-        z_rot_mat[:, 0, 2, 2] = 1.0
+        z_rot_mat = create_z_rot_mat_like(current_object_rot_mat, theta)
         # Multiply current rotation matrix with z-rotation matrix.
         new_rot_mat = torch.matmul(current_object_rot_mat, z_rot_mat)
-        if self._has_6D_rot_state:
-            new_rotation_entries = matrix_to_rotation_6d(new_rot_mat)
-        else:
-            new_rotation_entries = matrix_to_axis_angle(new_rot_mat)
-        predicted_next_state[:, target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end] = (
-            new_rotation_entries
-        )
+        new_rotation_entries = generate_rotation_entries_for_state(new_rot_mat, self.has_6D_rot_state)
         predicted_next_state[
-            ..., TableEnv.EE_OBSERVATION_IDX : TableEnv.EE_OBSERVATION_IDX + 1, rotation_IDX_start:rotation_IDX_end
-        ] = predicted_next_state[..., target_object_idx : target_object_idx + 1, rotation_IDX_start:rotation_IDX_end]
+            :, target_object_idx : target_object_idx + 1, self.rotation_IDX_start : self.rotation_IDX_end
+        ] = new_rotation_entries
+        predicted_next_state[
+            ...,
+            TableEnv.EE_OBSERVATION_IDX : TableEnv.EE_OBSERVATION_IDX + 1,
+            self.rotation_IDX_start : self.rotation_IDX_end,
+        ] = predicted_next_state[
+            ..., target_object_idx : target_object_idx + 1, self.rotation_IDX_start : self.rotation_IDX_end
+        ]
 
         # Calculate x- and y-position
         # The object stays where it was
@@ -335,6 +330,33 @@ class TableEnvDynamics(LatentDynamics):
         primitive_str = str(primitive).lower()
         destination_object_state = predicted_next_state[..., destination_object_idx, :]
 
+        unnormalized_action = unnormalize_action_tensor(action, primitive)
+
+        # Get target pose.
+        target_pos = current_state[:, destination_object_idx, :3]
+        target_rot_mat = get_object_rotation_matrix_from_state(
+            state=current_state,
+            object_idx=destination_object_idx,
+            rotation_IDX_start=self.rotation_IDX_start,
+            rotation_IDX_end=self.rotation_IDX_end,
+            has_6D_rot_state=self.has_6D_rot_state,
+        )
+        # Define target bounding box.
+
+        if "table" in primitive_str:
+            xy_target_range = torch.zeros([target_pos.size(0), 2, 2]).to(target_pos.device)
+            xy_target_range[:, 0, 0] = utils.TABLE_CONSTRAINTS["table_x_min"]
+            xy_target_range[:, 1, 0] = utils.TABLE_CONSTRAINTS["table_x_max"]
+            xy_target_range[:, 0, 1] = utils.TABLE_CONSTRAINTS["table_y_min"]
+            xy_target_range[:, 1, 1] = utils.TABLE_CONSTRAINTS["table_y_max"]
+            xy_target = (xy_target_range[:, 1] - xy_target_range[:, 0]) * (action[..., :2] + 1) / 2.0 + xy_target_range[
+                :, 0
+            ]
+            pos = torch.cat([xy_target, unnormalized_action[..., 2:3]], dim=-1)
+            command_pos = target_pos + torch.matmul(target_rot_mat[:, 0, ...], pos.unsqueeze(-1)).squeeze(-1)
+        else:
+            command_pos = destination_object_state[..., :3]
+
         if "table" in primitive_str:
             destination_object_surface_offset = 0
         elif "rack" in primitive_str:
@@ -352,9 +374,20 @@ class TableEnvDynamics(LatentDynamics):
         else:
             return predicted_next_state
 
-        predicted_next_state[..., source_object_idx, 2] = (
-            destination_object_state[..., 2] + destination_object_surface_offset + median_object_height / 2
-        )
+        command_pos[..., 2] = destination_object_surface_offset + median_object_height / 2
+
+        predicted_next_state[..., source_object_idx, :3] = command_pos
+
+        # Orientation
+        theta = unnormalized_action[..., 3]
+        # Create z-rotation matrix batch with angle theta.
+        z_rot_mat = create_z_rot_mat_like(target_rot_mat, theta)
+        # Multiply current rotation matrix with z-rotation matrix.
+        new_rot_mat = torch.matmul(target_rot_mat, z_rot_mat)
+        new_rotation_entries = generate_rotation_entries_for_state(new_rot_mat, self.has_6D_rot_state)
+        predicted_next_state[
+            :, source_object_idx : source_object_idx + 1, self.rotation_IDX_start : self.rotation_IDX_end
+        ] = new_rotation_entries
         return predicted_next_state
 
     def _handcrafted_dynamics_static_handover(
@@ -370,13 +403,8 @@ class TableEnvDynamics(LatentDynamics):
         assert hasattr(self.env.robot.arm, "base_pos")
         ADDITIONAL_OFFSET = np.array([0, 0, 0.2])
         pos_IDX = 0
-        rotation_IDX_start = 3
-        rotation_IDX_end = rotation_IDX_start + 6 if self._has_6D_rot_state else rotation_IDX_start + 3
         # Action: [pitch, yaw, distance, height]
-        action_range = torch.from_numpy(primitive.action_scale.high - primitive.action_scale.low).to(self.device)
-        action_min = torch.from_numpy(primitive.action_scale.low).to(self.device)
-        action_0_1 = (action + 1.0) / 2.0
-        unnormalized_action = action_0_1 * action_range + action_min
+        unnormalized_action = unnormalize_action_tensor(action, primitive)
         target_pos = current_state[:, target_idx, pos_IDX : pos_IDX + 3]
         pitch = unnormalized_action[..., 0]
         yaw = unnormalized_action[..., 1]
@@ -401,43 +429,26 @@ class TableEnvDynamics(LatentDynamics):
         R_eef_desired = euler_angles_to_matrix(
             torch.stack([yaw, pitch, torch.zeros_like(yaw)], dim=-1), convention="ZYX"
         )
-        if self._has_6D_rot_state:
-            R_eef_current = rotation_6d_to_matrix(
-                current_state[
-                    :,
-                    TableEnv.EE_OBSERVATION_IDX : TableEnv.EE_OBSERVATION_IDX + 1,
-                    rotation_IDX_start:rotation_IDX_end,
-                ]
-            )
-            R_obj_current = rotation_6d_to_matrix(
-                current_state[
-                    :,
-                    object_idx : object_idx + 1,
-                    rotation_IDX_start:rotation_IDX_end,
-                ]
-            )
-        else:
-            R_eef_current = axis_angle_to_matrix(
-                current_state[
-                    :,
-                    TableEnv.EE_OBSERVATION_IDX : TableEnv.EE_OBSERVATION_IDX + 1,
-                    rotation_IDX_start:rotation_IDX_end,
-                ]
-            )
-            R_obj_current = axis_angle_to_matrix(
-                current_state[
-                    :,
-                    object_idx : object_idx + 1,
-                    rotation_IDX_start:rotation_IDX_end,
-                ]
-            )
+        R_eef_current = get_object_rotation_matrix_from_state(
+            state=current_state,
+            object_idx=TableEnv.EE_OBSERVATION_IDX,
+            rotation_IDX_start=self.rotation_IDX_start,
+            rotation_IDX_end=self.rotation_IDX_end,
+            has_6D_rot_state=self.has_6D_rot_state,
+        )
+        R_obj_current = get_object_rotation_matrix_from_state(
+            state=current_state,
+            object_idx=object_idx,
+            rotation_IDX_start=self.rotation_IDX_start,
+            rotation_IDX_end=self.rotation_IDX_end,
+            has_6D_rot_state=self.has_6D_rot_state,
+        )
         R_T = torch.linalg.solve(R_eef_current[:, 0, ...], R_eef_desired, left=False)
         R_obj_next = torch.matmul(R_T, R_obj_current[:, 0, ...])
-        if self._has_6D_rot_state:
-            rotation_entries = matrix_to_rotation_6d(R_obj_next.unsqueeze(1))
-        else:
-            rotation_entries = matrix_to_axis_angle(R_obj_next.unsqueeze(1))
-        predicted_next_state[..., object_idx : object_idx + 1, rotation_IDX_start:rotation_IDX_end] = rotation_entries
+        rotation_entries = generate_rotation_entries_for_state(R_obj_next.unsqueeze(1), self.has_6D_rot_state)
+        predicted_next_state[..., object_idx : object_idx + 1, self.rotation_IDX_start : self.rotation_IDX_end] = (
+            rotation_entries
+        )
         return predicted_next_state
 
     def forward_eval(

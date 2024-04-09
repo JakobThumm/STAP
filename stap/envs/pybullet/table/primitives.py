@@ -371,7 +371,9 @@ class Place(Primitive):
         xy_target_range = np.array(target.bbox[:, :2])
         if target.name == "table":
             xy_target_range[0, 0] = utils.TABLE_CONSTRAINTS["table_x_min"]
-            xy_target_range[1, 0] = ACTION_CONSTRAINTS["max_lift_radius"]
+            xy_target_range[1, 0] = utils.TABLE_CONSTRAINTS["table_x_max"]
+            xy_target_range[0, 1] = utils.TABLE_CONSTRAINTS["table_y_min"]
+            xy_target_range[1, 1] = utils.TABLE_CONSTRAINTS["table_y_max"]
         xy_target = (xy_target_range[1] - xy_target_range[0]) * xy_normalized + xy_target_range[0]
         pos = np.append(xy_target, a.pos[2])
         if real_world:
