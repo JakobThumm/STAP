@@ -141,6 +141,25 @@ def position_norm_metric(
         raise NotImplementedError()
 
 
+def position_diff_along_direction(
+    pose_1: torch.Tensor, pose_2: torch.Tensor, direction: Sequence[float] = [1, 0, 0]
+) -> torch.Tensor:
+    """Calculate the positional difference of two poses along the given direction.
+
+    Can be used to evaluate if an object is placed left or right of another object.
+
+    Args:
+        pose_{1, 2}: the poses of the two objects.
+        direction: the direction along which to calculate the difference.
+    Returns:
+        The positional difference in shape [..., 1]
+    """
+    direction = torch.FloatTensor(direction).to(pose_1.device)  # type: ignore
+    direction = direction / torch.norm(direction, dim=-1, keepdim=True)  # type: ignore
+    position_diff = pose_1[..., :3] - pose_2[..., :3]
+    return torch.sum(position_diff * direction, dim=-1, keepdim=True)
+
+
 def great_circle_distance_metric(pose_1: torch.Tensor, pose_2: torch.Tensor) -> torch.Tensor:
     """Calculate the difference in orientation in radians of two poses using the great circle distance.
 
@@ -565,6 +584,141 @@ def HandoverVerticalOrientationFn(
     return total_probability
 
 
+def PlaceLeftOfRedBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the object is placed left of the red box and if the object is placed 10cm next to the red box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    red_box_id = get_object_id_from_name("red_box", env)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    red_box_pose = get_pose(state, red_box_id, -1)
+    # Evaluate if the object is placed left of the red box
+    left = [0.0, 1.0, 0.0]
+    direction_difference = position_diff_along_direction(next_object_pose, red_box_pose, left)
+    lower_threshold = 0.0
+    # The direction difference should be positive if the object is placed left of the red box.
+    is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
+    # Evaluate if the object has a deviation in the x direction.
+    x_diff_metric = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x"])
+    lower_threshold = 0.0
+    upper_threshold = 0.05
+    # The x difference should be as small as possible but no larger than 5cm.
+    x_diff_probability = linear_probability(x_diff_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    total_left_probability = probability_intersection(is_left_probability, x_diff_probability)
+    # Evaluate if the object is placed 10cm next to the red box.
+    distance_metric = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.050
+    ideal_point = 0.10
+    upper_threshold = 0.20
+    smaller_than_ideal_probability = linear_probability(
+        distance_metric, lower_threshold, ideal_point, is_smaller_then=False
+    )
+    bigger_than_ideal_probability = linear_probability(
+        distance_metric, ideal_point, upper_threshold, is_smaller_then=True
+    )
+    total_distance_probability = probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
+    # Combine the two probabilities
+    total_probability = probability_intersection(total_left_probability, total_distance_probability)
+    return total_probability
+
+
+def PlaceInFrontOfBlueBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the object is placed in front of the blue box and if the object is placed 10cm next to the blue box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    # Evaluate if the object is placed left of the blue box
+    left = [-1.0, 0.0, 0.0]
+    direction_difference = position_diff_along_direction(next_object_pose, blue_box_pose, left)
+    lower_threshold = 0.0
+    # The direction difference should be positive if the object is placed left of the blue box.
+    is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
+    # Evaluate if the object has a deviation in the x direction.
+    y_diff_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["y"])
+    lower_threshold = 0.0
+    upper_threshold = 0.05
+    # The x difference should be as small as possible but no larger than 5cm.
+    x_diff_probability = linear_probability(y_diff_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    total_left_probability = probability_intersection(is_left_probability, x_diff_probability)
+    # Evaluate if the object is placed 10cm next to the blue box.
+    distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.050
+    ideal_point = 0.10
+    upper_threshold = 0.20
+    smaller_than_ideal_probability = linear_probability(
+        distance_metric, lower_threshold, ideal_point, is_smaller_then=False
+    )
+    bigger_than_ideal_probability = linear_probability(
+        distance_metric, ideal_point, upper_threshold, is_smaller_then=True
+    )
+    total_distance_probability = probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
+    # Combine the two probabilities
+    total_probability = probability_intersection(total_left_probability, total_distance_probability)
+    return total_probability
+
+
+def PlaceDistanceApartBlueBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the object is placed 20cm next to the blue box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    # Evaluate if the object is placed 20cm next to the blue box.
+    distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.015
+    ideal_point = 0.20
+    upper_threshold = 0.25
+    smaller_than_ideal_probability = linear_probability(
+        distance_metric, lower_threshold, ideal_point, is_smaller_then=False
+    )
+    bigger_than_ideal_probability = linear_probability(
+        distance_metric, ideal_point, upper_threshold, is_smaller_then=True
+    )
+    total_distance_probability = probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
+    return total_distance_probability
+
+
 CUSTOM_FNS = {
     "HookHandoverOrientationFn": HookHandoverOrientationFn,
     "ScrewdriverPickFn": ScrewdriverPickFn,
@@ -573,4 +727,7 @@ CUSTOM_FNS = {
     "HandoverOrientationFn": HandoverOrientationFn,
     "HandoverOrientationAndPositionnFn": HandoverOrientationAndPositionnFn,
     "HandoverVerticalOrientationFn": HandoverVerticalOrientationFn,
+    "PlaceLeftOfRedBoxFn": PlaceLeftOfRedBoxFn,
+    "PlaceInFrontOfBlueBoxFn": PlaceInFrontOfBlueBoxFn,
+    "PlaceDistanceApartBlueBoxFn": PlaceDistanceApartBlueBoxFn,
 }

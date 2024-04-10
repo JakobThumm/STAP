@@ -419,9 +419,36 @@ class TableEnv(PybulletEnv):
     def get_object_id_from_name(self, name: str) -> int:
         """Returns the object id from the object name."""
         if name == "end_effector":
-            return 0
-        else:
-            return list(self.objects.keys()).index(name)
+            return TableEnv.EE_OBSERVATION_IDX
+        obj_states = self.object_states()
+        arg_object_names = [obj.name for obj in self.get_primitive().arg_objects]
+        arg_object_length = 2
+
+        object_ids = dict()
+        counter = 0
+        for obj_state in obj_states:
+            if obj_state == "TableEnv.robot.arm.ee_pose":
+                object_ids[obj_state] = TableEnv.EE_OBSERVATION_IDX
+            elif obj_state in arg_object_names:
+                arg_object_idx = arg_object_names.index(obj_state)
+                object_ids[obj_state] = arg_object_idx + 1
+            elif obj_state == "table":
+                continue
+            elif obj_state == "left_hand":
+                # We don't use this observation for now.
+                continue
+                observation[-2] = obj_states[obj_state].vector
+            elif obj_state == "right_hand":
+                # We don't use this observation for now.
+                continue
+                observation[-1] = obj_states[obj_state].vector
+            else:
+                object_ids[obj_state] = arg_object_length + counter + 1
+                counter += 1
+
+        if name not in object_ids:
+            raise ValueError(f"Object {name} not found in the observation matrix.")
+        return object_ids[name]
 
     def get_object_state_from_observation(self, observation: np.ndarray, identifier: str) -> object_state.ObjectState:
         """Returns the object state from the observation matrix."""
@@ -567,7 +594,7 @@ class TableEnv(PybulletEnv):
 
         The observation space is designed as follows:
             1. EEF pose
-            2. Primitive arg objects
+            2. Exactly 2 primitive arg objects
             3. Other objects (up to MAX_NUM_OBJECTS - 3)
             4. Human hand pose
         """
@@ -579,7 +606,7 @@ class TableEnv(PybulletEnv):
         observation = np.repeat(default_state[np.newaxis, :], self.MAX_NUM_OBJECTS, axis=0)
         assert observation.shape == self.observation_space.shape
         arg_object_names = [obj.name for obj in self.get_primitive().arg_objects]
-        arg_object_length = len(arg_object_names)
+        arg_object_length = 2
         counter = 0
         for obj_state in obj_states:
             if obj_state == "TableEnv.robot.arm.ee_pose":
