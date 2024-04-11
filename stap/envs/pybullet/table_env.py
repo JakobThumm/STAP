@@ -4,7 +4,16 @@ import multiprocessing
 import multiprocessing.synchronize
 import pathlib
 import random
-from typing import Any, Dict, Generator, List, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import gym
 import numpy as np
@@ -53,12 +62,14 @@ class Task:
     instruction: Optional[str]
     goal_propositions: Optional[List[predicates.Predicate]]
     supported_predicates: Optional[List[str]]
+    custom_fns: List[Optional[str]]
 
     @staticmethod
     def create(
         env: "TableEnv",
         action_skeleton: List[str],
         initial_state: List[str],
+        custom_fns: Optional[List[Optional[str]]] = None,
         prob: Optional[float] = None,
         instruction: Optional[str] = None,
         goal_propositions: Optional[List[List[str]]] = None,
@@ -78,6 +89,9 @@ class Task:
         if goal_propositions is not None:
             goal_propositions = [[predicates.Predicate.create(pred) for pred in goal] for goal in goal_propositions]
 
+        if custom_fns is None:
+            custom_fns = [None for _ in primitives]
+
         return Task(
             action_skeleton=primitives,
             initial_state=initial_propositions,
@@ -85,6 +99,7 @@ class Task:
             instruction=instruction,
             goal_propositions=goal_propositions,
             supported_predicates=supported_predicates,
+            custom_fns=custom_fns,
         )
 
 

@@ -8,6 +8,7 @@ import tqdm
 from stap import agents, dynamics, envs, planners
 from stap.dynamics import TableEnvDynamics
 from stap.envs.pybullet.table import primitives as table_primitives
+from stap.envs.pybullet.table_env import TableEnv
 from stap.utils import recording, timing
 
 
@@ -108,7 +109,7 @@ def evaluate_planners(
     if gui is not None:
         env_kwargs["gui"] = bool(gui)
     env_factory = envs.EnvFactory(config=env_config)
-    env = env_factory(**env_kwargs)
+    env: TableEnv = env_factory(**env_kwargs)  # type: ignore
 
     planner = planners.load(
         config=config,
@@ -143,7 +144,7 @@ def evaluate_planners(
             rewards, plan, t_planner = loaded_plan
             planners.evaluate_plan(
                 env,
-                env.action_skeleton,
+                env.task,
                 plan.actions,
                 gif_path=path / f"planning_{idx_iter}.gif",
             )
@@ -156,7 +157,7 @@ def evaluate_planners(
                 print("Planning open loop")
             rewards, plan, t_planner = planning_fn(
                 env,
-                env.action_skeleton,
+                env.task,
                 planner,
                 timer=timer,
                 gif_path=path / f"planning_{idx_iter}.gif",

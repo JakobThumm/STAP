@@ -1,12 +1,14 @@
 import abc
 import dataclasses
-from typing import Callable, Dict, Optional, Sequence, Union
+from typing import Callable, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 import torch
 
 from stap import agents, dynamics, envs
 from stap.envs.base import Primitive
+from stap.envs.pybullet.table_env import Task
+from stap.planners.custom_fns import CUSTOM_FNS
 from stap.utils import tensors
 
 
@@ -79,6 +81,25 @@ class Planner(abc.ABC):
         """Torch device."""
         return self._device
 
+    def build_custom_fn_list(self, task: Task) -> List[Optional[Callable]]:
+        """Builds a list of custom functions for each primitive."""
+        # First convert the custom function strings of the task into the actual functions
+        task_custom_fns: List[Optional[Callable]] = []
+        custom_fns = task.custom_fns
+        assert len(custom_fns) == len(task.action_skeleton)
+        for fn_name in custom_fns:
+            if fn_name is not None and fn_name in CUSTOM_FNS:
+                task_custom_fns.append(CUSTOM_FNS[fn_name])
+            else:
+                task_custom_fns.append(None)
+        # Now override the task custom functions with the planner custom functions if they exist for a given primitive.
+        if self.custom_fns is not None:
+            for i in range(len(task.action_skeleton)):
+                primitive = task.action_skeleton[i]
+                if type(primitive) in self.custom_fns and self.custom_fns.get(type(primitive)) is not None:
+                    task_custom_fns[i] = self.custom_fns.get(type(primitive))
+        return task_custom_fns
+
     def to(self, device: Union[str, torch.device]) -> "Planner":
         """Transfers networks to device."""
         self._device = torch.device(tensors.device(device))
@@ -91,14 +112,14 @@ class Planner(abc.ABC):
     def plan(
         self,
         observation: np.ndarray,
-        action_skeleton: Sequence[envs.Primitive],
+        task: Task,
         return_visited_samples: bool = False,
     ) -> PlanningResult:
         """Plans a sequence of actions following the given action skeleton.
 
         Args:
             observation: Environment observation.
-            action_skeleton: List of (idx_policy, policy_args) 2-tuples.
+            task: Task to perform.
             return_visited_samples: Whether to return the samples visited during planning.
 
         Returns:

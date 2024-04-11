@@ -5,6 +5,7 @@ import numpy as np
 import torch
 
 from stap import agents, dynamics, envs, networks
+from stap.envs.pybullet.table_env import Task
 from stap.planners import base as planners
 from stap.planners import utils
 from stap.utils import spaces
@@ -145,19 +146,20 @@ class SCODCEMPlanner(planners.Planner):
     def plan(
         self,
         observation: np.ndarray,
-        action_skeleton: Sequence[envs.Primitive],
+        task: Task,
         return_visited_samples: bool = False,
     ) -> planners.PlanningResult:
         """Runs `num_iterations` of CEM.
 
         Args:
             observation: Environment observation.
-            action_skeleton: List of primitives.
+            task: Task to perform.
             return_visited_samples: Whether to return the samples visited during planning.
 
         Returns:
             Planning result.
         """
+        action_skeleton = task.action_skeleton
         best_actions: Optional[np.ndarray] = None
         best_states: Optional[np.ndarray] = None
         p_best_success: float = -float("inf")
@@ -169,13 +171,8 @@ class SCODCEMPlanner(planners.Planner):
             p_visited_success_list = []
             visited_values_list = []
 
-        value_fns = [
-            self.policies[primitive.idx_policy].critic for primitive in action_skeleton
-        ]
-        decode_fns = [
-            functools.partial(self.dynamics.decode, primitive=primitive)
-            for primitive in action_skeleton
-        ]
+        value_fns = [self.policies[primitive.idx_policy].critic for primitive in action_skeleton]
+        decode_fns = [functools.partial(self.dynamics.decode, primitive=primitive) for primitive in action_skeleton]
 
         with torch.no_grad():
             # Prepare action spaces.
@@ -199,12 +196,8 @@ class SCODCEMPlanner(planners.Planner):
             t_observation = torch.from_numpy(observation).to(self.dynamics.device)
 
             # Initialize distribution.
-            mean, std = self._compute_initial_distribution(
-                t_observation, action_skeleton
-            )
-            elites = torch.empty(
-                (0, *mean.shape), dtype=torch.float32, device=self.device
-            )
+            mean, std = self._compute_initial_distribution(t_observation, action_skeleton)
+            elites = torch.empty((0, *mean.shape), dtype=torch.float32, device=self.device)
 
             # Prepare constant agents for rollouts.
             policies = [
@@ -226,9 +219,7 @@ class SCODCEMPlanner(planners.Planner):
 
                 # Include the best elites from the previous iteration.
                 if idx_iter > 0:
-                    samples[: self.num_elites_to_keep] = elites[
-                        : self.num_elites_to_keep
-                    ]
+                    samples[: self.num_elites_to_keep] = elites[: self.num_elites_to_keep]
 
                 # Also include the mean.
                 samples[self.num_elites_to_keep] = mean

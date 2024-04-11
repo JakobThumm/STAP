@@ -7,6 +7,7 @@ import torch
 from stap import agents, dynamics, envs, networks
 from stap.envs.base import Primitive
 from stap.envs.pybullet.table.primitives import Pick, StaticHandover
+from stap.envs.pybullet.table_env import Task
 from stap.planners import base as planners
 from stap.planners import utils
 from stap.utils import spaces
@@ -138,19 +139,20 @@ class CEMPlanner(planners.Planner):
     def plan(
         self,
         observation: np.ndarray,
-        action_skeleton: Sequence[envs.Primitive],
+        task: Task,
         return_visited_samples: bool = False,
     ) -> planners.PlanningResult:
         """Runs `num_iterations` of CEM.
 
         Args:
             observation: Environment observation.
-            action_skeleton: List of primitives.
+            task: Task to plan.
             return_visited_samples: Whether to return the samples visited during planning.
 
         Returns:
             Planning result.
         """
+        action_skeleton = task.action_skeleton
         best_actions: Optional[np.ndarray] = None
         best_states: Optional[np.ndarray] = None
         p_best_success: float = -float("inf")
@@ -163,10 +165,7 @@ class CEMPlanner(planners.Planner):
 
         value_fns = [self.policies[primitive.idx_policy].critic for primitive in action_skeleton]
         decode_fns = [functools.partial(self.dynamics.decode, primitive=primitive) for primitive in action_skeleton]
-        if self.custom_fns is not None:
-            custom_fns = [self.custom_fns[type(primitive)] for primitive in action_skeleton]  # type: ignore
-        else:
-            custom_fns = None
+        custom_fns = self.build_custom_fn_list(task)
 
         with torch.no_grad():
             # Prepare action spaces.

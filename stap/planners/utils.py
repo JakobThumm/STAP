@@ -21,6 +21,7 @@ from stap.dynamics import Dynamics, LatentDynamics
 from stap.dynamics import load as load_dynamics
 from stap.envs.base import Primitive
 from stap.envs.pybullet.table.primitives import PRIMITIVE_MATCHING, Null
+from stap.envs.pybullet.table_env import Task
 from stap.planners.custom_fns import CUSTOM_FNS
 from stap.utils import configs, recording, spaces, tensors, timing
 
@@ -278,7 +279,7 @@ def evaluate_trajectory(
 
 def evaluate_plan(
     env: envs.Env,
-    action_skeleton: Sequence[envs.Primitive],
+    task: Task,
     actions: np.ndarray,
     gif_path: Optional[Union[str, pathlib.Path]] = None,
 ) -> np.ndarray:
@@ -297,6 +298,7 @@ def evaluate_plan(
         env.record_start()
 
     # Iterate over plan.
+    action_skeleton = task.action_skeleton
     rewards = np.zeros(len(action_skeleton), dtype=np.float32)
     for t, primitive in enumerate(action_skeleton):
         # Execute action.
@@ -395,7 +397,7 @@ def vizualize_predicted_plan(
 
 def run_open_loop_planning(
     env: envs.Env,
-    action_skeleton: Sequence[envs.Primitive],
+    task: Task,
     planner: planners.Planner,
     timer: Optional[timing.Timer] = None,
     gif_path: Optional[Union[str, pathlib.Path]] = None,
@@ -410,7 +412,7 @@ def run_open_loop_planning(
     # Plan.
     if timer is not None:
         timer.tic("planner")
-    plan = planner.plan(env.get_observation(), env.action_skeleton)
+    plan = planner.plan(env.get_observation(), task)
     t_planner = None if timer is None else timer.toc("planner")
 
     if record_timelapse and gif_path is not None:
@@ -421,7 +423,7 @@ def run_open_loop_planning(
         env.set_state(state)
 
     # Execute plan.
-    rewards = evaluate_plan(env, action_skeleton, plan.actions, gif_path=gif_path)
+    rewards = evaluate_plan(env, task, plan.actions, gif_path=gif_path)
 
     if isinstance(planner.dynamics, dynamics.OracleDynamics):
         env.set_state(state)
@@ -431,7 +433,7 @@ def run_open_loop_planning(
 
 def run_closed_loop_planning(
     env: envs.Env,
-    action_skeleton: Sequence[envs.Primitive],
+    task: Task,
     planner: planners.Planner,
     timer: Optional[timing.Timer] = None,
     gif_path: Optional[Union[str, pathlib.Path]] = None,
@@ -441,7 +443,7 @@ def run_closed_loop_planning(
 
     Args:
         env: Sequential env.
-        action_skeleton: List of primitives.
+        task: Task of the environment including the action skeleton.
         actions: Planned actions [T, A].
         gif_path: Optional path to save a rendered gif.
 
@@ -454,6 +456,7 @@ def run_closed_loop_planning(
     if gif_path is not None:
         env.record_start()
 
+    action_skeleton = task.action_skeleton
     T = len(action_skeleton)
     rewards = np.zeros(T, dtype=np.float32)
     actions = spaces.null(planner.dynamics.action_space, batch_shape=T)
@@ -472,7 +475,17 @@ def run_closed_loop_planning(
         # Plan.
         if timer is not None:
             timer.tic("planner")
-        plan = planner.plan(observation, action_skeleton[t:])
+        # Reduce task to remaining primitives.
+        reduced_task = Task(
+            action_skeleton=task.action_skeleton[t:],
+            initial_state=task.initial_state,
+            prob=task.prob,
+            instruction=task.instruction,
+            goal_propositions=task.goal_propositions,
+            supported_predicates=task.supported_predicates,
+            custom_fns=task.custom_fns[t:],
+        )
+        plan = planner.plan(observation, reduced_task)
         if t_planner is not None and timer is not None:
             t_planner.append(timer.toc("planner"))
 

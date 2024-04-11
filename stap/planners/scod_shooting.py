@@ -5,7 +5,8 @@ import numpy as np
 import torch
 import tqdm
 
-from stap import agents, dynamics, envs
+from stap import agents, dynamics
+from stap.envs.pybullet.table_env import Task
 from stap.planners import base as planners
 from stap.planners import utils
 from stap.utils import spaces, tensors
@@ -48,19 +49,20 @@ class SCODShootingPlanner(planners.Planner):
     def plan(
         self,
         observation: np.ndarray,
-        action_skeleton: Sequence[envs.Primitive],
+        task: Task,
         return_visited_samples: bool = False,
     ) -> planners.PlanningResult:
         """Generates `num_samples` trajectories and picks the best one.
 
         Args:
             observation: Environment observation.
-            action_skeleton: List of primitives.
+            task: Task to perform.
             return_visited_samples: Whether to return the samples visited during planning.
 
         Returns:
             Planning result.
         """
+        action_skeleton = task.action_skeleton
         with torch.no_grad():
             # Prepare action spaces.
             T = len(action_skeleton)
@@ -83,17 +85,12 @@ class SCODShootingPlanner(planners.Planner):
             # Prepare minibatches.
             element_size: int = self.policies[0].critic.scod_wrapper._num_params  # type: ignore
             element_size += (T + 4) * int(
-                np.prod(self.dynamics.state_space.shape)
-                + np.prod(self.dynamics.action_space.shape)
+                np.prod(self.dynamics.state_space.shape) + np.prod(self.dynamics.action_space.shape)
             )
-            minibatch_size, num_minibatches = tensors.compute_minibatch(
-                num_samples, 4 * element_size
-            )
+            minibatch_size, num_minibatches = tensors.compute_minibatch(num_samples, 4 * element_size)
 
             best_actions = spaces.null(self.dynamics.action_space, (num_minibatches, T))
-            best_states = spaces.null(
-                self.dynamics.state_space, (num_minibatches, T + 1)
-            )
+            best_states = spaces.null(self.dynamics.state_space, (num_minibatches, T + 1))
             best_p_success = np.full(num_minibatches, float("nan"))
             best_values = np.full((num_minibatches, T), float("nan"))
             for idx_minibatch in tqdm.tqdm(range(num_minibatches)):
@@ -106,13 +103,9 @@ class SCODShootingPlanner(planners.Planner):
                 )
 
                 # Evaluate trajectories.
-                value_fns = [
-                    self.policies[primitive.idx_policy].critic
-                    for primitive in action_skeleton
-                ]
+                value_fns = [self.policies[primitive.idx_policy].critic for primitive in action_skeleton]
                 decode_fns = [
-                    functools.partial(self.dynamics.decode, primitive=primitive)
-                    for primitive in action_skeleton
+                    functools.partial(self.dynamics.decode, primitive=primitive) for primitive in action_skeleton
                 ]
                 p_success, t_values, t_values_unc = utils.evaluate_trajectory(
                     value_fns,
@@ -123,9 +116,7 @@ class SCODShootingPlanner(planners.Planner):
                 )
 
                 # Filter out trajectories with the highest uncertainty.
-                unc_trajectory_idx = t_values_unc.topk(
-                    num_filter_per_timestep // num_minibatches, dim=0
-                ).indices
+                unc_trajectory_idx = t_values_unc.topk(num_filter_per_timestep // num_minibatches, dim=0).indices
                 p_success[unc_trajectory_idx.flatten().unique()] = float("-Inf")
 
                 # Select best trajectory.
