@@ -64,6 +64,7 @@ class Gripper(articulated_body.ArticulatedBody):
             pos_gains: (kp, kv) position gains.
             pos_threshold: (position, velocity) error threshold for position convergence.
             timeout: Default command timeout.
+            q_home: Default joint position.
         """
         super().__init__(
             physics_id=physics_id,
@@ -263,7 +264,7 @@ class Gripper(articulated_body.ArticulatedBody):
         q, dq, _, _ = zip(*joint_states)
         q = np.array(q)
         dq = np.array(dq)
-        q_des = self._torque_multipliers * self._gripper_state.command
+        q_des = self._q_home + self._torque_multipliers * self._gripper_state.command
         q_err = q - q_des
 
         # Compute commands.
