@@ -23,6 +23,8 @@ class PlanningResult:
     p_visited_success: Optional[np.ndarray] = None  # [num_visited]
     visited_values: Optional[np.ndarray] = None  # [num_visited, T]
     values_unc: Optional[np.ndarray] = None  # [T]
+    predicted_preference_values: Optional[np.ndarray] = None  # [T]
+    observed_preference_values: Optional[np.ndarray] = None  # [T]
 
 
 class Planner(abc.ABC):
@@ -88,8 +90,9 @@ class Planner(abc.ABC):
         custom_fns = task.custom_fns
         assert len(custom_fns) == len(task.action_skeleton)
         for fn_name in custom_fns:
-            if fn_name is not None and fn_name in CUSTOM_FNS:
-                task_custom_fns.append(CUSTOM_FNS[fn_name])
+            if fn_name is not None:
+                assert fn_name in CUSTOM_FNS, f"Custom function {fn_name} not found."
+                task_custom_fns.append(CUSTOM_FNS.get(fn_name))
             else:
                 task_custom_fns.append(None)
         # Now override the task custom functions with the planner custom functions if they exist for a given primitive.

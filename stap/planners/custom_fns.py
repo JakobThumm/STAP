@@ -4,7 +4,7 @@ Author: Jakob Thumm
 Date: 2024-01-02
 """
 
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple, Union
 
 import torch
 
@@ -64,10 +64,10 @@ def get_object_orientation(observation: torch.Tensor, id: int) -> torch.Tensor:
 
 
 ############## HELPER FUNCTIONS FOR THE CUSTOM FNS ##############
-def get_object_id_from_name(name: str, env: Env) -> int:
+def get_object_id_from_name(name: str, env: Env, primitive: Primitive) -> int:
     """Return the object identifier from a given object name."""
     assert isinstance(env, TableEnv)
-    return env.get_object_id_from_name(name)
+    return env.get_object_id_from_name(name, primitive)
 
 
 def get_object_id_from_primitive(arg_id: int, primitive: Primitive) -> int:
@@ -113,6 +113,17 @@ def get_pose(state: torch.Tensor, object_id: int, frame: int = -1) -> torch.Tens
     return object_pose
 
 
+def build_direction_vector(pose_1: torch.Tensor, pose_2: torch.Tensor) -> torch.Tensor:
+    """Build the vector pointing from pose 1 to pose 2.
+
+    Args:
+        pose_{1, 2}: the poses of the two objects.
+    Returns:
+        The direction vector in shape [..., 3]
+    """
+    return pose_2[..., :3] - pose_1[..., :3]
+
+
 def position_norm_metric(
     pose_1: torch.Tensor, pose_2: torch.Tensor, norm: str = "L2", axes: Sequence[str] = ["x", "y", "z"]
 ) -> torch.Tensor:
@@ -142,22 +153,51 @@ def position_norm_metric(
 
 
 def position_diff_along_direction(
-    pose_1: torch.Tensor, pose_2: torch.Tensor, direction: Sequence[float] = [1, 0, 0]
+    pose_1: torch.Tensor, pose_2: torch.Tensor, direction: Union[torch.Tensor, Sequence[float]] = [1, 0, 0]
 ) -> torch.Tensor:
     """Calculate the positional difference of two poses along the given direction.
 
-    Can be used to evaluate if an object is placed left or right of another object.
+    E.g., can be used to evaluate if an object is placed left or right of another object.
+    Returns the dot product of the positional difference and the given direction.
 
     Args:
         pose_{1, 2}: the poses of the two objects.
         direction: the direction along which to calculate the difference.
+            Can be either a tensor of shape [..., 3] with one direction vector per entry in the batch or a list indicating
+            a single direction vector that is used for all entries in the batch.
     Returns:
         The positional difference in shape [..., 1]
     """
-    direction = torch.FloatTensor(direction).to(pose_1.device)  # type: ignore
+    if isinstance(direction, list):
+        direction = torch.FloatTensor(direction).to(pose_1.device)  # type: ignore
     direction = direction / torch.norm(direction, dim=-1, keepdim=True)  # type: ignore
-    position_diff = pose_1[..., :3] - pose_2[..., :3]
+    position_diff = pose_2[..., :3] - pose_1[..., :3]
     return torch.sum(position_diff * direction, dim=-1, keepdim=True)
+
+
+def position_metric_normal_to_direction(
+    pose_1: torch.Tensor, pose_2: torch.Tensor, direction: Union[torch.Tensor, Sequence[float]] = [1, 0, 0]
+) -> torch.Tensor:
+    """Calculate the positional difference of two poses normal to the given direction.
+
+    Given a point (pose_1), the function calculates the distance to a line defined by a point (pose_2) and a direction.
+
+    Args:
+        pose_{1, 2}: the poses of the two objects.
+        direction: the direction normal to which to calculate the difference.
+            Can be either a tensor of shape [..., 3] with one direction vector per entry in the batch or a list indicating
+            a single direction vector that is used for all entries in the batch.
+    Returns:
+        The positional difference in shape [..., 1]
+    """
+    if isinstance(direction, list):
+        direction = torch.FloatTensor(direction).to(pose_1.device)  # type: ignore
+    direction = direction / torch.norm(direction, dim=-1, keepdim=True)  # type: ignore
+    position_diff = pose_2[..., :3] - pose_1[..., :3]
+    distance = torch.norm(position_diff, dim=-1, keepdim=True)
+    distance_parallel = torch.norm(position_diff * direction, dim=-1, keepdim=True)
+    distance_normal = torch.sqrt(distance**2 - distance_parallel**2)
+    return distance_normal
 
 
 def great_circle_distance_metric(pose_1: torch.Tensor, pose_2: torch.Tensor) -> torch.Tensor:
@@ -173,7 +213,7 @@ def great_circle_distance_metric(pose_1: torch.Tensor, pose_2: torch.Tensor) -> 
 
 
 def pointing_in_direction_metric(
-    pose_1: torch.Tensor, pose_2: torch.Tensor, main_axis: Sequence[float] = [1, 0, 0]
+    pose_1: torch.Tensor, pose_2: torch.Tensor, main_axis: Union[torch.Tensor, Sequence[float]] = [1, 0, 0]
 ) -> torch.Tensor:
     """Evaluate if an object is pointing in a given direction.
 
@@ -183,10 +223,13 @@ def pointing_in_direction_metric(
         pose_1: the orientation of this pose is used to rotate the `main_axis`.
         pose_2: compare the rotated `main_axis` with the position vector of this pose.
         main_axis: axis describing in which direction an object is pointing in its default configuration.
+            Can be either a tensor of shape [..., 3] with one main axis vector per entry in the batch or a list indicating
+            a single main axis vector that is used for all entries in the batch.
     Returns:
         The great circle distance in radians between the rotated `main_axis` and the position part of `pose_2`.
     """
-    main_axis = torch.FloatTensor(main_axis).to(pose_1.device)  # type: ignore
+    if isinstance(main_axis, list):
+        main_axis = torch.FloatTensor(main_axis).to(pose_1.device)  # type: ignore
     norm_main_axis = main_axis / torch.norm(main_axis, dim=-1, keepdim=True)
     new_pose = torch.zeros_like(pose_1)
     new_pose[..., :3] = quaternion_apply(pose_1[..., 3:], norm_main_axis)
@@ -406,7 +449,7 @@ def ScrewdriverPickFn(
     assert primitive is not None and isinstance(primitive, Primitive)
     env = primitive.env
     object_id = get_object_id_from_primitive(0, primitive)
-    end_effector_id = get_object_id_from_name("end_effector", env)
+    end_effector_id = get_object_id_from_name("end_effector", env, primitive)
     # Get the pose of the end effector in the object frame
     next_end_effector_pose = get_pose(next_state, end_effector_id, object_id)
     # Assumes the rod length is 0.075 and the rod in the positive x direction in object frame.
@@ -601,17 +644,17 @@ def PlaceLeftOfRedBoxFn(
     assert primitive is not None and isinstance(primitive, Primitive)
     env = primitive.env
     object_id = get_object_id_from_primitive(0, primitive)
-    red_box_id = get_object_id_from_name("red_box", env)
+    red_box_id = get_object_id_from_name("red_box", env, primitive)
     next_object_pose = get_pose(next_state, object_id, -1)
     red_box_pose = get_pose(state, red_box_id, -1)
     # Evaluate if the object is placed left of the red box
-    left = [0.0, 1.0, 0.0]
+    left = [0.0, -1.0, 0.0]
     direction_difference = position_diff_along_direction(next_object_pose, red_box_pose, left)
     lower_threshold = 0.0
     # The direction difference should be positive if the object is placed left of the red box.
     is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
     # Evaluate if the object has a deviation in the x direction.
-    x_diff_metric = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x"])
+    x_diff_metric = position_metric_normal_to_direction(next_object_pose, red_box_pose, left)
     lower_threshold = 0.0
     upper_threshold = 0.05
     # The x difference should be as small as possible but no larger than 5cm.
@@ -651,17 +694,17 @@ def PlaceInFrontOfBlueBoxFn(
     assert primitive is not None and isinstance(primitive, Primitive)
     env = primitive.env
     object_id = get_object_id_from_primitive(0, primitive)
-    blue_box_id = get_object_id_from_name("blue_box", env)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
     next_object_pose = get_pose(next_state, object_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
-    # Evaluate if the object is placed left of the blue box
-    left = [-1.0, 0.0, 0.0]
-    direction_difference = position_diff_along_direction(next_object_pose, blue_box_pose, left)
+    # Evaluate if the object is placed in front of the blue box
+    in_front_of = [1.0, 0.0, 0.0]
+    direction_difference = position_diff_along_direction(next_object_pose, blue_box_pose, in_front_of)
     lower_threshold = 0.0
     # The direction difference should be positive if the object is placed left of the blue box.
     is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
     # Evaluate if the object has a deviation in the x direction.
-    y_diff_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["y"])
+    y_diff_metric = position_metric_normal_to_direction(next_object_pose, blue_box_pose, in_front_of)
     lower_threshold = 0.0
     upper_threshold = 0.05
     # The x difference should be as small as possible but no larger than 5cm.
@@ -701,7 +744,7 @@ def PlaceDistanceApartBlueBoxFn(
     assert primitive is not None and isinstance(primitive, Primitive)
     env = primitive.env
     object_id = get_object_id_from_primitive(0, primitive)
-    blue_box_id = get_object_id_from_name("blue_box", env)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
     next_object_pose = get_pose(next_state, object_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
     # Evaluate if the object is placed 20cm next to the blue box.
@@ -719,6 +762,107 @@ def PlaceDistanceApartBlueBoxFn(
     return total_distance_probability
 
 
+##### Hand-written custom functions for object arrangement ablation study #####
+# Place the object in a line with the red box and the blue box.
+def PlaceInLineWithRedAndBlueBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the object is placed in line with the red and blue box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    red_box_id = get_object_id_from_name("red_box", env, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    red_box_pose = get_pose(state, red_box_id, -1)
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    red_to_blue = build_direction_vector(red_box_pose, blue_box_pose)
+    normal_distance_metric = position_metric_normal_to_direction(next_object_pose, blue_box_pose, red_to_blue)
+    lower_threshold = 0.0
+    upper_threshold = 0.05
+    # The x difference should be as small as possible but no larger than 5cm.
+    probability = linear_probability(normal_distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    return probability
+
+
+def PlaceNextToBlueBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the object is placed next to the blue box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    # Evaluate if the object is placed 20cm next to the blue box.
+    distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.10
+    upper_threshold = 0.15
+    smaller_than_ideal_probability = linear_probability(
+        distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    return smaller_than_ideal_probability
+
+
+def PlaceFarAwayFromRedAndBlueFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the object is placed far away from the red and blue box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    red_box_id = get_object_id_from_name("red_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    red_box_pose = get_pose(state, red_box_id, -1)
+    # Evaluate if the object is placed far away from the red box
+    distance_metric_red = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.20
+    upper_threshold = 1.0
+    far_away_probability_red = linear_probability(
+        distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=False
+    )
+    # Evaluate if the object is placed far away from the blue box
+    distance_metric_blue = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
+    far_away_probability_blue = linear_probability(
+        distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=False
+    )
+    # Combine the two probabilities
+    total_probability = probability_intersection(far_away_probability_red, far_away_probability_blue)
+    return total_probability
+
+
 CUSTOM_FNS = {
     "HookHandoverOrientationFn": HookHandoverOrientationFn,
     "ScrewdriverPickFn": ScrewdriverPickFn,
@@ -730,4 +874,7 @@ CUSTOM_FNS = {
     "PlaceLeftOfRedBoxFn": PlaceLeftOfRedBoxFn,
     "PlaceInFrontOfBlueBoxFn": PlaceInFrontOfBlueBoxFn,
     "PlaceDistanceApartBlueBoxFn": PlaceDistanceApartBlueBoxFn,
+    "PlaceInLineWithRedAndBlueBoxFn": PlaceInLineWithRedAndBlueBoxFn,
+    "PlaceNextToBlueBoxFn": PlaceNextToBlueBoxFn,
+    "PlaceFarAwayFromRedAndBlueFn": PlaceFarAwayFromRedAndBlueFn,
 }

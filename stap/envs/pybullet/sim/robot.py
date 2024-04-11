@@ -1,4 +1,5 @@
 import copy
+import time
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
@@ -414,6 +415,7 @@ class Robot(body.Body):
             self.arm.update_torques(time=self._sim_time)
             status = self.gripper.update_torques()
             self.step_simulation()
+            time.sleep(0.008)
         # print("Robot.grasp:", command, status)
 
         if status == articulated_body.ControlStatus.ABORTED:

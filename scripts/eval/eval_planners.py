@@ -178,6 +178,8 @@ def evaluate_planners(
 
         if verbose:
             print("success:", rewards.prod(), rewards)
+            print("predicted preference values:", plan.predicted_preference_values)
+            print("observed preference values:", plan.observed_preference_values)
             print("predicted success:", plan.p_success, plan.values)
             if closed_loop:
                 print(

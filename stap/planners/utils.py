@@ -466,6 +466,8 @@ def run_closed_loop_planning(
     visited_states = spaces.null(planner.dynamics.state_space, batch_shape=(T, T + 1))
     p_visited_success = np.full(T, float("nan"), dtype=np.float32)
     visited_values = np.full((T, T), float("nan"), dtype=np.float32)
+    predicted_preference_values = np.full(T, float("nan"), dtype=np.float32)
+    observed_preference_values = np.full(T, float("nan"), dtype=np.float32)
 
     observation = env.get_observation()
     t_planner: Optional[List[float]] = None if timer is None else []
@@ -494,20 +496,18 @@ def run_closed_loop_planning(
         # DEBUG: Find observation difference to transition prediction
         next_state_predicted = plan.states[1]
         next_state_observed = next_observation
-        state_diff = next_state_observed - next_state_predicted
-        sum_state_diff_first_arg_obj = np.sum(np.abs(state_diff[1, :]))
-        custom_fn = planner.custom_fns[type(primitive)]  # type: ignore
+        custom_fn = planner.build_custom_fn_list(reduced_task)[0]
         state = torch.Tensor(plan.states[0][np.newaxis, :])
         next_state_predicted_Tensor = torch.Tensor(next_state_predicted[np.newaxis, :])
         next_state_observed_Tensor = torch.Tensor(next_state_observed[np.newaxis, :])
         if custom_fn is not None:
-            predicted_value = custom_fn(
+            predicted_preference_values[t] = custom_fn(
                 state,
                 torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),
                 next_state_predicted_Tensor,
                 primitive,
             )  # type: ignore
-            observed_value = custom_fn(
+            observed_preference_values[t] = custom_fn(
                 state,
                 torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),
                 next_state_observed_Tensor,
@@ -551,6 +551,8 @@ def run_closed_loop_planning(
         visited_states=visited_states,
         p_visited_success=p_visited_success,
         visited_values=visited_values,
+        predicted_preference_values=predicted_preference_values,
+        observed_preference_values=observed_preference_values,
     )
 
     return rewards, plan, t_planner

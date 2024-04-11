@@ -431,12 +431,12 @@ class TableEnv(PybulletEnv):
         """Returns an iterator over the non-null objects."""
         return (obj for obj in self.objects.values() if not obj.isinstance(Null))
 
-    def get_object_id_from_name(self, name: str) -> int:
+    def get_object_id_from_name(self, name: str, primitive: Primitive) -> int:
         """Returns the object id from the object name."""
         if name == "end_effector":
             return TableEnv.EE_OBSERVATION_IDX
         obj_states = self.object_states()
-        arg_object_names = [obj.name for obj in self.get_primitive().arg_objects]
+        arg_object_names = [obj.name for obj in primitive.arg_objects]
         arg_object_length = 2
 
         object_ids = dict()

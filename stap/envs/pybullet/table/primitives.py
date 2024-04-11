@@ -251,6 +251,7 @@ class Pick(Primitive):
 
         # Get object pose.
         obj = self.arg_objects[0]
+        a = self.correct_z(a, obj)
         obj_pose = obj.pose()
         obj_quat = eigen.Quaterniond(obj_pose.quat)
 
@@ -334,6 +335,13 @@ class Pick(Primitive):
         vector = np.concatenate([pos, [theta]])
         return primitive_actions.PickAction(primitive_actions.PickAction.clip_action(vector))
 
+    def correct_z(self, a: primitive_actions.PickAction, obj: Object) -> primitive_actions.PickAction:
+        """Corrects the z-coordinate of the action to be above the object."""
+        a_z = a.pos[2]
+        a_z = max(a_z, 0.5 * obj.size[2] + 0.01)
+        a.pos[2] = min(a_z, 0.5 * obj.size[2] - 0.01)
+        return a
+
 
 class Place(Primitive):
     action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(4,))
@@ -360,7 +368,7 @@ class Place(Primitive):
         dbprint(a)
 
         obj, target = self.arg_objects
-
+        a = self.correct_z(a, obj)
         # Get target pose.
         target_pose = target.pose()
         target_quat = eigen.Quaterniond(target_pose.quat)
@@ -402,7 +410,7 @@ class Place(Primitive):
             if not real_world and not utils.is_inworkspace(obj_pos=pre_pos[:2]):
                 raise ControlException(f"Placement location {pre_pos} is beyond robot workspace.")
 
-            robot.goto_pose(pre_pos, command_quat)
+            robot.goto_pose(pre_pos, command_quat, positional_precision=0.01, orientational_precision=0.05)
             if not allow_collisions and did_non_args_move():
                 if verbose:
                     print("Robot.goto_pose(pre_pos, command_quat) collided")
@@ -412,6 +420,8 @@ class Place(Primitive):
                 command_pos,
                 command_quat,
                 check_collisions=[target.body_id] + [obj.body_id for obj in self.get_non_arg_objects(objects)],
+                positional_precision=0.001,
+                orientational_precision=0.03,
             )
 
             # Make sure object won't drop from too high.
@@ -420,13 +430,16 @@ class Place(Primitive):
                     print("Object dropped from too high.")
                 raise ControlException("Object dropped from too high.")
 
+            # obj.freeze()
+            # obj_pose_after_grip = obj.pose()
             robot.grasp(0)
+            # obj.set_pose(obj_pose_after_grip)
             if not allow_collisions and did_non_args_move():
                 if verbose:
                     print("Robot.grasp(0) collided")
                 raise ControlException("Robot.grasp(0) collided")
 
-            robot.goto_pose(pre_pos, command_quat)
+            robot.goto_pose(pre_pos, command_quat, positional_precision=0.01, orientational_precision=0.05)
             if not allow_collisions and did_non_args_move():
                 if verbose:
                     print("Robot.goto_pose(pre_pos, command_quat) collided")
@@ -464,6 +477,14 @@ class Place(Primitive):
         action.pos[2] = np.clip(action.pos[2], action_range[0, 2], action_range[1, 2])
 
         return action
+
+    def correct_z(self, a: primitive_actions.PlaceAction, obj: Object) -> primitive_actions.PlaceAction:
+        """Corrects the z-coordinate of the action to be above the object."""
+        a_z = a.pos[2]
+        optimum = ACTION_CONSTRAINTS["max_lift_height"] - obj.pose().pos[2] + 0.5 * obj.size[2]
+        a_z = max(a_z, optimum + 0.01)
+        a.pos[2] = min(a_z, optimum - 0.01)
+        return a
 
     @classmethod
     def action(cls, action: np.ndarray) -> primitive_actions.PrimitiveAction:
