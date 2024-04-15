@@ -1,4 +1,4 @@
-# Arrange the red box, blue box, and cyan box in a triangle of edge length 10 cm.
+# Arrange the red box, blue box, and cyan box in a triangle of edge length 20 cm.
 env: pybullet.HumanTableEnv
 env_kwargs:
   name: ablation_task_0
@@ -17,9 +17,9 @@ env_kwargs:
         - place(cyan_box, table)
       custom_fns:
         - null
-        - PlaceNextToRedBox10cmFn
+        - PlaceNextToRedBox20cmFn
         - null
-        - PlaceNextToRedBoxAndBlueBox10cmFn
+        - PlaceNextToRedBoxAndBlueBox20cmFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table)

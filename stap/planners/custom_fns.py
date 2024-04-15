@@ -113,6 +113,19 @@ def get_pose(state: torch.Tensor, object_id: int, frame: int = -1) -> torch.Tens
     return object_pose
 
 
+def generate_pose_batch(pose: Sequence[float], pose_like: torch.Tensor) -> torch.Tensor:
+    """Repeat a pose for the batch dimension.
+
+    Args:
+        pose: the pose to repeat in [x, y, z, qw, qx, qy, qz] format.
+        pose_like: Another pose tensor to get the batch size and device from.
+    Returns:
+        The pose in shape [batch_size, 7].
+    """
+    pose_tensor = torch.FloatTensor(pose).to(pose_like.device)
+    return pose_tensor.repeat(pose_like.shape[0], 1)
+
+
 def build_direction_vector(pose_1: torch.Tensor, pose_2: torch.Tensor) -> torch.Tensor:
     """Build the vector pointing from pose 1 to pose 2.
 
@@ -815,7 +828,7 @@ def PlaceNextToBlueBoxFn(
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
     next_object_pose = get_pose(next_state, object_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
-    # Evaluate if the object is placed 20cm next to the blue box.
+    # Evaluate if the object is placed at least 10cm next to the blue box.
     distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold = 0.10
     upper_threshold = 0.15
@@ -863,6 +876,347 @@ def PlaceFarAwayFromRedAndBlueFn(
     return total_probability
 
 
+def PlaceNextToRedBox20cmFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object is placed 20cm next to the red box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    red_box_id = get_object_id_from_name("red_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    red_box_pose = get_pose(state, red_box_id, -1)
+    # Evaluate if the object is placed 20cm next to the red box.
+    distance_metric = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.15
+    ideal_point = 0.20
+    upper_threshold = 0.25
+    smaller_than_ideal_probability = linear_probability(
+        distance_metric, lower_threshold, ideal_point, is_smaller_then=False
+    )
+    bigger_than_ideal_probability = linear_probability(
+        distance_metric, ideal_point, upper_threshold, is_smaller_then=True
+    )
+    return probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
+
+
+def PlaceNextToRedBoxAndBlueBox20cmFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object is placed 20cm next to the red and blue box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    red_box_id = get_object_id_from_name("red_box", env, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    red_box_pose = get_pose(state, red_box_id, -1)
+    blue_box_pose = get_pose(state, red_box_id, -1)
+    # Evaluate if the object is placed 20cm next to the red box.
+    distance_metric = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.15
+    ideal_point = 0.20
+    upper_threshold = 0.25
+    smaller_than_ideal_probability = linear_probability(
+        distance_metric, lower_threshold, ideal_point, is_smaller_then=False
+    )
+    bigger_than_ideal_probability = linear_probability(
+        distance_metric, ideal_point, upper_threshold, is_smaller_then=True
+    )
+    probability_red_box = probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
+    distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
+    smaller_than_ideal_probability = linear_probability(
+        distance_metric, lower_threshold, ideal_point, is_smaller_then=False
+    )
+    bigger_than_ideal_probability = linear_probability(
+        distance_metric, ideal_point, upper_threshold, is_smaller_then=True
+    )
+    probability_blue_box = probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
+    return probability_intersection(probability_red_box, probability_blue_box)
+
+
+def LeftOfRedBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object is placed left of the red box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    red_box_id = get_object_id_from_name("red_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    red_box_pose = get_pose(state, red_box_id, -1)
+    # Evaluate if the object is placed left of the red box
+    left = [0.0, -1.0, 0.0]
+    direction_difference = position_diff_along_direction(next_object_pose, red_box_pose, left)
+    lower_threshold = 0.0
+    # The direction difference should be positive if the object is placed left of the red box.
+    is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
+    return is_left_probability
+
+
+def BehindBlueBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object is placed behind the blue box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    # Evaluate if the object is placed behind the blue box
+    behind = [-1.0, 0.0, 0.0]
+    direction_difference = position_diff_along_direction(next_object_pose, blue_box_pose, behind)
+    lower_threshold = 0.0
+    # The direction difference should be positive if the object is placed behind the blue box.
+    is_behind_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
+    return is_behind_probability
+
+
+def InFrontOfBlueBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object is placed in front the blue box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    # Evaluate if the object is placed in front the blue box
+    in_front = [1.0, 0.0, 0.0]
+    direction_difference = position_diff_along_direction(next_object_pose, blue_box_pose, in_front)
+    lower_threshold = 0.0
+    # The direction difference should be positive if the object is placed in front the blue box.
+    is_in_front_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
+    return is_in_front_probability
+
+
+def PlaceNextToScrewdriver15cmFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object is placed 15cm next to the screwdriver.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    screwdriver_id = get_object_id_from_name("screwdriver", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    screwdriver_pose = get_pose(state, screwdriver_id, -1)
+    # Evaluate if the object is placed 15cm next to the screwdriver.
+    distance_metric = position_norm_metric(next_object_pose, screwdriver_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.10
+    ideal_point = 0.15
+    upper_threshold = 0.20
+    smaller_than_ideal_probability = linear_probability(
+        distance_metric, lower_threshold, ideal_point, is_smaller_then=False
+    )
+    bigger_than_ideal_probability = linear_probability(
+        distance_metric, ideal_point, upper_threshold, is_smaller_then=True
+    )
+    return probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
+
+
+def FarLeftOfTableFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object is placed far left of the table.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    table_origin = generate_pose_batch([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], next_object_pose)
+    # Evaluate if the object is placed far left of the table
+    left = [0.0, -1.0, 0.0]
+    direction_difference = position_diff_along_direction(next_object_pose, table_origin, left)
+    mean = 0.5
+    std = 0.2
+    is_left_probability = normal_probability(direction_difference, mean, std, is_smaller_then=False)
+    return is_left_probability
+
+
+def CloseToCyanBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object is placed close to the cyan box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    cyan_box_pose = get_pose(state, cyan_box_id, -1)
+    # Evaluate if the object is placed close to the cyan box
+    distance_metric = position_norm_metric(next_object_pose, cyan_box_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.10
+    upper_threshold = 0.15
+    closeness_probability = linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    return closeness_probability
+
+
+def CloseToCyanAndBlueBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object is placed close to the cyan and blue box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    cyan_box_pose = get_pose(state, cyan_box_id, -1)
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    # Evaluate if the object is placed close to the cyan box
+    distance_metric = position_norm_metric(next_object_pose, cyan_box_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.10
+    upper_threshold = 0.15
+    closeness_probability_cyan = linear_probability(
+        distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    # Evaluate if the object is placed close to the blue box
+    distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
+    closeness_probability_blue = linear_probability(
+        distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    return probability_intersection(closeness_probability_cyan, closeness_probability_blue)
+
+
+def SameOrientationAsCyanBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object has the same orientation as the cyan box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    cyan_box_pose = get_pose(state, cyan_box_id, -1)
+    # Evaluate if the object has the same orientation as the cyan box
+    orientation_metric = great_circle_distance_metric(next_object_pose, cyan_box_pose)
+    lower_threshold = torch.pi / 6.0
+    upper_threshold = torch.pi / 3.0
+    orientation_probability = linear_probability(
+        orientation_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    return orientation_probability
+
+
+def InFrontOfCyanBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluate if the object is placed in front of the cyan box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
+    object_id = get_object_id_from_primitive(0, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    cyan_box_pose = get_pose(state, cyan_box_id, -1)
+    # Evaluate if the object is placed in front of the cyan box
+    in_front = [1.0, 0.0, 0.0]
+    direction_difference = position_diff_along_direction(next_object_pose, cyan_box_pose, in_front)
+    lower_threshold = 0.0
+    # The direction difference should be positive if the object is placed in front of the cyan box.
+    is_in_front_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
+    return is_in_front_probability
+
+
 CUSTOM_FNS = {
     "HookHandoverOrientationFn": HookHandoverOrientationFn,
     "ScrewdriverPickFn": ScrewdriverPickFn,
@@ -877,4 +1231,15 @@ CUSTOM_FNS = {
     "PlaceInLineWithRedAndBlueBoxFn": PlaceInLineWithRedAndBlueBoxFn,
     "PlaceNextToBlueBoxFn": PlaceNextToBlueBoxFn,
     "PlaceFarAwayFromRedAndBlueFn": PlaceFarAwayFromRedAndBlueFn,
+    "PlaceNextToRedBox20cmFn": PlaceNextToRedBox20cmFn,
+    "PlaceNextToRedBoxAndBlueBox20cmFn": PlaceNextToRedBoxAndBlueBox20cmFn,
+    "LeftOfRedBoxFn": LeftOfRedBoxFn,
+    "BehindBlueBoxFn": BehindBlueBoxFn,
+    "InFrontOfBlueBoxFn": InFrontOfBlueBoxFn,
+    "PlaceNextToScrewdriver15cmFn": PlaceNextToScrewdriver15cmFn,
+    "FarLeftOfTableFn": FarLeftOfTableFn,
+    "CloseToCyanBoxFn": CloseToCyanBoxFn,
+    "CloseToCyanAndBlueBoxFn": CloseToCyanAndBlueBoxFn,
+    "SameOrientationAsCyanBoxFn": SameOrientationAsCyanBoxFn,
+    "InFrontOfCyanBoxFn": InFrontOfCyanBoxFn,
 }

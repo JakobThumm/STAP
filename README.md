@@ -169,6 +169,7 @@ bash scripts/eval/eval_daf.sh
 ```
 ./run_docker_train.sh user gpu
 ./scripts/data/generate_all_datasets_tmux.sh 120
+Ctl + p, Ctrl + q to exit the container without stopping the processll
 ```
 Remove docker container.
 ### Train Q-Functions
