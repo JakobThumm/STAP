@@ -63,6 +63,7 @@ class Task:
     goal_propositions: Optional[List[predicates.Predicate]]
     supported_predicates: Optional[List[str]]
     custom_fns: List[Optional[str]]
+    evaluation_fns: List[Optional[str]]
 
     @staticmethod
     def create(
@@ -70,6 +71,7 @@ class Task:
         action_skeleton: List[str],
         initial_state: List[str],
         custom_fns: Optional[List[Optional[str]]] = None,
+        evaluation_fns: Optional[List[Optional[str]]] = None,
         prob: Optional[float] = None,
         instruction: Optional[str] = None,
         goal_propositions: Optional[List[List[str]]] = None,
@@ -92,6 +94,9 @@ class Task:
         if custom_fns is None:
             custom_fns = [None for _ in primitives]
 
+        if evaluation_fns is None:
+            evaluation_fns = custom_fns
+
         return Task(
             action_skeleton=primitives,
             initial_state=initial_propositions,
@@ -100,6 +105,7 @@ class Task:
             goal_propositions=goal_propositions,
             supported_predicates=supported_predicates,
             custom_fns=custom_fns,
+            evaluation_fns=evaluation_fns,
         )
 
 
@@ -421,8 +427,11 @@ class TableEnv(PybulletEnv):
             description += str(predicate) + "\n"
         description += "===== Task Description =====\n"
         description += "The sequence of skills to execute is as follows:\n"
-        for primitive in self.action_skeleton:
-            description += primitive.full_description() + "\n"
+        for i, primitive in enumerate(self.action_skeleton):
+            description += f"{i+1}. {primitive.full_description()}\n"
+        if self.task.instruction is not None:
+            description += "\nInstruction:\n"
+            description += self.task.instruction + "\n"
         if verbose:
             print(description)
         return description

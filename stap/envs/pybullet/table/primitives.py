@@ -210,12 +210,12 @@ class Primitive(envs.Primitive, abc.ABC):
 
     def full_description(self) -> str:
         """Return a string fully describing the primitive."""
-        description = f"Primitve {str(self)} with action ranges: ["
-        for key in self.Action.RANGES.keys():
-            description += f"{key}: [{self.Action.RANGES[key][0]:.3f}, {self.Action.RANGES[key][1]:.3f}], "
-        description = description[:-2] + "]."
-        return description
-        # return str(self)
+        # description = f"Primitve {str(self)} with action ranges: ["
+        # for key in self.Action.RANGES.keys():
+        #     description += f"{key}: [{self.Action.RANGES[key][0]:.3f}, {self.Action.RANGES[key][1]:.3f}], "
+        # description = description[:-2] + "]."
+        # return description
+        return str(self)
 
     def __eq__(self, other) -> bool:
         if isinstance(other, Primitive):
@@ -237,7 +237,7 @@ class Pick(Primitive):
     def full_description(self) -> str:
         """Return a string fully describing the primitive."""
         description = super().full_description()
-        description += " This primitive is used to pick up objects with the robot gripper."
+        # description += " This primitive is used to pick up objects with the robot gripper."
         return description
 
     def execute(self, action: np.ndarray, real_world: bool = False) -> ExecutionResult:
@@ -353,7 +353,7 @@ class Place(Primitive):
         """Return a string fully describing the primitive."""
         description = super().full_description()
         # description += " Here, the action describes the position to place the object in world frame and the z-rotation of the end-effector."
-        description += " This primitive is used to place objects that are in the gripper onto other objects."
+        # description += " This primitive is used to place objects that are in the gripper onto other objects."
         return description
 
     def execute(self, action: np.ndarray, real_world: bool = False, verbose: bool = False) -> ExecutionResult:
@@ -701,7 +701,7 @@ class StaticHandover(Primitive):
         # description += " A yaw of 0 means that the end effector is pointing towards the human and a yaw of pi/2 means that the end effector is pointing to the right of the human."
         # description += " The distance defines the distance in which the EEF should be placed from the base."
         # description += " The height defines the height at which the object should be handed over."
-        description += " This primitive is used to hand over objects to the human. The next state describes the position and orientation of the object at the exact time of the handover."
+        # description += " This primitive is used to hand over objects to the human. The next state describes the position and orientation of the object at the exact time of the handover."
         return description
 
     def execute(self, action: np.ndarray, real_world: bool = False, verbose: bool = False) -> ExecutionResult:

@@ -9,6 +9,7 @@ from stap import agents, dynamics, envs
 from stap.envs.base import Primitive
 from stap.envs.pybullet.table_env import Task
 from stap.planners.custom_fns import CUSTOM_FNS
+from stap.planners.evaluation_fns import EVALUATION_FNS
 from stap.utils import tensors
 
 
@@ -83,16 +84,27 @@ class Planner(abc.ABC):
         """Torch device."""
         return self._device
 
-    def build_custom_fn_list(self, task: Task) -> List[Optional[Callable]]:
-        """Builds a list of custom functions for each primitive."""
+    def build_custom_fn_list(self, task: Task, is_custom_fn: bool = True) -> List[Optional[Callable]]:
+        """Builds a list of custom functions for each primitive.
+
+        Args:
+            task: Task to perform.
+            is_custom_fn: Whether to use the custom functions or the evaluation functions.
+        Returns:
+            List of custom functions.
+        """
         # First convert the custom function strings of the task into the actual functions
         task_custom_fns: List[Optional[Callable]] = []
-        custom_fns = task.custom_fns
+        custom_fns = task.custom_fns if is_custom_fn else task.evaluation_fns
         assert len(custom_fns) == len(task.action_skeleton)
         for fn_name in custom_fns:
             if fn_name is not None:
-                assert fn_name in CUSTOM_FNS, f"Custom function {fn_name} not found."
-                task_custom_fns.append(CUSTOM_FNS.get(fn_name))
+                if is_custom_fn:
+                    assert fn_name in CUSTOM_FNS, f"Custom function {fn_name} not found."
+                    task_custom_fns.append(CUSTOM_FNS.get(fn_name))
+                else:
+                    assert fn_name in EVALUATION_FNS, f"Evaluation function {fn_name} not found."
+                    task_custom_fns.append(EVALUATION_FNS.get(fn_name))
             else:
                 task_custom_fns.append(None)
         # Now override the task custom functions with the planner custom functions if they exist for a given primitive.

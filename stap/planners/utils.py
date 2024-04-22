@@ -486,6 +486,7 @@ def run_closed_loop_planning(
             goal_propositions=task.goal_propositions,
             supported_predicates=task.supported_predicates,
             custom_fns=task.custom_fns[t:],
+            evaluation_fns=task.evaluation_fns[t:],
         )
         plan = planner.plan(observation, reduced_task)
         if t_planner is not None and timer is not None:
@@ -493,21 +494,21 @@ def run_closed_loop_planning(
 
         next_observation, reward, _, _, _ = env.step(plan.actions[0, : env.action_space.shape[0]])
 
-        # DEBUG: Find observation difference to transition prediction
         next_state_predicted = plan.states[1]
         next_state_observed = next_observation
         custom_fn = planner.build_custom_fn_list(reduced_task)[0]
+        evaluation_fn = planner.build_custom_fn_list(reduced_task, is_custom_fn=False)[0]
         state = torch.Tensor(plan.states[0][np.newaxis, :])
         next_state_predicted_Tensor = torch.Tensor(next_state_predicted[np.newaxis, :])
         next_state_observed_Tensor = torch.Tensor(next_state_observed[np.newaxis, :])
-        if custom_fn is not None:
+        if evaluation_fn is not None:
             predicted_preference_values[t] = custom_fn(
                 state,
                 torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),
                 next_state_predicted_Tensor,
                 primitive,
             )  # type: ignore
-            observed_preference_values[t] = custom_fn(
+            observed_preference_values[t] = evaluation_fn(
                 state,
                 torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),
                 next_state_observed_Tensor,

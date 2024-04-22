@@ -1,7 +1,7 @@
 """Defines custom evaluation functions to be used in the trajectory evaluation of the planner.
 
 Author: Jakob Thumm
-Date: 2024-01-02
+Date: 2024-04-15
 """
 
 from typing import Optional
@@ -841,7 +841,7 @@ def InFrontOfCyanBoxFn(
     return is_in_front_probability
 
 
-CUSTOM_FNS = {
+EVALUATION_FNS = {
     "HookHandoverOrientationFn": HookHandoverOrientationFn,
     "ScrewdriverPickFn": ScrewdriverPickFn,
     "ScrewdriverPickActionFn": ScrewdriverPickActionFn,

@@ -110,6 +110,7 @@ def evaluate_planners(
         env_kwargs["gui"] = bool(gui)
     env_factory = envs.EnvFactory(config=env_config)
     env: TableEnv = env_factory(**env_kwargs)  # type: ignore
+    print(env.get_scene_description())
 
     planner = planners.load(
         config=config,
