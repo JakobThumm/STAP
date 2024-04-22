@@ -1,7 +1,7 @@
 # Place the blue box and red box as far to the left of the table as possible.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_0
+  name: ablation_task_6
   gui: true
 
   primitives:
@@ -15,7 +15,7 @@ env_kwargs:
         - place(blue_box, table)
         - pick(red_box, table)
         - place(red_box, table)
-      custom_fns:
+      evaluation_fns:
         - null
         - FarLeftOfTableFn
         - null

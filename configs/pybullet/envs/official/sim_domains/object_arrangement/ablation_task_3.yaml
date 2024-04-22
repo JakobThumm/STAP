@@ -1,7 +1,7 @@
 # Make sure that the blue box and the cyan box are left of the red box.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_0
+  name: ablation_task_3
   gui: true
 
   primitives:
@@ -15,7 +15,7 @@ env_kwargs:
         - place(blue_box, table)
         - pick(cyan_box, table)
         - place(cyan_box, table)
-      custom_fns:
+      evaluation_fns:
         - null
         - LeftOfRedBoxFn
         - null

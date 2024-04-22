@@ -1,6 +1,6 @@
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: arrange_salt
+  name: ablation_task_10
   gui: true
 
   primitives:
@@ -10,8 +10,11 @@ env_kwargs:
 
   tasks:
     - action_skeleton:
-        - pick(blue_box, table)
-        - place(blue_box, table)
+        - pick(cyan_box, table)
+        - place(cyan_box, table)
+      evaluation_fns:
+        - null
+        - PlaceLeftOfRedBoxFn
       initial_state:
         - free(screwdriver)
         - on(screwdriver, table)
@@ -21,6 +24,7 @@ env_kwargs:
         - on(red_box, table)
         - free(blue_box)
         - on(blue_box, table)
+      instruction: "Place the cyan box left of the red box and make sure the two boxes are aligned."
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

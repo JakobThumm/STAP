@@ -1,7 +1,7 @@
 # Arrange the blue box, red box, and cyan box in a circle of radius 15 cm around the screwdriver.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_0
+  name: ablation_task_5
   gui: true
 
   primitives:
@@ -17,7 +17,7 @@ env_kwargs:
         - place(cyan_box, table)
         - pick(blue_box, table)
         - place(blue_box, table)
-      custom_fns:
+      evaluation_fns:
         - null
         - PlaceNextToScrewdriver15cmFn
         - null

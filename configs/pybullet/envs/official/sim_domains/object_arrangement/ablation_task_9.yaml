@@ -1,7 +1,7 @@
 # Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_0
+  name: ablation_task_9
   gui: true
 
   primitives:
@@ -15,7 +15,7 @@ env_kwargs:
         - place(blue_box, table)
         - pick(red_box, table)
         - place(red_box, table)
-      custom_fns:
+      evaluation_fns:
         - null
         - InFrontOfCyanBoxFn
         - null
