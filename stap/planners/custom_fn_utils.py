@@ -202,7 +202,7 @@ def position_metric_normal_to_direction(
     direction = direction / torch.norm(direction, dim=-1, keepdim=True)  # type: ignore
     position_diff = pose_2[..., :3] - pose_1[..., :3]
     distance = torch.norm(position_diff, dim=-1, keepdim=True)
-    distance_parallel = torch.norm(position_diff * direction, dim=-1, keepdim=True)
+    distance_parallel = torch.sum(position_diff * direction, dim=-1, keepdim=True)
     distance_normal = torch.sqrt(distance**2 - distance_parallel**2)
     return distance_normal
 
