@@ -3,34 +3,7 @@
 set -e
 
 function run_cmd {
-    docker_command="docker run -d --rm "
-    options="--net=host --shm-size=10.24gb"
-    image="stap-train"
-
-    if [ "$gpu" = "gpu" ]
-    then
-        options="${options} --gpus all"
-        image="${image}-gpu"
-    fi
-
-    if [ "$user" = "root" ]
-        then
-        options="${options} --volume="$(pwd)/models/:/root/models/""
-        image="${image}/root:v2"
-    elif [ "$user" = "user" ]
-        then
-        options="${options} --volume="$(pwd)/models/:/home/$USER/models/" --user=$USER"
-        image="${image}/$USER:v2"
-    else
-        echo "User mode unknown. Please choose user, root, or leave out for default user"
-    fi
-
-    echo "Running docker command: ${docker_command} ${options} ${image} ${CMD}"
-
-    ${docker_command} \
-        ${options} \
-        ${image} \
-        "${CMD}"
+    ${CMD}
 }
 
 function eval_planner {
@@ -116,7 +89,6 @@ PLANNERS=(
 
 # Setup.
 user=${1:-user}
-gpu=${2:-cpu}
 
 if [ "$user" = "root" ]
     then

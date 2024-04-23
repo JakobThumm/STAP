@@ -3,7 +3,34 @@
 set -e
 
 function run_cmd {
-    ${CMD}
+    docker_command="docker run -d --rm "
+    options="--net=host --shm-size=10.24gb"
+    image="stap-train"
+
+    if [ "$gpu" = "gpu" ]
+    then
+        options="${options} --gpus all"
+        image="${image}-gpu"
+    fi
+
+    if [ "$user" = "root" ]
+        then
+        options="${options} --volume="$(pwd)/models/:/root/models/""
+        image="${image}/root:v2"
+    elif [ "$user" = "user" ]
+        then
+        options="${options} --volume="$(pwd)/models/:/home/$USER/models/" --user=$USER"
+        image="${image}/$USER:v2"
+    else
+        echo "User mode unknown. Please choose user, root, or leave out for default user"
+    fi
+
+    echo "Running docker command: ${docker_command} ${options} ${image} ${CMD}"
+
+    ${docker_command} \
+        ${options} \
+        ${image} \
+        "${CMD}"
 }
 
 function eval_planner {
@@ -66,19 +93,19 @@ function run_planners {
 # Evaluation tasks: Uncomment tasks to evaluate.
 TASK_ROOT="configs/pybullet/envs/official/sim_domains"
 TASKS=(
-    "object_arrangement/ablation_task_0"
-    "object_arrangement/ablation_task_1"
-    "object_arrangement/ablation_task_2"
-    "object_arrangement/ablation_task_3"
-    "object_arrangement/ablation_task_4"
-    "object_arrangement/ablation_task_5"
-    "object_arrangement/ablation_task_6"
-    "object_arrangement/ablation_task_7"
-    "object_arrangement/ablation_task_8"
-    "object_arrangement/ablation_task_9"
-    "object_arrangement/ablation_task_10"
-    "object_arrangement/ablation_task_11"
-    "object_arrangement/ablation_task_12"
+    "object_arrangement/oracle_task_0"
+    "object_arrangement/oracle_task_1"
+    "object_arrangement/oracle_task_2"
+    "object_arrangement/oracle_task_3"
+    "object_arrangement/oracle_task_4"
+    "object_arrangement/oracle_task_5"
+    "object_arrangement/oracle_task_6"
+    "object_arrangement/oracle_task_7"
+    "object_arrangement/oracle_task_8"
+    "object_arrangement/oracle_task_9"
+    "object_arrangement/oracle_task_10"
+    "object_arrangement/oracle_task_11"
+    "object_arrangement/oracle_task_12"
 )
 
 # Planners: Uncomment planners to evaluate.
@@ -89,6 +116,7 @@ PLANNERS=(
 
 # Setup.
 user=${1:-user}
+gpu=${2:-cpu}
 
 if [ "$user" = "root" ]
     then
