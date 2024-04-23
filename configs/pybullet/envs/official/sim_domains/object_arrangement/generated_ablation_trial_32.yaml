@@ -1,0 +1,55 @@
+# Place the blue box and red box as far to the left of the table as possible.
+env: pybullet.HumanTableEnv
+env_kwargs:
+  name: ablation_task_6
+  gui: true
+
+  primitives:
+    - pick
+    - place
+    - static_handover
+
+  tasks:
+    - action_skeleton:
+        - pick(blue_box, table)
+        - place(blue_box, table)
+        - pick(red_box, table)
+        - place(red_box, table)
+      evaluation_fns:
+        - null
+        - FarLeftOfTableFn
+        - null
+        - FarLeftOfTableFn
+      initial_state:
+        - free(cyan_box)
+        - on(cyan_box, table)
+        - free(red_box)
+        - on(red_box, table)
+        - free(blue_box)
+        - on(blue_box, table)
+      instruction: "Place the blue box and red box as far to the left of the table as possible."
+      custom_fns:
+        - null
+        - FarLeftOfTableFn_trial_32
+        - null
+        - FarLeftOfTableFn_trial_32
+      
+      
+      
+        
+  robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
+  human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
+  animation_type: HumanRobotHandover
+  animation_frequency: 100
+  animation_initializations: configs/pybullet/envs/humans/animation_initializations_far_away.yaml
+  visualize_shield: false
+
+  objects:
+    - object_type: Urdf
+      object_kwargs:
+        name: table
+        path: configs/pybullet/envs/assets/asl_table.urdf
+        is_static: true
+    - configs/pybullet/envs/assets/milk.yaml
+    - configs/pybullet/envs/assets/icecream.yaml
+    - configs/pybullet/envs/assets/salt.yaml
