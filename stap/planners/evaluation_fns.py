@@ -23,6 +23,7 @@ from stap.planners.custom_fn_utils import (  # noqa: F401
     get_pose,
     great_circle_distance_metric,
     linear_probability,
+    linear_probability_to_normal_probability,
     normal_probability,
     pointing_in_direction_metric,
     position_diff_along_direction,
@@ -430,7 +431,9 @@ def PlaceInLineWithRedAndBlueBoxFn(
     lower_threshold = 0.0
     upper_threshold = 0.05
     # The x difference should be as small as possible but no larger than 5cm.
-    probability = linear_probability(normal_distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    probability = linear_probability_to_normal_probability(
+        normal_distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     return probability
 
 
@@ -458,7 +461,9 @@ def PlaceNextToBlueBoxFn(
     distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold = 0.10
     upper_threshold = 0.15
-    close_by_probability = linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    close_by_probability = linear_probability_to_normal_probability(
+        distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     return close_by_probability
 
 
@@ -487,12 +492,12 @@ def PlaceFarAwayFromRedAndBlueFn(
     distance_metric_red = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold = 0.20
     upper_threshold = 1.0
-    far_away_probability_red = linear_probability(
+    far_away_probability_red = linear_probability_to_normal_probability(
         distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=False
     )
     # Evaluate if the object is placed far away from the blue box
     distance_metric_blue = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
-    far_away_probability_blue = linear_probability(
+    far_away_probability_blue = linear_probability_to_normal_probability(
         distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=False
     )
     # Combine the two probabilities
@@ -524,10 +529,10 @@ def PlaceNextToRedBox20cmFn(
     lower_threshold = 0.15
     ideal_point = 0.20
     upper_threshold = 0.25
-    smaller_than_ideal_probability = linear_probability(
+    smaller_than_ideal_probability = linear_probability_to_normal_probability(
         distance_metric, lower_threshold, ideal_point, is_smaller_then=False
     )
-    bigger_than_ideal_probability = linear_probability(
+    bigger_than_ideal_probability = linear_probability_to_normal_probability(
         distance_metric, ideal_point, upper_threshold, is_smaller_then=True
     )
     return probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
@@ -559,18 +564,18 @@ def PlaceNextToRedBoxAndBlueBox20cmFn(
     lower_threshold = 0.15
     ideal_point = 0.20
     upper_threshold = 0.25
-    smaller_than_ideal_probability = linear_probability(
+    smaller_than_ideal_probability = linear_probability_to_normal_probability(
         distance_metric, lower_threshold, ideal_point, is_smaller_then=False
     )
-    bigger_than_ideal_probability = linear_probability(
+    bigger_than_ideal_probability = linear_probability_to_normal_probability(
         distance_metric, ideal_point, upper_threshold, is_smaller_then=True
     )
     probability_red_box = probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
     distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
-    smaller_than_ideal_probability = linear_probability(
+    smaller_than_ideal_probability = linear_probability_to_normal_probability(
         distance_metric, lower_threshold, ideal_point, is_smaller_then=False
     )
-    bigger_than_ideal_probability = linear_probability(
+    bigger_than_ideal_probability = linear_probability_to_normal_probability(
         distance_metric, ideal_point, upper_threshold, is_smaller_then=True
     )
     probability_blue_box = probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
@@ -685,10 +690,10 @@ def PlaceNextToScrewdriver15cmFn(
     lower_threshold = 0.10
     ideal_point = 0.15
     upper_threshold = 0.20
-    smaller_than_ideal_probability = linear_probability(
+    smaller_than_ideal_probability = linear_probability_to_normal_probability(
         distance_metric, lower_threshold, ideal_point, is_smaller_then=False
     )
-    bigger_than_ideal_probability = linear_probability(
+    bigger_than_ideal_probability = linear_probability_to_normal_probability(
         distance_metric, ideal_point, upper_threshold, is_smaller_then=True
     )
     return probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
@@ -744,7 +749,9 @@ def CloseToCyanBoxFn(
     distance_metric = position_norm_metric(next_object_pose, cyan_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold = 0.10
     upper_threshold = 0.15
-    closeness_probability = linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    closeness_probability = linear_probability_to_normal_probability(
+        distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     return closeness_probability
 
 
@@ -773,12 +780,12 @@ def CloseToCyanAndBlueBoxFn(
     distance_metric = position_norm_metric(next_object_pose, cyan_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold = 0.10
     upper_threshold = 0.15
-    closeness_probability_cyan = linear_probability(
+    closeness_probability_cyan = linear_probability_to_normal_probability(
         distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
     )
     # Evaluate if the object is placed close to the blue box
     distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
-    closeness_probability_blue = linear_probability(
+    closeness_probability_blue = linear_probability_to_normal_probability(
         distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
     )
     return probability_intersection(closeness_probability_cyan, closeness_probability_blue)
@@ -807,7 +814,7 @@ def SameOrientationAsCyanBoxFn(
     orientation_metric = great_circle_distance_metric(next_object_pose, cyan_box_pose)
     lower_threshold = torch.pi / 6.0
     upper_threshold = torch.pi / 3.0
-    orientation_probability = linear_probability(
+    orientation_probability = linear_probability_to_normal_probability(
         orientation_metric, lower_threshold, upper_threshold, is_smaller_then=True
     )
     return orientation_probability

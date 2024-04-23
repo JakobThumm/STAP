@@ -514,6 +514,7 @@ def run_closed_loop_planning(
                 next_state_observed_Tensor,
                 primitive,
             )  # type: ignore
+            stop = 0
 
         rewards[t] = reward
         visited_actions[t, t:] = plan.actions

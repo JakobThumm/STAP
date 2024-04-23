@@ -315,6 +315,25 @@ def normal_probability(metric: torch.Tensor, mean: float, std_dev: float, is_sma
     return cdf
 
 
+def linear_probability_to_normal_probability(
+    metric: torch.Tensor, lower_threshold: float, upper_threshold: float, is_smaller_then: bool = True
+) -> torch.Tensor:
+    """Return a probability function based on the cummulative distribution function that has values of
+        0.97 at the upper threshold and 0.03 at the lower threshold.
+
+    Args:
+        metric: the metric to calculate the value for.
+        lower_threshold: the lower threshold of the linear probability function.
+        upper_threshold: the upper threshold of the linear probability function.
+        is_smaller_then: if true, invert the return value with `(1-p)`.
+    Returns:
+        `cdf(metric, mean, std_dev)`
+    """
+    mean = (upper_threshold + lower_threshold) / 2.0
+    std_dev = (upper_threshold - lower_threshold) / 4.0
+    return normal_probability(metric, mean, std_dev, is_smaller_then)
+
+
 def probability_intersection(p_1: torch.Tensor, p_2: torch.Tensor) -> torch.Tensor:
     """Calculate the intersection of two probabilities `p = p_1 * p_2`."""
     return p_1 * p_2
