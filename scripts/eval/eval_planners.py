@@ -233,6 +233,8 @@ def evaluate_planners(
                 # ),
                 # "visited_states": plan.visited_states,
                 "p_visited_success": plan.p_visited_success,
+                "predicted_preference_values": plan.predicted_preference_values,
+                "observed_preference_values": plan.observed_preference_values,
                 # "visited_values": plan.visited_values,
                 "t_planner": t_planner,
                 "action_skeleton": list(map(str, env.action_skeleton)),

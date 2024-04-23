@@ -3,13 +3,34 @@
 set -e
 
 function run_cmd {
-    echo ""
-    echo "${CMD}"
-    if [[ `hostname` == "sc.stanford.edu" ]] || [[ `hostname` == juno* ]]; then
-        sbatch "${SBATCH_SLURM}" "${CMD}"
-    else
-        ${CMD}
+    docker_command="docker run -d --rm "
+    options="--net=host --shm-size=10.24gb"
+    image="stap-train"
+
+    if [ "$gpu" = "gpu" ]
+    then
+        options="${options} --gpus all"
+        image="${image}-gpu"
     fi
+
+    if [ "$user" = "root" ]
+        then
+        options="${options} --volume="$(pwd)/models/:/root/models/""
+        image="${image}/root:v2"
+    elif [ "$user" = "user" ]
+        then
+        options="${options} --volume="$(pwd)/models/:/home/$USER/models/" --user=$USER"
+        image="${image}/$USER:v2"
+    else
+        echo "User mode unknown. Please choose user, root, or leave out for default user"
+    fi
+
+    echo "Running docker command: ${docker_command} ${options} ${image} ${CMD}"
+
+    ${docker_command} \
+        ${options} \
+        ${image} \
+        "${CMD}"
 }
 
 function eval_planner {
@@ -126,33 +147,30 @@ PLANNERS=(
 )
 
 # Setup.
-SBATCH_SLURM="scripts/eval/eval_planners_juno.sh"
-DEBUG=0
+user=${1:-user}
+gpu=${2:-cpu}
 
-input_path="models"
-output_path="plots"
-
-# Pybullet experiments.
-if [[ `hostname` == *stanford.edu ]] || [[ `hostname` == juno* ]]; then
-    ENV_KWARGS="--gui 0"
+if [ "$user" = "root" ]
+    then
+    STAP_PATH="/root"
+elif [ "$user" = "user" ]
+    then
+    STAP_PATH="/home/$USER"
+else
+    echo "User mode unknown. Please choose user, root, or leave out for default user"
 fi
-ENV_KWARGS="${ENV_KWARGS} --closed-loop 1"
+
+input_path="${STAP_PATH}/models"
+output_path="${STAP_PATH}/models/eval"
+
+ENV_KWARGS="--gui 0 --closed-loop 1"
 
 # Evaluate planners.
 exp_name="planning"
 PLANNER_OUTPUT_ROOT="${output_path}/${exp_name}"
-PRIMITIVES=("pick" "place" "pull" "push")
+PRIMITIVES=("pick" "place" "static_handover")
 
-# Uncomment to evaluate planners with RL agents (scripts/train/train_agents.sh)
-CHECKPOINT="official_model"
+CHECKPOINT="final_model"
 POLICY_INPUT_PATH="${input_path}/agents_rl"
 DYNAMICS_INPUT_PATH="${input_path}/dynamics_rl/pick_place_pull_push_dynamics"
 run_planners
-
-# Uncomment to evaluate planners with inverse RL agents (scripts/train/train_policies.sh)
-# PLANNER_CONFIG_PATH="configs/pybullet/planners"
-# PLANNERS=("irl_policy_cem")
-# CHECKPOINT="final_model"
-# POLICY_INPUT_PATH="${input_path}/policies_irl"
-# DYNAMICS_INPUT_PATH="${input_path}/dynamics_irl/pick_place_pull_push_dynamics"
-# run_planners
