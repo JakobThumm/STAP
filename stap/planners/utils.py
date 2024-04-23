@@ -502,12 +502,13 @@ def run_closed_loop_planning(
         next_state_predicted_Tensor = torch.Tensor(next_state_predicted[np.newaxis, :])
         next_state_observed_Tensor = torch.Tensor(next_state_observed[np.newaxis, :])
         if evaluation_fn is not None:
-            predicted_preference_values[t] = custom_fn(
-                state,
-                torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),
-                next_state_predicted_Tensor,
-                primitive,
-            )  # type: ignore
+            if custom_fn is not None:
+                predicted_preference_values[t] = custom_fn(
+                    state,
+                    torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),
+                    next_state_predicted_Tensor,
+                    primitive,
+                )  # type: ignore
             observed_preference_values[t] = evaluation_fn(
                 state,
                 torch.Tensor(plan.actions[0:1, : env.action_space.shape[0]]),

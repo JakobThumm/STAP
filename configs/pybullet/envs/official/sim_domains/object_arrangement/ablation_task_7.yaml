@@ -28,6 +28,11 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table)
       instruction: "Place the cyan box, blue box, and red box close to each other without them touching."
+      custom_fns:
+        - null
+        - null
+        - null
+        - null
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

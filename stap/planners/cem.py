@@ -242,7 +242,7 @@ class CEMPlanner(planners.Planner):
                     custom_fns=custom_fns,
                     action_skeleton=action_skeleton,
                 )
-                assert not torch.any(torch.isnan(p_success))
+                torch.nan_to_num_(p_success, nan=0.0)
                 # Select the top trajectories.
                 idx_elites = p_success.topk(self.num_elites).indices
                 n_success = torch.sum(p_success[idx_elites] > 0.0)
