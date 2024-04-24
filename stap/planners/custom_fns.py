@@ -1099,9 +1099,7 @@ def PlaceInCircleAroundScrewdriver15cmFn_trial_5(
     ideal_radius = 0.15  # 15cm
     lower_threshold = 0.14  # Slightly smaller than the ideal radius to allow for some tolerance
     upper_threshold = 0.16  # Slightly larger than the ideal radius to allow for some tolerance
-    probability = linear_probability(
-        distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
-    )
+    probability = linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
     return probability
 
 
@@ -1117,7 +1115,7 @@ def FarLeftOnTableFn_trial_6(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1128,7 +1126,9 @@ def FarLeftOnTableFn_trial_6(
     table_pose = get_pose(state, table_id, -1)
     # Assuming the left of the table is negative x direction
     left_most_position = table_pose[:, 0] - 1.5  # Half the table width to the left
-    distance_to_left_most = position_diff_along_direction(next_object_pose, generate_pose_batch([left_most_position, 0, 0, 1, 0, 0, 0], next_object_pose), [1, 0, 0])
+    distance_to_left_most = position_diff_along_direction(
+        next_object_pose, generate_pose_batch([left_most_position, 0, 0, 1, 0, 0, 0], next_object_pose), [1, 0, 0]
+    )
     # The closer to 0, the better, but not exceeding the table's left boundary
     probability = threshold_probability(distance_to_left_most, 0.05, is_smaller_then=True)
     return probability
@@ -1202,7 +1202,7 @@ def OrientBlueBoxLikeCyanBoxFn_trial_8(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1230,7 +1230,7 @@ def OrientRedBoxLikeCyanBoxFn_trial_8(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1270,10 +1270,10 @@ def PlaceInLineFn_trial_9(
     red_box_pose = get_pose(state, red_box_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
     cyan_box_pose = get_pose(state, cyan_box_id, -1)
-    
+
     # Direction vector for "in front of" relation
     in_front = [1.0, 0.0, 0.0]
-    
+
     # Evaluate if the blue box is placed in front of the cyan box
     if object_id == blue_box_id:
         target_pose = cyan_box_pose
@@ -1283,18 +1283,18 @@ def PlaceInLineFn_trial_9(
     else:
         # This function should not be called for the cyan box in this context
         raise ValueError("PlaceInLineFn_trial_9 called with incorrect object.")
-    
+
     direction_difference = position_diff_along_direction(next_object_pose, target_pose, in_front)
     lower_threshold = 0.0
     # The direction difference should be positive if the object is placed in front of the target.
     is_in_front_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
-    
+
     # Evaluate if the objects are placed close to each other in the specified line
     distance_metric = position_norm_metric(next_object_pose, target_pose, norm="L2", axes=["x", "y"])
     lower_threshold = 0.10
     upper_threshold = 0.20
     closeness_probability = linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
-    
+
     # Combine the probabilities
     total_probability = probability_intersection(is_in_front_probability, closeness_probability)
     return total_probability
@@ -1428,9 +1428,7 @@ def AlignBoxesInLineFn_trial_13(
     upper_threshold = 0.05  # Allow a small margin for alignment
 
     # Calculate probability based on the distance to the line
-    alignment_probability = linear_probability(
-        distance_to_line, lower_threshold, upper_threshold, is_smaller_then=True
-    )
+    alignment_probability = linear_probability(distance_to_line, lower_threshold, upper_threshold, is_smaller_then=True)
 
     return alignment_probability
 
@@ -1499,9 +1497,7 @@ def PlaceFarFromBlueAndRedBoxFn_trial_14(
     combined_distance = distance_to_blue + distance_to_red
     lower_threshold = 0.40  # Combined distance should be more than 40cm
     upper_threshold = 0.60  # Up to 60cm considered optimal
-    probability = linear_probability(
-        combined_distance, lower_threshold, upper_threshold, is_smaller_then=False
-    )
+    probability = linear_probability(combined_distance, lower_threshold, upper_threshold, is_smaller_then=False)
     return probability
 
 
@@ -1562,8 +1558,12 @@ def TrianglePlacementCyanFn_trial_15(
     ideal_distance = 0.20  # 20cm
     lower_threshold = 0.18  # Slightly less to allow for some margin
     upper_threshold = 0.22  # Slightly more to allow for some margin
-    distance_probability_red = linear_probability(distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=True)
-    distance_probability_blue = linear_probability(distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=True)
+    distance_probability_red = linear_probability(
+        distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    distance_probability_blue = linear_probability(
+        distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     # Combine the probabilities to ensure the object is correctly placed in relation to both boxes
     total_probability = probability_intersection(distance_probability_red, distance_probability_blue)
     return total_probability
@@ -1852,7 +1852,7 @@ def LeftAndAlignedWithRedBoxFn_trial_23(
         next_state [batch_size, state_dim]: Next state.
         primitive: Optional primitive to receive the object information from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1861,16 +1861,16 @@ def LeftAndAlignedWithRedBoxFn_trial_23(
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     next_cyan_box_pose = get_pose(next_state, cyan_box_id, -1)
     red_box_pose = get_pose(state, red_box_id, -1)
-    
+
     # Evaluate if the cyan box is placed left of the red box
     left_direction = [0.0, -1.0, 0.0]
     direction_difference = position_diff_along_direction(next_cyan_box_pose, red_box_pose, left_direction)
     is_left_probability = threshold_probability(direction_difference, 0.0, is_smaller_then=False)
-    
+
     # Evaluate if the cyan box is aligned with the red box
     alignment_difference = position_metric_normal_to_direction(next_cyan_box_pose, red_box_pose, left_direction)
     alignment_probability = threshold_probability(alignment_difference, 0.05, is_smaller_then=True)
-    
+
     # Combine probabilities
     total_probability = probability_intersection(is_left_probability, alignment_probability)
     return total_probability
@@ -1973,17 +1973,25 @@ def PlaceInLineWithRedAndBlueFn_trial_26(
     # Calculate the direction vector from the red box to the blue box
     direction_vector_red_to_blue = build_direction_vector(red_box_pose, blue_box_pose)
     # Calculate the positional difference of the cyan box along the direction vector
-    position_diff_cyan_along_direction = position_diff_along_direction(cyan_box_next_pose, red_box_pose, direction_vector_red_to_blue)
+    position_diff_cyan_along_direction = position_diff_along_direction(
+        cyan_box_next_pose, red_box_pose, direction_vector_red_to_blue
+    )
     # Calculate the positional difference of the cyan box normal to the direction vector
-    position_diff_cyan_normal_to_direction = position_metric_normal_to_direction(cyan_box_next_pose, red_box_pose, direction_vector_red_to_blue)
+    position_diff_cyan_normal_to_direction = position_metric_normal_to_direction(
+        cyan_box_next_pose, red_box_pose, direction_vector_red_to_blue
+    )
 
     # The cyan box should be along the line formed by the red and blue boxes, so the normal difference should be minimal
     normal_diff_threshold = 0.05  # Allow a small margin for alignment
-    normal_diff_probability = threshold_probability(position_diff_cyan_normal_to_direction, normal_diff_threshold, is_smaller_then=True)
+    normal_diff_probability = threshold_probability(
+        position_diff_cyan_normal_to_direction, normal_diff_threshold, is_smaller_then=True
+    )
 
     # The cyan box should be between the red and blue boxes along the direction vector, so the positional difference should be positive but less than the distance between red and blue
     distance_red_to_blue = position_norm_metric(red_box_pose, blue_box_pose, norm="L2", axes=["x", "y"])
-    between_boxes_probability = (position_diff_cyan_along_direction >= 0) & (position_diff_cyan_along_direction <= distance_red_to_blue)
+    between_boxes_probability = (position_diff_cyan_along_direction >= 0) & (
+        position_diff_cyan_along_direction <= distance_red_to_blue
+    )
 
     # Combine probabilities
     total_probability = probability_intersection(normal_diff_probability, between_boxes_probability)
@@ -2235,9 +2243,7 @@ def CircleAroundScrewdriverFn_trial_31(
     tolerance = 0.02  # 2 cm tolerance for placement
     lower_threshold = radius - tolerance
     upper_threshold = radius + tolerance
-    circle_probability = linear_probability(
-        distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
-    )
+    circle_probability = linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
     return circle_probability
 
 
@@ -2325,12 +2331,16 @@ def PlaceCloseToBlueAndCyanBoxFn_trial_33(
     distance_metric_blue = position_norm_metric(next_red_box_pose, blue_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold_blue = 0.05
     upper_threshold_blue = 0.10
-    close_by_probability_blue = linear_probability(distance_metric_blue, lower_threshold_blue, upper_threshold_blue, is_smaller_then=True)
+    close_by_probability_blue = linear_probability(
+        distance_metric_blue, lower_threshold_blue, upper_threshold_blue, is_smaller_then=True
+    )
     # Evaluate if the red box is placed close to the cyan box.
     distance_metric_cyan = position_norm_metric(next_red_box_pose, cyan_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold_cyan = 0.05
     upper_threshold_cyan = 0.10
-    close_by_probability_cyan = linear_probability(distance_metric_cyan, lower_threshold_cyan, upper_threshold_cyan, is_smaller_then=True)
+    close_by_probability_cyan = linear_probability(
+        distance_metric_cyan, lower_threshold_cyan, upper_threshold_cyan, is_smaller_then=True
+    )
     # Combine the two probabilities
     total_probability = probability_intersection(close_by_probability_blue, close_by_probability_cyan)
     return total_probability

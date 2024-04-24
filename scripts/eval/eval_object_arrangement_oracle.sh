@@ -3,7 +3,7 @@
 set -e
 
 function run_cmd {
-    ${CMD}
+    ${CMD} || true
 }
 
 function eval_planner {
@@ -38,7 +38,8 @@ function eval_planner {
 }
 
 function run_planners {
-    for task in "${TASKS[@]}"; do
+    for ((i=START; i<${#TASKS[@]}; i++)); do
+        task=${TASKS[$i]}
         PLANNER_OUTPUT_PATH="${PLANNER_OUTPUT_ROOT}/${task}"
         ENV_CONFIG="${TASK_ROOT}/${task}.yaml"
 
@@ -62,6 +63,8 @@ function run_planners {
         done
     done
 }
+
+START=${1:-0}
 
 # Evaluation tasks: Uncomment tasks to evaluate.
 TASK_ROOT="configs/pybullet/envs/official/sim_domains"
