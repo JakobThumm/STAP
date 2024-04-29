@@ -10,7 +10,24 @@ import pathlib
 from typing import Any, Dict, Sequence, Union
 
 import numpy as np
+import pandas as pd
 from scipy.stats import bootstrap
+
+
+def list_subdirs(parent_path):
+    """Lists all subdirectories in the given parent directory.
+
+    Arguments:
+    - parent_path: The parent directory path as a string.
+
+    Returns:
+    - A list of strings, where each string is the full path to a subdirectory.
+    """
+    return [
+        os.path.join(parent_path, name)
+        for name in os.listdir(parent_path)
+        if os.path.isdir(os.path.join(parent_path, name))
+    ]
 
 
 def read_in_files(
@@ -126,11 +143,64 @@ def simplified_summary_all_trials(
     return summary
 
 
+def dicts_to_csv(
+    dict_list: Sequence[Dict[str, Any]],
+    csv_filename: str,
+    keys: Sequence[str] = [
+        "values",
+        "rewards",
+        "predicted_preference_values",
+        "observed_preference_values",
+        "t_planner",
+    ],
+) -> None:
+    """
+    Converts a list of dictionaries into a pandas DataFrame and saves it as a CSV file.
+
+    Arguments:
+    - dict_list: A list of dictionaries, where each dictionary contains method results.
+      Each dictionary should have the method name under a specific key if needed.
+    - csv_filename: The filename for the output CSV.
+
+    The function assumes all dictionaries have the same structure.
+    """
+    n_results = len(keys)
+    n_experiments = len(dict_list)
+    rows_list = []
+    for i in range(n_results):
+        result_dict = {"ID": i, "Measurement": keys[i]}
+        for j in range(n_experiments):
+            result_dict[f"Method{dict_list[j]['experiment']}Mean"] = dict_list[j][keys[i] + "_mean"]
+            result_dict[f"Method{dict_list[j]['experiment']}CI025"] = dict_list[j][keys[i] + "_ci_025"]
+            result_dict[f"Method{dict_list[j]['experiment']}CI975"] = dict_list[j][keys[i] + "_ci_975"]
+        rows_list.append(result_dict)
+
+    # Convert the list of dictionaries to a DataFrame
+    df = pd.DataFrame(rows_list)
+
+    # Save the DataFrame as a CSV file
+    df.to_csv(csv_filename, index=False, sep=",")
+
+
 def create_result_summary(
     eval_path: Union[str, pathlib.Path],
 ) -> None:
-    raw_data = read_in_files(eval_path)
-    simplified_trial_runs = simplified_summary_all_trials(raw_data)
+    experiment_paths = list_subdirs(eval_path)
+    summary_list = []
+    keys = [
+        "values",
+        "rewards",
+        "predicted_preference_values",
+        "observed_preference_values",
+        "t_planner",
+    ]
+    for experiment_path in experiment_paths:
+        print(f"Summarizing results for experiment {experiment_path}")
+        raw_data = read_in_files(experiment_path)
+        summary = simplified_summary_all_trials(raw_data, keys)
+        summary["experiment"] = experiment_path.split("/")[-1]
+        summary_list.append(summary)
+    dicts_to_csv(summary_list, f"{eval_path}/summary.csv", keys)
     # for trial_name, trial_results in raw_data.items():
     #     summary = summarize_trial(trial_results)
     #     print(f"Summary for trial {trial_name}: {summary}")
