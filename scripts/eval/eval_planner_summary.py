@@ -130,6 +130,12 @@ def simplified_summary_all_trials(
             elif key == "rewards":
                 # We want to summarize if the the last action was successful or not.
                 values.extend([result[key][-1] for result in results])
+            # elif key == "observed_preference_values":
+            #     # Emulate a threshold prefenerence function instead of the normal cdf function.
+            #     for result in results:
+            #         for val in result[key]:
+            #             if not math.isnan(val):
+            #                 values.append(1.0 if val > 0.02275 else 0.0)
             else:
                 # Just take all values available
                 for result in results:
