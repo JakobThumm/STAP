@@ -17,13 +17,17 @@ env_kwargs:
         - PlaceLeftOfRedBoxFn
       initial_state:
         - free(screwdriver)
-        - on(screwdriver, table)
+        - on(screwdriver, table
+        - graspable(screwdriver)
         - free(cyan_box)
-        - on(cyan_box, table)
+        - on(cyan_box, table
+        - graspable(cyan_box)
         - free(red_box)
-        - on(red_box, table)
+        - on(red_box, table
+        - graspable(red_box)
         - free(blue_box)
-        - on(blue_box, table)
+        - on(blue_box, table
+        - graspable(blue_box)
       instruction: "Place the blue box left of the red box."
       custom_fns:
         - null

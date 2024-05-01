@@ -22,20 +22,20 @@ env_kwargs:
         - LeftOfRedBoxFn
       initial_state:
         - free(cyan_box)
-        - on(cyan_box, table)
+        - on(cyan_box, table
+        - graspable(cyan_box)
         - free(red_box)
-        - on(red_box, table)
+        - on(red_box, table
+        - graspable(red_box)
         - free(blue_box)
-        - on(blue_box, table)
+        - on(blue_box, table
+        - graspable(blue_box)
       instruction: "Make sure that the blue box and the cyan box are left of the red box."
       custom_fns:
         - null
         - LeftOfRedBoxFn_trial_3
         - null
         - LeftOfRedBoxFn_trial_3
-      
-      
-      
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

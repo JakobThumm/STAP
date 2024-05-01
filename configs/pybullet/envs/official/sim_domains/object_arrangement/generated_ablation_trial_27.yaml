@@ -22,20 +22,22 @@ env_kwargs:
         - PlaceFarAwayFromRedAndBlueFn
       initial_state:
         - free(cyan_box)
-        - on(cyan_box, table)
+        - on(cyan_box, table
+        - graspable(cyan_box)
         - free(red_box)
-        - on(red_box, table)
+        - on(red_box, table
+        - graspable(red_box)
         - free(blue_box)
-        - on(blue_box, table)
+        - on(blue_box, table
+        - graspable(blue_box)
       instruction: "Place the red box next to the blue box and cyan box as far away as possible from the two."
       custom_fns:
         - null
-        - PlaceRedBoxNextToBlueBoxFn_trial_27
-        - null
-        - PlaceCyanBoxFarFromRedAndBlueBoxFn_trial_27
+        - PlaceFarFromBlueAndCyanBoxFn_trial_27
       
       
       
+
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

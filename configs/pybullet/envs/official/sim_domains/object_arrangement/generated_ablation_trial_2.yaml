@@ -22,20 +22,20 @@ env_kwargs:
         - PlaceNextToRedBoxAndBlueBox20cmFn
       initial_state:
         - free(cyan_box)
-        - on(cyan_box, table)
+        - on(cyan_box, table
+        - graspable(cyan_box)
         - free(red_box)
-        - on(red_box, table)
+        - on(red_box, table
+        - graspable(red_box)
         - free(blue_box)
-        - on(blue_box, table)
+        - on(blue_box, table
+        - graspable(blue_box)
       instruction: "Arrange the red box, blue box, and cyan box in a triangle of edge length 20 cm."
       custom_fns:
         - null
-        - TrianglePlacementBlueFn_trial_2
+        - TriangleFormationWithRedBoxFn_trial_2
         - null
-        - TrianglePlacementCyanFn_trial_2
-      
-      
-      
+        - TriangleFormationWithBlueBoxFn_trial_2
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

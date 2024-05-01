@@ -22,18 +22,22 @@ env_kwargs:
         - FarLeftOfTableFn
       initial_state:
         - free(cyan_box)
-        - on(cyan_box, table)
+        - on(cyan_box, table
+        - graspable(cyan_box)
         - free(red_box)
-        - on(red_box, table)
+        - on(red_box, table
+        - graspable(red_box)
         - free(blue_box)
-        - on(blue_box, table)
+        - on(blue_box, table
+        - graspable(blue_box)
       instruction: "Place the blue box and red box as far to the left of the table as possible."
       custom_fns:
-        - PlaceToLeftFn_trial_19
-        - PlaceToLeftFn_trial_19
+        - PlaceToLeftOfTableFn_trial_19
+        - PlaceToLeftOfTableFn_trial_19
       
       
       
+
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

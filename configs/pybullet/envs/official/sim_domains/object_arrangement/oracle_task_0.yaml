@@ -18,11 +18,14 @@ env_kwargs:
         - PlaceInLineWithRedAndBlueBoxFn
       initial_state:
         - free(cyan_box)
-        - on(cyan_box, table)
+        - on(cyan_box, table
+        - graspable(cyan_box)
         - free(red_box)
-        - on(red_box, table)
+        - on(red_box, table
+        - graspable(red_box)
         - free(blue_box)
-        - on(blue_box, table)
+        - on(blue_box, table
+        - graspable(blue_box)
       instruction: "Make sure that the red box, the blue box, and the cyan box are in a line on the table."
       custom_fns:
         - null
