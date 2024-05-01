@@ -1,6 +1,6 @@
 import dataclasses
 import random
-from typing import Dict, List, Optional, Sequence, Tuple, Type
+from typing import Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
 import symbolic
@@ -12,6 +12,11 @@ from stap.envs.pybullet.sim import math
 from stap.envs.pybullet.sim.robot import Robot
 from stap.envs.pybullet.table import primitive_actions, utils
 from stap.envs.pybullet.table.objects import Box, Hook, Null, Object, Rack, Screwdriver
+from stap.envs.pybullet.table.primitives import (
+    ACTION_CONSTRAINTS,
+    Pick,
+    compute_top_down_orientation,
+)
 
 dbprint = lambda *args: None  # noqa
 # dbprint = print
@@ -586,6 +591,106 @@ class InOodZone(Predicate, TableBounds):
         return bounds, margin
 
 
+class Graspable(Predicate):
+    def value(
+        self,
+        objects: Dict[str, Object],
+        robot: Robot,
+        state: Optional[Sequence["Predicate"]] = None,
+        sim: bool = True,
+    ) -> bool:
+        super().value(objects=objects, robot=robot, state=state)
+
+        obj = self.get_arg_objects(objects)[0]
+        if obj.isinstance(Null):
+            return True
+        pick_action = self.sample_action(obj)
+        command_pos, command_quat = self.generate_command_pose(obj, pick_action)
+        pre_pos = np.append(command_pos[:2], ACTION_CONSTRAINTS["max_lift_height"])
+        if not self.check_pose(robot, pre_pos, command_quat, positional_precision=0.01, orientational_precision=0.05):
+            return False
+        if not self.check_pose(
+            robot, command_pos, command_quat, positional_precision=0.001, orientational_precision=0.01
+        ):
+            return False
+        return True
+
+    def check_pose(
+        self,
+        robot: Robot,
+        pos: Optional[np.ndarray] = None,
+        quat: Optional[Union[eigen.Quaterniond, np.ndarray]] = None,
+        pos_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
+        ori_gains: Optional[Union[Tuple[float, float], np.ndarray]] = None,
+        timeout: Optional[float] = None,
+        positional_precision: Optional[float] = 1e-3,
+        orientational_precision: Optional[float] = None,
+        ignore_last_half_rotation: bool = True,
+    ) -> bool:
+        return robot.arm.set_pose_goal(
+            pos=pos,
+            quat=quat,
+            pos_gains=pos_gains,
+            ori_gains=ori_gains,
+            timeout=timeout,
+            positional_precision=positional_precision,
+            orientational_precision=orientational_precision,
+            ignore_last_half_rotation=ignore_last_half_rotation,
+        )
+
+    def generate_command_pose(self, obj: Object, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        a = primitive_actions.PickAction(Pick.scale_action(action))
+        a_z = a.pos[2]
+        a_z = max(a_z, 0.5 * obj.size[2] + 0.01)
+        a.pos[2] = min(a_z, 0.5 * obj.size[2] - 0.01)
+        obj_pose = obj.pose()
+        obj_quat = eigen.Quaterniond(obj_pose.quat)
+
+        # Compute position.
+        command_pos = obj_pose.pos + obj_quat * a.pos
+
+        # Compute orientation.
+        command_quat = compute_top_down_orientation(a.theta.item(), obj_quat)
+        return command_pos, command_quat
+
+    def sample_action(self, obj: Object) -> np.ndarray:
+        if obj.isinstance(Hook):
+            hook: Hook = obj  # type: ignore
+            pos_handle, pos_head, _ = Hook.compute_link_positions(
+                hook.head_length, hook.handle_length, hook.handle_y, hook.radius
+            )
+            action_range = Pick.Action.range()
+            if random.random() < hook.handle_length / (hook.handle_length + hook.head_length):
+                # Handle.
+                random_x = np.random.uniform(*action_range[:, 0])
+                pos = np.array([random_x, pos_handle[1], 0])
+                theta = 0.0
+            else:
+                # Head.
+                random_y = np.random.uniform(*action_range[:, 1])
+                pos = np.array([pos_head[0], random_y, 0])
+                theta = np.pi / 2
+            pos[2] += 0.015
+        elif obj.isinstance(Screwdriver):
+            screwdriver: Screwdriver = obj  # type: ignore
+            action_range = Pick.Action.range()
+            random_x = np.random.uniform(low=-screwdriver.head_length, high=screwdriver.handle_length)
+            # random_x = np.random.uniform(low=0.02, high=screwdriver.handle_length)
+            if random_x > 0.02:
+                pos = np.array([random_x, 0, 0.0])
+            else:
+                pos = np.array([random_x, 0, 0.00])
+            theta = 0.0
+        elif obj.isinstance(Box):
+            pos = np.array([0.0, 0.0, obj.size[2] / 2.0 - 0.01])
+            theta = 0.0  # if random.random() <= 0.5 else np.pi / 2
+        else:
+            pos = np.array([0.0, 0.0, 0.0])
+            theta = 0.0
+        vector = np.concatenate([pos, [theta]])
+        return vector
+
+
 class Ingripper(Predicate):
     MAX_GRASP_ATTEMPTS = 1
     SAMPLE_OFFSET = np.array([0.0, 0.0, 0.0])
@@ -599,7 +704,7 @@ class Ingripper(Predicate):
     THETA_STDDEV = 0.05
 
     def sample(self, robot: Robot, objects: Dict[str, Object], state: Sequence[Predicate]) -> bool:
-        """Samples a geometric grounding of the InHand(a) predicate."""
+        """Samples a geometric grounding of the InGripper(a) predicate."""
         obj = self.get_arg_objects(objects)[0]
         if obj.is_static:
             return True
@@ -1228,6 +1333,7 @@ BINARY_PREDICATES = {
     "infront": InFront,
     "nonblocking": NonBlocking,
     "on": On,
+    "graspable": Graspable,
 }
 
 
@@ -1249,6 +1355,7 @@ PREDICATE_HIERARCHY = [
     "nonblocking",
     "on",
     "ingripper",
+    "graspable",
 ]
 
 
@@ -1260,4 +1367,5 @@ SUPPORTED_PREDICATES = {
     "on(a, b)": On,
     "ingripper(a)": Ingripper,
     "tpose(a)": TPose,
+    "graspable(a)": Graspable,
 }

@@ -281,7 +281,7 @@ class Pick(Primitive):
                 command_quat,
                 check_collisions=[obj.body_id for obj in self.get_non_arg_objects(objects)],
                 positional_precision=0.001,
-                orientational_precision=0.03,
+                orientational_precision=0.01,
             )
 
             if not robot.grasp_object(obj):
