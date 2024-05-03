@@ -272,6 +272,8 @@ def threshold_probability(metric: torch.Tensor, threshold: float, is_smaller_the
     """If `is_smaller_then`: return `1.0` if `metric < threshold` and `0.0` otherwise.
     If not `is_smaller_then`: return `1.0` if `metric >= threshold` and `0.0` otherwise.
     """
+    if metric.dim() == 1:
+        metric = metric.unsqueeze(1)
     cdf = torch.where(metric < threshold, 1.0, 0.0)[:, 0]
     if not is_smaller_then:
         cdf = 1.0 - cdf
@@ -292,6 +294,8 @@ def linear_probability(
         - `0.0` if `metric < lower_threshold`
         - linearly interpolate between 1 and 0 otherwise.
     """
+    if metric.dim() == 1:
+        metric = metric.unsqueeze(1)
     cdf = torch.clip((metric - lower_threshold) / (upper_threshold - lower_threshold), 0.0, 1.0)[:, 0]
     if is_smaller_then:
         cdf = 1.0 - cdf
@@ -309,6 +313,8 @@ def normal_probability(metric: torch.Tensor, mean: float, std_dev: float, is_sma
     Returns:
         `cdf(metric, mean, std_dev)`
     """
+    if metric.dim() == 1:
+        metric = metric.unsqueeze(1)
     cdf = 0.5 * (1 + torch.erf((metric - mean) / (std_dev * torch.sqrt(torch.tensor(2.0, device=metric.device)))))[:, 0]
     if is_smaller_then:
         cdf = 1.0 - cdf
