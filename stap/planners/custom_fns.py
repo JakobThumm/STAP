@@ -893,69 +893,72 @@ def AlignBoxesInLineFn_trial_0(
     return total_probability
 
 
-def NextToBlueBoxFn_trial_1(
+def CloseToBlueBoxFn_trial_1(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
-    r"""Evaluate if the red box is placed next to the blue box.
-
+    r"""Evaluates the preference probability of placing the red box close to the blue box.
     Args:
         state [batch_size, state_dim]: Current state.
         action [batch_size, action_dim]: Action.
-        next_state [batch_size, state_dim]: Next state.
-        primitive: optional primitive to receive the object orientation from
+        next_state [batch_size, state_dim]: Predicted next state after executing this action.
+        primitive: Optional primitive to receive the object information from
     Returns:
         The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
     env = primitive.env
-    # Get the object ID from the primitive.
-    object_id = get_object_id_from_primitive(0, primitive)
-    # Get the non-manipulated object IDs from the environment.
-    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant.
-    next_object_pose = get_pose(next_state, object_id, -1)
-    # For the non-manipulated objects, the current state is more reliable.
-    blue_box_pose = get_pose(state, blue_box_id, -1)
-    # Evaluate if the object is placed next to the blue box
-    distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2")
-    # According to the rules, distances of 5cm are considered close.
-    return linear_probability(distance_metric, 5, 10, is_smaller_then=True)
-
-
-def FarFromBlueAndCyanBoxFn_trial_1(
-    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
-) -> torch.Tensor:
-    r"""Evaluate if the cyan box is placed as far away as possible from the blue and red boxes.
-
-    Args:
-        state [batch_size, state_dim]: Current state.
-        action [batch_size, action_dim]: Action.
-        next_state [batch_size, state_dim]: Next state.
-        primitive: optional primitive to receive the object orientation from
-    Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
-            Output shape: [batch_size] \in [0, 1].
-    """
-    assert primitive is not None and isinstance(primitive, Primitive)
-    env = primitive.env
-    # Get the object ID from the primitive.
-    object_id = get_object_id_from_primitive(0, primitive)
-    # Get the non-manipulated object IDs from the environment.
-    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    # Get the object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant.
-    next_object_pose = get_pose(next_state, object_id, -1)
-    # For the non-manipulated objects, the current state is more reliable.
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    # Get the poses of the objects.
+    red_box_pose = get_pose(next_state, red_box_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
+    # Calculate the distance between the red box and the blue box.
+    distance_metric = position_norm_metric(red_box_pose, blue_box_pose, norm="L2")
+    # Define thresholds for "close" distance.
+    lower_threshold = 0.05  # 5cm
+    upper_threshold = 0.10  # 10cm
+    # Calculate the probability based on the distance metric.
+    probability = linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    return probability
+
+
+def FarFromBothBoxesFn_trial_1(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates the preference probability of placing the cyan box far from both the red and the blue box.
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Predicted next state after executing this action.
+        primitive: Optional primitive to receive the object information from
+    Returns:
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
+            Output shape: [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    # Get the object IDs from the environment.
+    cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
+    red_box_id = get_object_id_from_name("red_box", env, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    # Get the poses of the objects.
+    cyan_box_pose = get_pose(next_state, cyan_box_id, -1)
     red_box_pose = get_pose(state, red_box_id, -1)
-    # Evaluate if the object is placed far from both the blue and red boxes
-    distance_to_blue = position_norm_metric(next_object_pose, blue_box_pose, norm="L2")
-    distance_to_red = position_norm_metric(next_object_pose, red_box_pose, norm="L2")
-    # Combine the distances to evaluate far placement from both boxes
-    min_distance = torch.min(distance_to_blue, distance_to_red)
-    # According to the rules, distances starting at 20cm are considered far, but ideally 100cm.
-    return linear_probability(min_distance, 20, 100, is_smaller_then=False)
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    # Calculate the distance between the cyan box and the other two boxes.
+    distance_to_red = position_norm_metric(cyan_box_pose, red_box_pose, norm="L2")
+    distance_to_blue = position_norm_metric(cyan_box_pose, blue_box_pose, norm="L2")
+    # Define thresholds for "far" distance.
+    lower_threshold = 0.20  # 20cm
+    upper_threshold = 1.00  # 100cm
+    # Calculate the probability based on the distance metrics.
+    probability_red = linear_probability(distance_to_red, lower_threshold, upper_threshold, is_smaller_then=False)
+    probability_blue = linear_probability(distance_to_blue, lower_threshold, upper_threshold, is_smaller_then=False)
+    # Combine the probabilities to ensure the cyan box is far from both boxes.
+    total_probability = probability_intersection(probability_red, probability_blue)
+    return total_probability
 
 
 def TriangleFormationWithRedBoxFn_trial_2(
@@ -1558,10 +1561,10 @@ def AlignInLineWithBoxesFn_trial_13(
     )
 
 
-def PlaceNextToBlueBoxFn_trial_14(
+def PlaceCloseToBlueBoxFn_trial_14(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
-    r"""Evaluates if the red box is placed next to the blue box, considering a distance of at least 10cm as close.
+    r"""Evaluates if the red box is placed close to the blue box, within a distance of 5cm to 10cm.
 
     Args:
         state [batch_size, state_dim]: Current state.
@@ -1577,24 +1580,22 @@ def PlaceNextToBlueBoxFn_trial_14(
     env = primitive.env
     # Get the object ID from the primitive.
     object_id = get_object_id_from_primitive(0, primitive)
-    # Get the non-manipulated object IDs from the environment.
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
     # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     blue_box_pose = get_pose(state, blue_box_id, -1)
-    # Evaluate if the object is placed next to the blue box.
+    # Evaluate if the object is placed close to the blue box.
     distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
-    lower_threshold = 0.10  # 10cm as close
-    upper_threshold = 0.20  # Beyond 20cm is not considered close
-    distance_probability = linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
-    return distance_probability
+    lower_threshold = 0.05  # 5cm
+    upper_threshold = 0.10  # 10cm
+    return linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
 
 
-def PlaceFarFromBlueAndRedBoxFn_trial_14(
+def PlaceFarFromRedAndBlueBoxFn_trial_14(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
-    r"""Evaluates if the cyan box is placed as far as possible from both the blue and red boxes, starting at 20cm but ideally 100cm.
+    r"""Evaluates if the cyan box is placed far from both the red and the blue box, ideally more than 100cm away.
 
     Args:
         state [batch_size, state_dim]: Current state.
@@ -1610,28 +1611,22 @@ def PlaceFarFromBlueAndRedBoxFn_trial_14(
     env = primitive.env
     # Get the object ID from the primitive.
     object_id = get_object_id_from_primitive(0, primitive)
-    # Get the non-manipulated object IDs from the environment.
-    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
     red_box_id = get_object_id_from_name("red_box", env, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
     # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
-    blue_box_pose = get_pose(state, blue_box_id, -1)
     red_box_pose = get_pose(state, red_box_id, -1)
-    # Evaluate if the object is placed far from both the blue and red boxes.
-    distance_metric_blue = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    # Evaluate if the object is placed far from both the red and the blue box.
     distance_metric_red = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x", "y"])
-    lower_threshold = 0.20  # Starting at 20cm is considered far
-    upper_threshold = 1.00  # Ideally 100cm
-    distance_probability_blue = linear_probability(
-        distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=True
-    )
-    distance_probability_red = linear_probability(
-        distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=True
-    )
+    distance_metric_blue = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
+    lower_threshold = 0.20  # 20cm
+    upper_threshold = 1.00  # 100cm
+    probability_red = linear_probability(distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=True)
+    probability_blue = linear_probability(distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=True)
     # Combine the probabilities to ensure the object is far from both boxes.
-    total_probability = probability_intersection(distance_probability_blue, distance_probability_red)
-    return total_probability
+    return probability_intersection(probability_red, probability_blue)
 
 
 def TriangleFormationWithRedBoxFn_trial_15(
@@ -2185,15 +2180,15 @@ def AlignBoxesInLineFn_trial_26(
     return alignment_probability
 
 
-def PlaceFarFromBlueAndCyanBoxFn_trial_27(
+def CloseToBlueBoxFn_trial_27(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
-    r"""Evaluates if the red box is placed far from the blue and cyan box, ideally as far as possible.
+    r"""Evaluates if the red box is placed close to the blue box.
 
     Args:
         state [batch_size, state_dim]: Current state.
         action [batch_size, action_dim]: Action.
-        next_state [batch_size, state_dim]: Next state.
+        next_state [batch_size, state_dim]: Predicted next state after executing this action.
         primitive: Optional primitive to receive the object information from
 
     Returns:
@@ -2204,25 +2199,54 @@ def PlaceFarFromBlueAndCyanBoxFn_trial_27(
     env = primitive.env
     # Get the object ID from the primitive.
     object_id = get_object_id_from_primitive(0, primitive)
-    # Get the non-manipulated object IDs from the environment.
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
     # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
-    # For the non-manipulated objects, the current state is more reliable.
     blue_box_pose = get_pose(state, blue_box_id, -1)
-    cyan_box_pose = get_pose(state, cyan_box_id, -1)
-    # Evaluate if the object is placed far from the blue and cyan box.
+    # Calculate the distance between the red box and the blue box.
+    distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
+    # Define the thresholds for close distance.
+    lower_threshold = 0.05  # 5cm
+    upper_threshold = 0.10  # 10cm
+    probability = linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    return probability
+
+
+def FarFromRedAndBlueBoxFn_trial_27(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the cyan box is placed far away from both the red and the blue box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Predicted next state after executing this action.
+        primitive: Optional primitive to receive the object information from
+
+    Returns:
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
+            Output shape: [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    # Get the object ID from the primitive.
+    object_id = get_object_id_from_primitive(0, primitive)
+    red_box_id = get_object_id_from_name("red_box", env, primitive)
+    blue_box_id = get_object_id_from_name("blue_box", env, primitive)
+    # For the manipulated object, the state after placing the object is relevant.
+    next_object_pose = get_pose(next_state, object_id, -1)
+    red_box_pose = get_pose(state, red_box_id, -1)
+    blue_box_pose = get_pose(state, blue_box_id, -1)
+    # Calculate the distance between the cyan box and the red and blue boxes.
+    distance_metric_red = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x", "y"])
     distance_metric_blue = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
-    distance_metric_cyan = position_norm_metric(next_object_pose, cyan_box_pose, norm="L2", axes=["x", "y"])
-    # Combine the distances to evaluate the farthest placement.
-    lower_threshold = 0.20  # Starting at 20cm to be considered far.
-    ideal_point = 1.00  # Ideally 100cm far.
-    upper_threshold = 1.50  # Maximum considered distance.
-    probability_blue = linear_probability(distance_metric_blue, lower_threshold, ideal_point, is_smaller_then=False)
-    probability_cyan = linear_probability(distance_metric_cyan, lower_threshold, ideal_point, is_smaller_then=False)
-    # Combine probabilities to ensure the object is far from both.
-    return probability_intersection(probability_blue, probability_cyan)
+    # Define the thresholds for far distance.
+    lower_threshold = 0.20  # 20cm
+    upper_threshold = 1.00  # 100cm
+    probability_red = linear_probability(distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=False)
+    probability_blue = linear_probability(distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=False)
+    # Combine the probabilities to ensure the cyan box is far from both the red and blue boxes.
+    return probability_intersection(probability_red, probability_blue)
 
 
 def FormTriangleWithRedBoxFn_trial_28(
@@ -2760,7 +2784,8 @@ CUSTOM_FNS = {
     "LeftOfRedBoxFn_trial_29": LeftOfRedBoxFn_trial_29,
     "FormTriangleWithRedAndBlueBoxFn_trial_28": FormTriangleWithRedAndBlueBoxFn_trial_28,
     "FormTriangleWithRedBoxFn_trial_28": FormTriangleWithRedBoxFn_trial_28,
-    "PlaceFarFromBlueAndCyanBoxFn_trial_27": PlaceFarFromBlueAndCyanBoxFn_trial_27,
+    "FarFromRedAndBlueBoxFn_trial_27": FarFromRedAndBlueBoxFn_trial_27,
+    "CloseToBlueBoxFn_trial_27": CloseToBlueBoxFn_trial_27,
     "AlignBoxesInLineFn_trial_26": AlignBoxesInLineFn_trial_26,
     "PlaceLeftOfRedBoxAlignedFn_trial_25": PlaceLeftOfRedBoxAlignedFn_trial_25,
     "PlaceInFrontOfBlueBoxFn_trial_24": PlaceInFrontOfBlueBoxFn_trial_24,
@@ -2777,8 +2802,8 @@ CUSTOM_FNS = {
     "LeftOfRedBoxFn_trial_16": LeftOfRedBoxFn_trial_16,
     "TriangleFormationWithBlueBoxFn_trial_15": TriangleFormationWithBlueBoxFn_trial_15,
     "TriangleFormationWithRedBoxFn_trial_15": TriangleFormationWithRedBoxFn_trial_15,
-    "PlaceFarFromBlueAndRedBoxFn_trial_14": PlaceFarFromBlueAndRedBoxFn_trial_14,
-    "PlaceNextToBlueBoxFn_trial_14": PlaceNextToBlueBoxFn_trial_14,
+    "PlaceFarFromRedAndBlueBoxFn_trial_14": PlaceFarFromRedAndBlueBoxFn_trial_14,
+    "PlaceCloseToBlueBoxFn_trial_14": PlaceCloseToBlueBoxFn_trial_14,
     "AlignInLineWithBoxesFn_trial_13": AlignInLineWithBoxesFn_trial_13,
     "LeftAndAlignedWithRedBoxFn_trial_12": LeftAndAlignedWithRedBoxFn_trial_12,
     "PlaceInFrontAndAlignedWithBlueBoxFn_trial_11": PlaceInFrontAndAlignedWithBlueBoxFn_trial_11,
@@ -2796,8 +2821,8 @@ CUSTOM_FNS = {
     "LeftOfRedBoxFn_trial_3": LeftOfRedBoxFn_trial_3,
     "TriangleFormationWithBlueBoxFn_trial_2": TriangleFormationWithBlueBoxFn_trial_2,
     "TriangleFormationWithRedBoxFn_trial_2": TriangleFormationWithRedBoxFn_trial_2,
-    "FarFromBlueAndCyanBoxFn_trial_1": FarFromBlueAndCyanBoxFn_trial_1,
-    "NextToBlueBoxFn_trial_1": NextToBlueBoxFn_trial_1,
+    "FarFromBothBoxesFn_trial_1": FarFromBothBoxesFn_trial_1,
+    "CloseToBlueBoxFn_trial_1": CloseToBlueBoxFn_trial_1,
     "AlignBoxesInLineFn_trial_0": AlignBoxesInLineFn_trial_0,
     "HookHandoverOrientationFn": HookHandoverOrientationFn,
     "ScrewdriverPickFn": ScrewdriverPickFn,

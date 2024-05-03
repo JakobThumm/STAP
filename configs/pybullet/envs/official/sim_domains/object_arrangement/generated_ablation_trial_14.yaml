@@ -1,4 +1,4 @@
-# Place the red box next to the blue box and cyan box as far away as possible from the two.
+# Make sure that the red box is placed close to the blue box and that the cyan box is placed far away from both the red and the blue box.
 env: pybullet.HumanTableEnv
 env_kwargs:
   name: ablation_task_1
@@ -30,12 +30,12 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Place the red box next to the blue box and cyan box as far away as possible from the two."
+      instruction: "Make sure that the red box is placed close to the blue box and that the cyan box is placed far away from both the red and the blue box."
       custom_fns:
         - null
-        - PlaceNextToBlueBoxFn_trial_14
+        - PlaceCloseToBlueBoxFn_trial_14
         - null
-        - PlaceFarFromBlueAndRedBoxFn_trial_14
+        - PlaceFarFromRedAndBlueBoxFn_trial_14
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
