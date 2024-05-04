@@ -36,6 +36,9 @@ env_kwargs:
         - LeftOfRedBoxFn_trial_16
         - null
         - LeftOfRedBoxFn_trial_16
+      
+      
+      
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

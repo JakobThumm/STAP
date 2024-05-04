@@ -33,9 +33,12 @@ env_kwargs:
       instruction: "Arrange the red box, blue box, and cyan box in a triangle of edge length 20 cm."
       custom_fns:
         - null
-        - TriangleFormationWithRedBoxFn_trial_2
+        - TrianglePlacementBlueFn_trial_2
         - null
-        - TriangleFormationWithBlueBoxFn_trial_2
+        - TrianglePlacementCyanFn_trial_2
+      
+      
+      
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

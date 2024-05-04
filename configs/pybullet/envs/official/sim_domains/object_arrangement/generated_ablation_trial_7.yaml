@@ -33,9 +33,12 @@ env_kwargs:
       instruction: "Place the cyan box, blue box, and red box close to each other without them touching."
       custom_fns:
         - null
-        - PlaceCloseToCyanBoxFn_trial_7
+        - PlaceCloseToCyanAndRedBoxFn_trial_7
         - null
-        - PlaceCloseToBlueBoxFn_trial_7
+        - PlaceCloseToCyanAndBlueBoxFn_trial_7
+      
+      
+      
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

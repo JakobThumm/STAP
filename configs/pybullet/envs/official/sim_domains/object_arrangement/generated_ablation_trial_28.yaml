@@ -35,11 +35,10 @@ env_kwargs:
         - null
         - FormTriangleWithRedBoxFn_trial_28
         - null
-        - FormTriangleWithRedAndBlueBoxFn_trial_28
+        - FormTriangleWithBlueBoxFn_trial_28
       
       
       
-
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

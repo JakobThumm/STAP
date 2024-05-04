@@ -36,6 +36,9 @@ env_kwargs:
         - CloseToBlueBoxFn_trial_27
         - null
         - FarFromRedAndBlueBoxFn_trial_27
+      
+      
+      
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

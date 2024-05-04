@@ -33,9 +33,12 @@ env_kwargs:
       instruction: "The blue box has to be in front of the red box but behind the cyan box."
       custom_fns:
         - null
-        - PlaceBlueInFrontOfRedFn_trial_4
         - null
-        - PlaceBlueBehindCyanFn_trial_4
+        - null
+        - PlaceCyanBoxInFrontOfRedBoxFn_trial_4
+      
+      
+      
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

@@ -33,9 +33,12 @@ env_kwargs:
       instruction: "Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box."
       custom_fns:
         - null
-        - LinePlacementBlueFrontOfRedFn_trial_9
+        - PlaceBlueBoxInLineFn_trial_9
         - null
-        - LinePlacementRedFrontOfCyanFn_trial_9
+        - PlaceRedBoxInLineFn_trial_9
+      
+      
+      
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

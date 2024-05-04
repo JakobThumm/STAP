@@ -29,7 +29,10 @@ env_kwargs:
       instruction: "Make sure that the red box, the blue box, and the cyan box are in a line on the table."
       custom_fns:
         - null
-        - AlignInLineWithBoxesFn_trial_13
+        - AlignBoxesInLineFn_trial_13
+      
+      
+      
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

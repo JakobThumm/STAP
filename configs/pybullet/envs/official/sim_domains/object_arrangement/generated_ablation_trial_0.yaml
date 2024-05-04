@@ -30,6 +30,9 @@ env_kwargs:
       custom_fns:
         - null
         - AlignBoxesInLineFn_trial_0
+      
+      
+      
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

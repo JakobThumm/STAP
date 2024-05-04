@@ -299,12 +299,48 @@ def PlaceLeftOfRedBoxFn(
     upper_threshold = 0.05
     # The x difference should be as small as possible but no larger than 5cm.
     x_diff_probability = linear_probability(x_diff_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    total_probability = probability_intersection(is_left_probability, x_diff_probability)
+    return total_probability
+
+
+def PlaceLeftOfAndNextToRedBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the object is placed left of the red box and if the object is placed 10cm next to the red box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    red_box_id = get_object_id_from_name("red_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    red_box_pose = get_pose(state, red_box_id, -1)
+    # Evaluate if the object is placed left of the red box
+    left = [0.0, -1.0, 0.0]
+    direction_difference = position_diff_along_direction(next_object_pose, red_box_pose, left)
+    lower_threshold = 0.0
+    # The direction difference should be positive if the object is placed left of the red box.
+    is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
+    # Evaluate if the object has a deviation in the x direction.
+    x_diff_metric = position_metric_normal_to_direction(next_object_pose, red_box_pose, left)
+    lower_threshold = 0.0
+    upper_threshold = 0.05
+    # The x difference should be as small as possible but no larger than 5cm.
+    x_diff_probability = linear_probability(x_diff_metric, lower_threshold, upper_threshold, is_smaller_then=True)
     total_left_probability = probability_intersection(is_left_probability, x_diff_probability)
     # Evaluate if the object is placed 10cm next to the red box.
     distance_metric = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold = 0.050
     ideal_point = 0.10
-    upper_threshold = 0.20
+    upper_threshold = 0.15
     smaller_than_ideal_probability = linear_probability(
         distance_metric, lower_threshold, ideal_point, is_smaller_then=False
     )
@@ -343,27 +379,12 @@ def PlaceInFrontOfBlueBoxFn(
     lower_threshold = 0.0
     # The direction difference should be positive if the object is placed left of the blue box.
     is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
-    # Evaluate if the object has a deviation in the x direction.
+    # Evaluate if the object has a deviation normal to the given direction.
     y_diff_metric = position_metric_normal_to_direction(next_object_pose, blue_box_pose, in_front_of)
     lower_threshold = 0.0
     upper_threshold = 0.05
-    # The x difference should be as small as possible but no larger than 5cm.
     x_diff_probability = linear_probability(y_diff_metric, lower_threshold, upper_threshold, is_smaller_then=True)
-    total_left_probability = probability_intersection(is_left_probability, x_diff_probability)
-    # Evaluate if the object is placed 10cm next to the blue box.
-    distance_metric = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
-    lower_threshold = 0.050
-    ideal_point = 0.10
-    upper_threshold = 0.20
-    smaller_than_ideal_probability = linear_probability(
-        distance_metric, lower_threshold, ideal_point, is_smaller_then=False
-    )
-    bigger_than_ideal_probability = linear_probability(
-        distance_metric, ideal_point, upper_threshold, is_smaller_then=True
-    )
-    total_distance_probability = probability_intersection(smaller_than_ideal_probability, bigger_than_ideal_probability)
-    # Combine the two probabilities
-    total_probability = probability_intersection(total_left_probability, total_distance_probability)
+    total_probability = probability_intersection(is_left_probability, x_diff_probability)
     return total_probability
 
 
@@ -857,6 +878,7 @@ EVALUATION_FNS = {
     "HandoverOrientationAndPositionnFn": HandoverOrientationAndPositionnFn,
     "HandoverVerticalOrientationFn": HandoverVerticalOrientationFn,
     "PlaceLeftOfRedBoxFn": PlaceLeftOfRedBoxFn,
+    "PlaceLeftOfAndNextToRedBoxFn": PlaceLeftOfAndNextToRedBoxFn,
     "PlaceInFrontOfBlueBoxFn": PlaceInFrontOfBlueBoxFn,
     "PlaceDistanceApartBlueBoxFn": PlaceDistanceApartBlueBoxFn,
     "PlaceInLineWithRedAndBlueBoxFn": PlaceInLineWithRedAndBlueBoxFn,

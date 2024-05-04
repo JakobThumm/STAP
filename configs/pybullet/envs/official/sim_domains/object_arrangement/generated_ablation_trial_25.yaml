@@ -31,11 +31,10 @@ env_kwargs:
       instruction: "Place the blue box in front of the red box and make sure the two boxes are aligned and 10cm apart."
       custom_fns:
         - null
-        - PlaceLeftOfRedBoxAlignedFn_trial_25
+        - PlaceInFrontOfRedBoxAligned10cmFn_trial_25
       
       
       
-
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
