@@ -28,7 +28,7 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Place the cyan box left of the red box and make sure the two boxes are aligned."
+      instruction: "Place the blue box in front of the red box and make sure the two boxes are aligned."
       custom_fns:
         - null
         - LeftAndAlignedWithRedBoxFn_trial_23

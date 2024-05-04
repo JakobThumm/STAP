@@ -28,7 +28,7 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Place the red box in front of the blue box."
+      instruction: "Place the red box in front of the blue box and make sure the two boxes are aligned."
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
