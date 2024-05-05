@@ -35,7 +35,7 @@ env_kwargs:
         - null
         - CloseToBlueBoxFn_trial_1
         - null
-        - FarFromRedAndBlueBoxFn_trial_1
+        - FarFromBothBoxesFn_trial_1
       
       
       

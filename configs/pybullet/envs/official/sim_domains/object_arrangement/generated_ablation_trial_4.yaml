@@ -33,9 +33,9 @@ env_kwargs:
       instruction: "The blue box has to be in front of the red box but behind the cyan box."
       custom_fns:
         - null
+        - PlaceBlueInFrontOfRedFn_trial_4
         - null
-        - null
-        - PlaceCyanBoxInFrontOfRedBoxFn_trial_4
+        - PlaceBlueBehindCyanFn_trial_4
       
       
       

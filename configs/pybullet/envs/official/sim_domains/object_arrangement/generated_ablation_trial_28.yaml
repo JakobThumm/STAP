@@ -33,9 +33,9 @@ env_kwargs:
       instruction: "Arrange the red box, blue box, and cyan box in a triangle of edge length 20 cm."
       custom_fns:
         - null
-        - FormTriangleWithRedBoxFn_trial_28
+        - TriangleFormationWithRedBoxFn_trial_28
         - null
-        - FormTriangleWithBlueBoxFn_trial_28
+        - TriangleFormationWithBlueBoxFn_trial_28
       
       
       

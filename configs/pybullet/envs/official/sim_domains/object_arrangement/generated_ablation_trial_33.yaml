@@ -33,9 +33,9 @@ env_kwargs:
       instruction: "Place the cyan box, blue box, and red box close to each other without them touching."
       custom_fns:
         - null
-        - PlaceCloseToBlueBoxFn_trial_33
+        - PlaceCloseToCyanAndRedBoxFn_trial_33
         - null
-        - PlaceCloseToRedBoxFn_trial_33
+        - PlaceCloseToBlueAndCyanBoxFn_trial_33
       
       
       

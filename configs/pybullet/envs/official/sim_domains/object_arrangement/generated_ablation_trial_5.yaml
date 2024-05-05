@@ -39,9 +39,12 @@ env_kwargs:
         - graspable(screwdriver)
       instruction: "Arrange the blue box, red box, and cyan box in a circle of radius 15 cm around the screwdriver."
       custom_fns:
-        - PlaceInCircleAroundScrewdriver15cmFn_trial_5
-        - PlaceInCircleAroundScrewdriver15cmFn_trial_5
-        - PlaceInCircleAroundScrewdriver15cmFn_trial_5
+        - null
+        - CircleAroundScrewdriver15cmFn_trial_5
+        - null
+        - CircleAroundScrewdriver15cmFn_trial_5
+        - null
+        - CircleAroundScrewdriver15cmFn_trial_5
       
       
       

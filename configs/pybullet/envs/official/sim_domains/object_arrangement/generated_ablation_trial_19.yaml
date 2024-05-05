@@ -32,10 +32,10 @@ env_kwargs:
         - graspable(blue_box)
       instruction: "Place the blue box and red box as far to the left of the table as possible."
       custom_fns:
+        - PlaceAsFarLeftAsPossibleFn_trial_19
         - null
-        - PlaceBlueBoxToLeftFn_trial_19
         - null
-        - PlaceRedBoxToLeftFn_trial_19
+        - null
       
       
       

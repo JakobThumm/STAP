@@ -33,9 +33,9 @@ env_kwargs:
       instruction: "Make sure that the cyan box, blue box and red box are oriented in the same direction."
       custom_fns:
         - null
-        - OrientLikeCyanBoxFn_trial_8
+        - OrientSameAsCyanBoxFn_trial_8
         - null
-        - OrientLikeCyanBoxFn_trial_8
+        - OrientSameAsCyanBoxFn_trial_8
       
       
       

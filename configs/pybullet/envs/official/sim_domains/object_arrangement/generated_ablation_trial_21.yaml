@@ -31,7 +31,7 @@ env_kwargs:
         - on(blue_box, table
         - graspable(blue_box)
       instruction: "Make sure that the cyan box, blue box and red box are oriented in the same direction."
-      custom_fns: 
+      custom_fns:
         - null
         - OrientSameAsCyanBoxFn_trial_21
         - null

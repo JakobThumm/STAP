@@ -31,7 +31,7 @@ env_kwargs:
       instruction: "Place the cyan box in a straight line left of the red box."
       custom_fns:
         - null
-        - LeftOfRedBoxAlignedFn_trial_36
+        - LeftOfRedBoxFn_trial_36
       
       
       
