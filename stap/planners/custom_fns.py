@@ -269,7 +269,7 @@ def HandoverVerticalOrientationFn(
 def PlaceLeftOfRedBoxFn(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
-    r"""Evaluates if the object is placed left of the red box and if the object is placed 10cm next to the red box.
+    r"""Evaluates if the object is placed in a straight line left of the red box.
 
     Args:
         state [batch_size, state_dim]: Current state.
@@ -290,22 +290,22 @@ def PlaceLeftOfRedBoxFn(
     left = [0.0, -1.0, 0.0]
     direction_difference = position_diff_along_direction(next_object_pose, red_box_pose, left)
     lower_threshold = 0.0
-    # The direction difference should be positive if the object is placed left of the red box.
     is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
-    # Evaluate if the object has a deviation in the x direction.
-    x_diff_metric = position_metric_normal_to_direction(next_object_pose, red_box_pose, left)
+    # Evaluate if the object is placed in a straight line left of the red box.
+    straight_line_metric = position_metric_normal_to_direction(next_object_pose, red_box_pose, left)
     lower_threshold = 0.0
     upper_threshold = 0.05
-    # The x difference should be as small as possible but no larger than 5cm.
-    x_diff_probability = linear_probability(x_diff_metric, lower_threshold, upper_threshold, is_smaller_then=True)
-    total_probability = probability_intersection(is_left_probability, x_diff_probability)
+    straight_line_probability = linear_probability(
+        straight_line_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    total_probability = probability_intersection(is_left_probability, straight_line_probability)
     return total_probability
 
 
 def PlaceInFrontOfBlueBoxFn(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
-    r"""Evaluates if the object is placed in front of the blue box and if the object is placed 10cm next to the blue box.
+    r"""Evaluates if the object is placed in a straight line in front of the blue box.
 
     Args:
         state [batch_size, state_dim]: Current state.
@@ -326,9 +326,8 @@ def PlaceInFrontOfBlueBoxFn(
     in_front_of = [1.0, 0.0, 0.0]
     direction_difference = position_diff_along_direction(next_object_pose, blue_box_pose, in_front_of)
     lower_threshold = 0.0
-    # The direction difference should be positive if the object is placed left of the blue box.
     is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
-    # Evaluate if the object has a deviation normal to the given direction.
+    # Evaluate if the object is placed in a straight line in front of the blue box.
     y_diff_metric = position_metric_normal_to_direction(next_object_pose, blue_box_pose, in_front_of)
     lower_threshold = 0.0
     upper_threshold = 0.05
@@ -340,7 +339,7 @@ def PlaceInFrontOfBlueBoxFn(
 def PlaceLeftOfAndNextToRedBoxFn(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
-    r"""Evaluates if the object is placed left of the red box and if the object is placed 10cm next to the red box.
+    r"""Evaluates if the object is placed in a straight line left of the red box and if the object is placed 10cm next to the red box.
 
     Args:
         state [batch_size, state_dim]: Current state.
@@ -361,13 +360,11 @@ def PlaceLeftOfAndNextToRedBoxFn(
     left = [0.0, -1.0, 0.0]
     direction_difference = position_diff_along_direction(next_object_pose, red_box_pose, left)
     lower_threshold = 0.0
-    # The direction difference should be positive if the object is placed left of the red box.
     is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
-    # Evaluate if the object has a deviation in the x direction.
+    # Evaluate if the object is placed in a straight line left of the red box.
     x_diff_metric = position_metric_normal_to_direction(next_object_pose, red_box_pose, left)
     lower_threshold = 0.0
     upper_threshold = 0.05
-    # The x difference should be as small as possible but no larger than 5cm.
     x_diff_probability = linear_probability(x_diff_metric, lower_threshold, upper_threshold, is_smaller_then=True)
     total_left_probability = probability_intersection(is_left_probability, x_diff_probability)
     # Evaluate if the object is placed 10cm next to the red box.
@@ -826,8 +823,8 @@ def SameOrientationAsCyanBoxFn(
     cyan_box_pose = get_pose(state, cyan_box_id, -1)
     # Evaluate if the object has the same orientation as the cyan box
     orientation_metric = great_circle_distance_metric(next_object_pose, cyan_box_pose)
-    lower_threshold = torch.pi / 6.0
-    upper_threshold = torch.pi / 3.0
+    lower_threshold = torch.pi / 8.0
+    upper_threshold = torch.pi / 6.0
     orientation_probability = linear_probability(
         orientation_metric, lower_threshold, upper_threshold, is_smaller_then=True
     )
@@ -873,7 +870,7 @@ def AlignBoxesInLineFn_trial_0(
         next_state [batch_size, state_dim]: Next state.
         primitive: optional primitive to receive the object orientation from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -883,7 +880,7 @@ def AlignBoxesInLineFn_trial_0(
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     cyan_box_pose = get_pose(next_state, cyan_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -891,9 +888,13 @@ def AlignBoxesInLineFn_trial_0(
     # Calculate the direction vector from the red box to the blue box
     direction_vector_red_to_blue = build_direction_vector(red_box_pose, blue_box_pose)
     # Calculate the positional difference of the cyan box along the direction vector
-    position_diff_cyan_along_direction = position_diff_along_direction(cyan_box_pose, red_box_pose, direction_vector_red_to_blue)
+    position_diff_cyan_along_direction = position_diff_along_direction(
+        cyan_box_pose, red_box_pose, direction_vector_red_to_blue
+    )
     # Calculate the positional difference of the cyan box normal to the direction vector
-    position_diff_cyan_normal_to_direction = position_metric_normal_to_direction(cyan_box_pose, red_box_pose, direction_vector_red_to_blue)
+    position_diff_cyan_normal_to_direction = position_metric_normal_to_direction(
+        cyan_box_pose, red_box_pose, direction_vector_red_to_blue
+    )
     # Evaluate if the cyan box is aligned with the red and blue boxes
     alignment_probability = linear_probability(position_diff_cyan_normal_to_direction, 0.0, 0.05, is_smaller_then=True)
     # Evaluate if the cyan box is placed in line between the red and blue boxes
@@ -913,7 +914,7 @@ def CloseToBlueBoxFn_trial_1(
         next_state [batch_size, state_dim]: Predicted next state after executing this action.
         primitive: Optional primitive to receive the object information from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -921,7 +922,7 @@ def CloseToBlueBoxFn_trial_1(
     # Get the object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     red_box_pose = get_pose(next_state, red_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     blue_box_pose = get_pose(state, blue_box_id, -1)
@@ -945,7 +946,7 @@ def FarFromRedAndBlueBoxFn_trial_1(
         next_state [batch_size, state_dim]: Predicted next state after executing this action.
         primitive: Optional primitive to receive the object information from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -954,7 +955,7 @@ def FarFromRedAndBlueBoxFn_trial_1(
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     cyan_box_pose = get_pose(next_state, cyan_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -994,7 +995,7 @@ def TrianglePlacementBlueFn_trial_2(
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     blue_box_pose = get_pose(next_state, blue_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -1004,8 +1005,12 @@ def TrianglePlacementBlueFn_trial_2(
     distance_metric_cyan = position_norm_metric(blue_box_pose, cyan_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold = 0.20
     upper_threshold = 0.25
-    triangle_probability_red = linear_probability(distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=True)
-    triangle_probability_cyan = linear_probability(distance_metric_cyan, lower_threshold, upper_threshold, is_smaller_then=True)
+    triangle_probability_red = linear_probability(
+        distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    triangle_probability_cyan = linear_probability(
+        distance_metric_cyan, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     total_probability = probability_intersection(triangle_probability_red, triangle_probability_cyan)
     return total_probability
 
@@ -1031,7 +1036,7 @@ def TrianglePlacementCyanFn_trial_2(
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     cyan_box_pose = get_pose(next_state, cyan_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -1041,8 +1046,12 @@ def TrianglePlacementCyanFn_trial_2(
     distance_metric_blue = position_norm_metric(cyan_box_pose, blue_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold = 0.20
     upper_threshold = 0.25
-    triangle_probability_red = linear_probability(distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=True)
-    triangle_probability_blue = linear_probability(distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=True)
+    triangle_probability_red = linear_probability(
+        distance_metric_red, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    triangle_probability_blue = linear_probability(
+        distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     total_probability = probability_intersection(triangle_probability_red, triangle_probability_blue)
     return total_probability
 
@@ -1057,7 +1066,7 @@ def LeftOfRedBoxFn_trial_3(
         next_state [batch_size, state_dim]: Predicted next state after executing this action.
         primitive: Optional primitive to receive the object information from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1066,7 +1075,7 @@ def LeftOfRedBoxFn_trial_3(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -1074,9 +1083,7 @@ def LeftOfRedBoxFn_trial_3(
     direction_difference = position_diff_along_direction(next_object_pose, red_box_pose, direction=[0, 1, 0])
     lower_threshold = 0.10  # At least 10cm to the left to be considered 'left'.
     upper_threshold = 0.20  # Ideally 20cm to the left.
-    probability = linear_probability(
-        direction_difference, lower_threshold, upper_threshold, is_smaller_then=True
-    )
+    probability = linear_probability(direction_difference, lower_threshold, upper_threshold, is_smaller_then=True)
     return probability
 
 
@@ -1101,7 +1108,7 @@ def PlaceCyanBoxInFrontOfRedBoxFn_trial_4(
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     cyan_box_pose = get_pose(next_state, cyan_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -1137,7 +1144,7 @@ def PlaceInCircleAroundScrewdriver15cmFn_trial_5(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the screwdriver ID from the environment.
     screwdriver_id = get_object_id_from_name("screwdriver", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the screwdriver, the current state is more reliable.
     screwdriver_pose = get_pose(state, screwdriver_id, -1)
@@ -1146,9 +1153,7 @@ def PlaceInCircleAroundScrewdriver15cmFn_trial_5(
     ideal_radius = 0.15  # 15cm
     lower_threshold = 0.10  # 10cm
     upper_threshold = 0.20  # 20cm
-    probability = linear_probability(
-        distance_metric, lower_threshold, upper_threshold, is_smaller_then=True
-    )
+    probability = linear_probability(distance_metric, lower_threshold, upper_threshold, is_smaller_then=True)
     return probability
 
 
@@ -1164,14 +1169,14 @@ def FarLeftOnTableFn_trial_6(
         primitive: Optional primitive to receive the object information from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
     env = primitive.env
     # Get the object ID from the primitive.
     object_id = get_object_id_from_primitive(0, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # Assuming the leftmost position on the table is at x = 0.
     leftmost_position = 0.0
@@ -1205,7 +1210,7 @@ def PlaceCloseToCyanAndRedBoxFn_trial_7(
     # Get the non-manipulated object IDs from the environment.
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
     red_box_id = get_object_id_from_name("red_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     blue_box_pose = get_pose(next_state, blue_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     cyan_box_pose = get_pose(state, cyan_box_id, -1)
@@ -1242,7 +1247,7 @@ def PlaceCloseToCyanAndBlueBoxFn_trial_7(
     # Get the non-manipulated object IDs from the environment.
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     red_box_pose = get_pose(next_state, red_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     cyan_box_pose = get_pose(state, cyan_box_id, -1)
@@ -1270,7 +1275,7 @@ def OrientLikeCyanBoxFn_trial_8(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1279,7 +1284,7 @@ def OrientLikeCyanBoxFn_trial_8(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the cyan box ID from the environment.
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_orientation = get_pose(next_state, object_id, -1)[..., 3:]
     # For the cyan box, the current state is more reliable.
     cyan_box_orientation = get_pose(state, cyan_box_id, -1)[..., 3:]
@@ -1314,7 +1319,7 @@ def PlaceBlueBoxInLineFn_trial_9(
     # Get the object ID from the primitive.
     blue_box_id = get_object_id_from_primitive(0, primitive)
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     blue_box_pose = get_pose(next_state, blue_box_id, -1)
     cyan_box_pose = get_pose(state, cyan_box_id, -1)
     # Evaluate if the blue box is placed in line and at least 10cm from the cyan box
@@ -1344,7 +1349,7 @@ def PlaceRedBoxInLineFn_trial_9(
     # Get the object ID from the primitive.
     red_box_id = get_object_id_from_primitive(0, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     red_box_pose = get_pose(next_state, red_box_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
     # Evaluate if the red box is placed in line and at least 10cm from the blue box
@@ -1366,7 +1371,7 @@ def LeftOfRedBoxAndAlignedFn_trial_10(
         next_state [batch_size, state_dim]: Predicted next state after executing this action.
         primitive: Optional primitive to receive the object information from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1383,7 +1388,9 @@ def LeftOfRedBoxAndAlignedFn_trial_10(
     is_left_probability = threshold_probability(position_difference_left, 0.0, is_smaller_then=False)
     # Evaluate if the cyan box is aligned with the red box.
     alignment_direction = [1.0, 0.0, 0.0]  # Considering alignment along the x-axis.
-    position_difference_alignment = position_metric_normal_to_direction(cyan_box_pose, red_box_pose, alignment_direction)
+    position_difference_alignment = position_metric_normal_to_direction(
+        cyan_box_pose, red_box_pose, alignment_direction
+    )
     alignment_probability = linear_probability(position_difference_alignment, 0.05, 0.10, is_smaller_then=True)
     # Combine probabilities.
     total_probability = probability_intersection(is_left_probability, alignment_probability)
@@ -1402,7 +1409,7 @@ def PlaceInFrontAndAlignedWithBlueBoxFn_trial_11(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1411,7 +1418,7 @@ def PlaceInFrontAndAlignedWithBlueBoxFn_trial_11(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the non-manipulated object IDs from the environment.
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     blue_box_pose = get_pose(state, blue_box_id, -1)
@@ -1438,7 +1445,7 @@ def InFrontAndAlignedWithRedBoxFn_trial_12(
         next_state [batch_size, state_dim]: Predicted next state after executing this action.
         primitive: Optional primitive to receive the object information from
     Returns:
-        The probability that action `a` on primitive satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1446,7 +1453,7 @@ def InFrontAndAlignedWithRedBoxFn_trial_12(
     # Get the object IDs from the environment.
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
     red_box_id = get_object_id_from_name("red_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     blue_box_pose = get_pose(next_state, blue_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -1473,7 +1480,7 @@ def AlignBoxesInLineFn_trial_13(
         next_state [batch_size, state_dim]: Predicted next state after executing this action.
         primitive: Optional primitive to receive the object information from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1482,22 +1489,22 @@ def AlignBoxesInLineFn_trial_13(
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    
+
     # Get the poses of the objects.
     cyan_box_pose = get_pose(next_state, cyan_box_id, -1)
     red_box_pose = get_pose(state, red_box_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
-    
+
     # Calculate the direction vector from the red box to the blue box.
     direction_vector = build_direction_vector(red_box_pose, blue_box_pose)
-    
+
     # Calculate the positional difference of the cyan box normal to the direction vector.
     position_diff_metric = position_metric_normal_to_direction(cyan_box_pose, red_box_pose, direction_vector)
-    
+
     # Calculate the probability that the cyan box is aligned with the red and blue boxes.
     # Considering a tolerance of 5cm for being considered "in line".
     probability_in_line = linear_probability(position_diff_metric, 0, 0.05, is_smaller_then=True)
-    
+
     return probability_in_line
 
 
@@ -1513,7 +1520,7 @@ def PlaceCloseToBlueBoxFn_trial_14(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1522,7 +1529,7 @@ def PlaceCloseToBlueBoxFn_trial_14(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the non-manipulated object IDs from the environment.
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     blue_box_pose = get_pose(state, blue_box_id, -1)
@@ -1545,7 +1552,7 @@ def PlaceFarFromRedAndBlueBoxFn_trial_14(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1555,7 +1562,7 @@ def PlaceFarFromRedAndBlueBoxFn_trial_14(
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -1566,7 +1573,9 @@ def PlaceFarFromRedAndBlueBoxFn_trial_14(
     lower_threshold = 0.20  # 20cm
     upper_threshold = 1.00  # 100cm
     probability_red = linear_probability(distance_to_red_metric, lower_threshold, upper_threshold, is_smaller_then=True)
-    probability_blue = linear_probability(distance_to_blue_metric, lower_threshold, upper_threshold, is_smaller_then=True)
+    probability_blue = linear_probability(
+        distance_to_blue_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     # Combine the probabilities to ensure the object is far from both boxes.
     return probability_intersection(probability_red, probability_blue)
 
@@ -1598,7 +1607,9 @@ def TriangleFormationWithRedBoxFn_trial_15(
     # Evaluate if the object is placed at a 20cm distance from the red box.
     distance_metric = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x", "y"])
     ideal_distance = 0.20
-    distance_probability = linear_probability(distance_metric, ideal_distance - 0.05, ideal_distance + 0.05, is_smaller_then=False)
+    distance_probability = linear_probability(
+        distance_metric, ideal_distance - 0.05, ideal_distance + 0.05, is_smaller_then=False
+    )
     return distance_probability
 
 
@@ -1632,8 +1643,12 @@ def TriangleFormationWithBlueBoxFn_trial_15(
     distance_metric_blue = position_norm_metric(next_object_pose, blue_box_pose, norm="L2", axes=["x", "y"])
     distance_metric_red = position_norm_metric(next_object_pose, red_box_pose, norm="L2", axes=["x", "y"])
     ideal_distance = 0.20
-    distance_probability_blue = linear_probability(distance_metric_blue, ideal_distance - 0.05, ideal_distance + 0.05, is_smaller_then=False)
-    distance_probability_red = linear_probability(distance_metric_red, ideal_distance - 0.05, ideal_distance + 0.05, is_smaller_then=False)
+    distance_probability_blue = linear_probability(
+        distance_metric_blue, ideal_distance - 0.05, ideal_distance + 0.05, is_smaller_then=False
+    )
+    distance_probability_red = linear_probability(
+        distance_metric_red, ideal_distance - 0.05, ideal_distance + 0.05, is_smaller_then=False
+    )
     # Combine the probabilities to ensure the cyan box is equidistant from both the blue and red boxes.
     total_probability = probability_intersection(distance_probability_blue, distance_probability_red)
     return total_probability
@@ -1658,7 +1673,7 @@ def LeftOfRedBoxFn_trial_16(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -1691,7 +1706,7 @@ def InFrontOfRedBoxBehindCyanBoxFn_trial_17(
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     blue_box_pose = get_pose(next_state, blue_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -1717,7 +1732,7 @@ def CircleAroundScrewdriverFn_trial_18(
         next_state [batch_size, state_dim]: Predicted next state after executing this action.
         primitive: Optional primitive to receive the object information from
     Returns:
-        The probability that action `a` on primitive {{Primitive.name}} satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive {{Primitive.name}} satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1726,7 +1741,7 @@ def CircleAroundScrewdriverFn_trial_18(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the screwdriver ID from the environment.
     screwdriver_id = get_object_id_from_name("screwdriver", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the screwdriver, the current state is more reliable.
     screwdriver_pose = get_pose(state, screwdriver_id, -1)
@@ -1750,7 +1765,7 @@ def PlaceBlueBoxToLeftFn_trial_19(
         primitive: Optional primitive to receive the object information from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1759,7 +1774,7 @@ def PlaceBlueBoxToLeftFn_trial_19(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the table ID from the environment.
     table_id = get_object_id_from_name("table", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the table, the current state is more reliable.
     table_pose = get_pose(state, table_id, -1)
@@ -1782,7 +1797,7 @@ def PlaceRedBoxToLeftFn_trial_19(
         primitive: Optional primitive to receive the object information from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1791,7 +1806,7 @@ def PlaceRedBoxToLeftFn_trial_19(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the table ID from the environment.
     table_id = get_object_id_from_name("table", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the table, the current state is more reliable.
     table_pose = get_pose(state, table_id, -1)
@@ -1814,7 +1829,7 @@ def PlaceCloseToCyanBoxFn_trial_20(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1847,7 +1862,7 @@ def PlaceCloseToBlueBoxFn_trial_20(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -1888,15 +1903,15 @@ def OrientSameAsCyanBoxFn_trial_21(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the non-manipulated object IDs from the environment.
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_orientation = get_pose(next_state, object_id, -1)[3:]
     # For the non-manipulated objects, the current state is more reliable.
     cyan_box_orientation = get_pose(state, cyan_box_id, -1)[3:]
     # Calculate the difference in orientation using the great circle distance metric.
     orientation_difference = great_circle_distance_metric(next_object_orientation, cyan_box_orientation)
     # We consider differences of torch.pi/3 as small, but ideally torch.pi/6.
-    lower_threshold = torch.pi/6
-    upper_threshold = torch.pi/3
+    lower_threshold = torch.pi / 6
+    upper_threshold = torch.pi / 3
     probability = linear_probability(orientation_difference, lower_threshold, upper_threshold, is_smaller_then=True)
     return probability
 
@@ -1975,7 +1990,7 @@ def LeftOfRedBoxAlignedFn_trial_23(
         next_state [batch_size, state_dim]: Predicted next state after executing this action.
         primitive: Optional primitive to receive the object information from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2018,7 +2033,7 @@ def PlaceInFrontOfBlueBoxFn_trial_24(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the non-manipulated object IDs from the environment.
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
     # Evaluate if the object is placed in front of the blue box
@@ -2026,7 +2041,9 @@ def PlaceInFrontOfBlueBoxFn_trial_24(
     direction_difference = position_diff_along_direction(next_object_pose, blue_box_pose, in_front)
     lower_threshold = 0.0
     upper_threshold = 0.10
-    in_front_probability = linear_probability(direction_difference, lower_threshold, upper_threshold, is_smaller_then=True)
+    in_front_probability = linear_probability(
+        direction_difference, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     # Evaluate if the object is aligned with the blue box in the y direction.
     y_diff_metric = position_metric_normal_to_direction(next_object_pose, blue_box_pose, in_front)
     y_diff_probability = linear_probability(y_diff_metric, 0.0, 0.05, is_smaller_then=True)
@@ -2046,7 +2063,7 @@ def PlaceInFrontOfRedBoxAligned10cmFn_trial_25(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2055,7 +2072,7 @@ def PlaceInFrontOfRedBoxAligned10cmFn_trial_25(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     red_box_pose = get_pose(state, red_box_id, -1)
     # Evaluate if the object is placed in front of the red box
@@ -2067,9 +2084,7 @@ def PlaceInFrontOfRedBoxAligned10cmFn_trial_25(
     )
     # Evaluate if the object is aligned with the red box
     alignment_metric = position_metric_normal_to_direction(next_object_pose, red_box_pose, front)
-    alignment_probability = linear_probability(
-        alignment_metric, 0.0, 0.05, is_smaller_then=True
-    )
+    alignment_probability = linear_probability(alignment_metric, 0.0, 0.05, is_smaller_then=True)
     total_probability = probability_intersection(distance_probability, alignment_probability)
     return total_probability
 
@@ -2086,7 +2101,7 @@ def AlignBoxesInLineFn_trial_26(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2104,9 +2119,13 @@ def AlignBoxesInLineFn_trial_26(
     # Calculate the direction vector from the red box to the blue box.
     direction_vector_red_to_blue = build_direction_vector(red_box_pose, blue_box_pose)
     # Calculate the positional difference of the cyan box along the direction vector.
-    position_diff_cyan_along_direction = position_diff_along_direction(cyan_box_pose, red_box_pose, direction_vector_red_to_blue)
+    position_diff_cyan_along_direction = position_diff_along_direction(
+        cyan_box_pose, red_box_pose, direction_vector_red_to_blue
+    )
     # Calculate the positional difference of the cyan box normal to the direction vector.
-    position_diff_cyan_normal_to_direction = position_metric_normal_to_direction(cyan_box_pose, red_box_pose, direction_vector_red_to_blue)
+    position_diff_cyan_normal_to_direction = position_metric_normal_to_direction(
+        cyan_box_pose, red_box_pose, direction_vector_red_to_blue
+    )
     # The cyan box should be aligned with the red and blue boxes, so the normal difference should be minimal.
     alignment_probability = linear_probability(position_diff_cyan_normal_to_direction, 0.0, 0.05, is_smaller_then=True)
     # The cyan box should be placed between the red and blue boxes or in line with them, so the along direction difference should be positive.
@@ -2128,7 +2147,7 @@ def CloseToBlueBoxFn_trial_27(
         primitive: Optional primitive to receive the object information from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2136,7 +2155,7 @@ def CloseToBlueBoxFn_trial_27(
     # Get the object ID from the primitive.
     red_box_id = get_object_id_from_primitive(0, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     red_box_pose = get_pose(next_state, red_box_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
     # Calculate the distance between the red and blue boxes.
@@ -2160,7 +2179,7 @@ def FarFromRedAndBlueBoxFn_trial_27(
         primitive: Optional primitive to receive the object information from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2169,7 +2188,7 @@ def FarFromRedAndBlueBoxFn_trial_27(
     cyan_box_id = get_object_id_from_primitive(0, primitive)
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     cyan_box_pose = get_pose(next_state, cyan_box_id, -1)
     red_box_pose = get_pose(state, red_box_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
@@ -2206,7 +2225,7 @@ def FormTriangleWithRedBoxFn_trial_28(
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     red_box_pose = get_pose(state, red_box_id, -1)
     cyan_box_pose = get_pose(state, cyan_box_id, -1)
@@ -2243,7 +2262,7 @@ def FormTriangleWithBlueBoxFn_trial_28(
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     red_box_pose = get_pose(state, red_box_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
@@ -2271,7 +2290,7 @@ def LeftOfRedBoxFn_trial_29(
         primitive: Optional primitive to receive the object information from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2280,7 +2299,7 @@ def LeftOfRedBoxFn_trial_29(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)
@@ -2320,7 +2339,9 @@ def InFrontOfRedBoxFn_trial_30(
     direction_difference = position_diff_along_direction(blue_box_pose, red_box_pose, [1, 0, 0])
     lower_threshold = 0.10  # 10cm
     upper_threshold = 0.20  # 20cm
-    in_front_probability = linear_probability(direction_difference, lower_threshold, upper_threshold, is_smaller_then=True)
+    in_front_probability = linear_probability(
+        direction_difference, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     return in_front_probability
 
 
@@ -2351,7 +2372,9 @@ def BehindCyanBoxFn_trial_30(
     direction_difference = position_diff_along_direction(cyan_box_pose, blue_box_pose, [1, 0, 0])
     lower_threshold = 0.10  # 10cm
     upper_threshold = 0.20  # 20cm
-    behind_probability = linear_probability(direction_difference, lower_threshold, upper_threshold, is_smaller_then=True)
+    behind_probability = linear_probability(
+        direction_difference, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     return behind_probability
 
 
@@ -2374,7 +2397,7 @@ def CircleAroundScrewdriverFn_trial_31(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the screwdriver object ID from the environment.
     screwdriver_id = get_object_id_from_name("screwdriver", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # For the screwdriver, the current state is more reliable.
     screwdriver_pose = get_pose(state, screwdriver_id, -1)
@@ -2404,7 +2427,7 @@ def FarLeftOfTableFn_trial_32(
     env = primitive.env
     # Get the object ID from the primitive.
     object_id = get_object_id_from_primitive(0, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     # Assuming the table's left edge is at x = 0 (normalized), evaluate how close the object is to this edge.
     # The x-coordinate of the object's pose represents its distance from the left edge.
@@ -2479,8 +2502,12 @@ def PlaceCloseToRedBoxFn_trial_33(
     distance_metric_blue = position_norm_metric(red_box_pose, blue_box_pose, norm="L2", axes=["x", "y"])
     lower_threshold = 0.10  # Close but not touching
     upper_threshold = 0.15  # Ideal close distance
-    close_by_probability_cyan = linear_probability(distance_metric_cyan, lower_threshold, upper_threshold, is_smaller_then=True)
-    close_by_probability_blue = linear_probability(distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=True)
+    close_by_probability_cyan = linear_probability(
+        distance_metric_cyan, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    close_by_probability_blue = linear_probability(
+        distance_metric_blue, lower_threshold, upper_threshold, is_smaller_then=True
+    )
     # Combine the probabilities to ensure the red box is close to both the cyan and blue boxes.
     total_probability = probability_intersection(close_by_probability_cyan, close_by_probability_blue)
     return total_probability
@@ -2506,14 +2533,14 @@ def OrientSameAsCyanBoxFn_trial_34(
     object_id = get_object_id_from_primitive(0, primitive)
     # Get the non-manipulated object IDs from the environment.
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     next_object_pose = get_pose(next_state, object_id, -1)
     cyan_box_pose = get_pose(state, cyan_box_id, -1)
     # Evaluate if the object is oriented in the same direction as the cyan box.
     orientation_difference = great_circle_distance_metric(next_object_pose, cyan_box_pose)
     # Use linear probability to evaluate the orientation difference.
-    lower_threshold = torch.pi/6  # Ideally the same orientation.
-    upper_threshold = torch.pi/3  # Acceptable orientation difference.
+    lower_threshold = torch.pi / 6  # Ideally the same orientation.
+    upper_threshold = torch.pi / 3  # Acceptable orientation difference.
     probability = linear_probability(orientation_difference, lower_threshold, upper_threshold, is_smaller_then=True)
     return probability
 
@@ -2529,7 +2556,7 @@ def InFrontOfCyanBoxFn_trial_35(
         next_state [batch_size, state_dim]: Next state.
         primitive: optional primitive to receive the object orientation from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2537,7 +2564,7 @@ def InFrontOfCyanBoxFn_trial_35(
     # Get the object ID from the primitive.
     blue_box_id = get_object_id_from_primitive(0, primitive)
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     blue_box_pose = get_pose(next_state, blue_box_id, -1)
     cyan_box_pose = get_pose(state, cyan_box_id, -1)
     # Evaluate if the blue box is placed in front of the cyan box
@@ -2559,7 +2586,7 @@ def InFrontOfBlueBoxFn_trial_35(
         next_state [batch_size, state_dim]: Next state.
         primitive: optional primitive to receive the object orientation from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2567,7 +2594,7 @@ def InFrontOfBlueBoxFn_trial_35(
     # Get the object ID from the primitive.
     red_box_id = get_object_id_from_primitive(0, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     red_box_pose = get_pose(next_state, red_box_id, -1)
     blue_box_pose = get_pose(state, blue_box_id, -1)
     # Evaluate if the red box is placed in front of the blue box
@@ -2588,7 +2615,7 @@ def LeftOfRedBoxAlignedFn_trial_36(
         next_state [batch_size, state_dim]: Predicted next state after executing this action.
         primitive: Optional primitive to receive the object information from
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2626,7 +2653,7 @@ def AlignAndPlaceInFrontOfBlueBoxFn_trial_37(
         primitive: Optional primitive to receive the object information from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2634,7 +2661,7 @@ def AlignAndPlaceInFrontOfBlueBoxFn_trial_37(
     # Get the object ID from the primitive.
     red_box_id = get_object_id_from_primitive(0, primitive)
     blue_box_id = get_object_id_from_name("blue_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     red_box_pose = get_pose(next_state, red_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     blue_box_pose = get_pose(state, blue_box_id, -1)
@@ -2662,7 +2689,7 @@ def AlignAndFrontOfRedBoxFn_trial_38(
         primitive: optional primitive to receive the object orientation from
 
     Returns:
-        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner. 
+        The probability that action `a` on primitive `Place` satisfies the preferences of the human partner.
             Output shape: [batch_size] \in [0, 1].
     """
     assert primitive is not None and isinstance(primitive, Primitive)
@@ -2671,7 +2698,7 @@ def AlignAndFrontOfRedBoxFn_trial_38(
     blue_box_id = get_object_id_from_primitive(0, primitive)
     # Get the non-manipulated object IDs from the environment.
     red_box_id = get_object_id_from_name("red_box", env, primitive)
-    # For the manipulated object, the state after placing the object is relevant. 
+    # For the manipulated object, the state after placing the object is relevant.
     blue_box_pose = get_pose(next_state, blue_box_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
     red_box_pose = get_pose(state, red_box_id, -1)

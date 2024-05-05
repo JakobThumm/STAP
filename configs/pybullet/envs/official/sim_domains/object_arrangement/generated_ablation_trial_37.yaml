@@ -28,7 +28,7 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Place the red box in front of the blue box and make sure the two boxes are aligned."
+      instruction: "Place the red box in a straight line in front of the blue box."
       custom_fns:
         - null
         - AlignAndPlaceInFrontOfBlueBoxFn_trial_37
