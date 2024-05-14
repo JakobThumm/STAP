@@ -1310,9 +1310,9 @@ def OrientSameAsCyanBoxFn_trial_8(
     # Get the non-manipulated object IDs from the environment.
     cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
     # For the manipulated object, the state after placing the object is relevant.
-    next_object_orientation = get_pose(next_state, object_id, -1)[..., 3:]
+    next_object_orientation = get_pose(next_state, object_id, -1)
     # For the non-manipulated objects, the current state is more reliable.
-    cyan_box_orientation = get_pose(state, cyan_box_id, -1)[..., 3:]
+    cyan_box_orientation = get_pose(state, cyan_box_id, -1)
     # Evaluate if the object is oriented in the same direction as the cyan box
     orientation_difference = great_circle_distance_metric(next_object_orientation, cyan_box_orientation)
     lower_threshold = 0.0
