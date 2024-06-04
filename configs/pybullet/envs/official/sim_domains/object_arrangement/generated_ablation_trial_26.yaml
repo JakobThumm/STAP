@@ -33,11 +33,9 @@ env_kwargs:
       instruction: "Make sure that the cyan box, blue box and red box are oriented in the same direction."
       custom_fns:
         - null
-        - OrientSameAsCyanBoxFn_trial_34
+        - OrientSameAsCyanBoxFn_trial_26
         - null
-        - OrientSameAsCyanBoxFn_trial_34
-      
-      
+        - OrientSameAsCyanBoxFn_trial_26
       
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml

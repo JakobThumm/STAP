@@ -33,9 +33,9 @@ env_kwargs:
       instruction: "Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box."
       custom_fns:
         - null
-        - InFrontOfCyanBoxFn_trial_35
+        - PlaceInFrontOfBlueBoxFn_trial_27
         - null
-        - InFrontOfBlueBoxFn_trial_35
+        - PlaceInFrontOfCyanBoxFn_trial_27
       
       
       

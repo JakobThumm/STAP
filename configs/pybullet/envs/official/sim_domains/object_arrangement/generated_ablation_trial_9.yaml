@@ -31,7 +31,7 @@ env_kwargs:
       instruction: "Place the red box in a straight line in front of the blue box."
       custom_fns:
         - null
-        - StraightLineInFrontOfBlueBoxFn_trial_11
+        - PlaceInFrontOfBlueBoxFn_trial_9
       
       
       

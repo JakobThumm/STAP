@@ -33,9 +33,9 @@ env_kwargs:
       instruction: "Make sure that the red box is placed close to the blue box and that the cyan box is placed far away from both the red and the blue box."
       custom_fns:
         - null
-        - PlaceCloseToBlueBoxFn_trial_14
+        - CloseToBlueBoxFn_trial_11
         - null
-        - PlaceFarFromRedAndBlueBoxFn_trial_14
+        - FarFromRedAndBlueBoxFn_trial_11
       
       
       
