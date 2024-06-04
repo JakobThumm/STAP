@@ -1,0 +1,63 @@
+env: pybullet.HumanTableEnv
+env_kwargs:
+  name: ablation_task_10
+  gui: true
+
+  primitives:
+    - pick
+    - place
+    - static_handover
+
+  tasks:
+    - action_skeleton:
+        - pick(cyan_box, table)
+        - place(cyan_box, table)
+      evaluation_fns:
+        - null
+        - PlaceLeftOfRedBoxFn
+      initial_state:
+        - free(screwdriver)
+        - on(screwdriver, table
+        - graspable(screwdriver)
+        - free(cyan_box)
+        - on(cyan_box, table
+        - graspable(cyan_box)
+        - free(red_box)
+        - on(red_box, table
+        - graspable(red_box)
+        - free(blue_box)
+        - on(blue_box, table
+        - graspable(blue_box)
+      instruction: "Place the cyan box in a straight line left of the red box."
+      custom_fns:
+        - null
+        - StraightLineLeftOfRedBoxFn_trial_23
+      
+      
+      
+        
+  robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
+  human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
+  animation_type: HumanRobotHandover
+  animation_frequency: 100
+  animation_initializations: configs/pybullet/envs/humans/animation_initializations.yaml
+  visualize_shield: false
+
+  objects:
+    - object_type: Urdf
+      object_kwargs:
+        name: table
+        path: configs/pybullet/envs/assets/asl_table.urdf
+        is_static: true
+    - object_type: Screwdriver
+      object_kwargs:
+          name: screwdriver
+          head_length: 0.09
+          handle_length: 0.075
+          head_radius: 0.012
+          handle_radius: 0.008
+          mass: 0.1
+          color: [0.95, 0.6, 0.15, 1.0]
+    - configs/pybullet/envs/assets/milk.yaml
+    - configs/pybullet/envs/assets/icecream.yaml
+    - configs/pybullet/envs/assets/salt.yaml

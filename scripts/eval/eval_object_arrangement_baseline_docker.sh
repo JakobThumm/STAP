@@ -103,9 +103,6 @@ TASKS=(
     "object_arrangement/ablation_task_7"
     "object_arrangement/ablation_task_8"
     "object_arrangement/ablation_task_9"
-    "object_arrangement/ablation_task_10"
-    "object_arrangement/ablation_task_11"
-    "object_arrangement/ablation_task_12"
 )
 
 # Planners: Uncomment planners to evaluate.

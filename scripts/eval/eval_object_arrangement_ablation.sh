@@ -100,15 +100,6 @@ TASKS=(
     "object_arrangement/generated_ablation_trial_27"
     "object_arrangement/generated_ablation_trial_28"
     "object_arrangement/generated_ablation_trial_29"
-    "object_arrangement/generated_ablation_trial_30"
-    "object_arrangement/generated_ablation_trial_31"
-    "object_arrangement/generated_ablation_trial_32"
-    "object_arrangement/generated_ablation_trial_33"
-    "object_arrangement/generated_ablation_trial_34"
-    "object_arrangement/generated_ablation_trial_35"
-    "object_arrangement/generated_ablation_trial_36"
-    "object_arrangement/generated_ablation_trial_37"
-    "object_arrangement/generated_ablation_trial_38"
 )
 
 # Planners: Uncomment planners to evaluate.

@@ -1,7 +1,7 @@
-# Arrange the red box, blue box, and cyan box in a triangle of edge length 20 cm.
+# Place the cyan box, blue box, and red box close to each other without them touching.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_2
+  name: ablation_task_5
   gui: true
 
   primitives:
@@ -13,13 +13,13 @@ env_kwargs:
     - action_skeleton:
         - pick(blue_box, table)
         - place(blue_box, table)
-        - pick(cyan_box, table)
-        - place(cyan_box, table)
+        - pick(red_box, table)
+        - place(red_box, table)
       evaluation_fns:
         - null
-        - PlaceNextToRedBox20cmFn
+        - CloseToCyanBoxFn
         - null
-        - PlaceNextToRedBoxAndBlueBox20cmFn
+        - CloseToCyanAndBlueBoxFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table
@@ -30,12 +30,12 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Arrange the red box, blue box, and cyan box in a triangle of edge length 20 cm."
+      instruction: "Place the cyan box, blue box, and red box close to each other without them touching."
       custom_fns:
         - null
-        - TriangleFormationWithRedBoxFn_trial_15
+        - PlaceCloseToCyanAndRedBoxFn_trial_20
         - null
-        - TriangleFormationWithBlueBoxFn_trial_15
+        - PlaceCloseToCyanAndBlueBoxFn_trial_20
       
       
       

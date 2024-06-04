@@ -79,9 +79,6 @@ TASKS=(
     "object_arrangement/oracle_task_7"
     "object_arrangement/oracle_task_8"
     "object_arrangement/oracle_task_9"
-    "object_arrangement/oracle_task_10"
-    "object_arrangement/oracle_task_11"
-    "object_arrangement/oracle_task_12"
 )
 
 # Planners: Uncomment planners to evaluate.

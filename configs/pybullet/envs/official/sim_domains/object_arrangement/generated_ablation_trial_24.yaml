@@ -1,6 +1,7 @@
+# Arrange the blue box, red box, and cyan box in a circle of radius 15 cm around the screwdriver.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_11
+  name: ablation_task_4
   gui: true
 
   primitives:
@@ -12,13 +13,18 @@ env_kwargs:
     - action_skeleton:
         - pick(red_box, table)
         - place(red_box, table)
+        - pick(cyan_box, table)
+        - place(cyan_box, table)
+        - pick(blue_box, table)
+        - place(blue_box, table)
       evaluation_fns:
         - null
-        - PlaceInFrontOfBlueBoxFn
+        - PlaceNextToScrewdriver15cmFn
+        - null
+        - PlaceNextToScrewdriver15cmFn
+        - null
+        - PlaceNextToScrewdriver15cmFn
       initial_state:
-        - free(screwdriver)
-        - on(screwdriver, table
-        - graspable(screwdriver)
         - free(cyan_box)
         - on(cyan_box, table
         - graspable(cyan_box)
@@ -28,10 +34,17 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Place the red box in a straight line in front of the blue box."
+        - free(screwdriver)
+        - on(screwdriver, table
+        - graspable(screwdriver)
+      instruction: "Arrange the blue box, red box, and cyan box in a circle of radius 15 cm around the screwdriver."
       custom_fns:
         - null
-        - PlaceInFrontOfBlueBoxFn_trial_24
+        - CircleAroundScrewdriverFn_trial_31
+        - null
+        - CircleAroundScrewdriverFn_trial_31
+        - null
+        - CircleAroundScrewdriverFn_trial_31
       
       
       
@@ -40,7 +53,7 @@ env_kwargs:
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
   animation_type: HumanRobotHandover
   animation_frequency: 100
-  animation_initializations: configs/pybullet/envs/humans/animation_initializations.yaml
+  animation_initializations: configs/pybullet/envs/humans/animation_initializations_far_away.yaml
   visualize_shield: false
 
   objects:

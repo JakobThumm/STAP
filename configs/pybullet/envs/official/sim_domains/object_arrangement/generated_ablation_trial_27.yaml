@@ -1,7 +1,7 @@
-# Make sure that the red box is placed close to the blue box and that the cyan box is placed far away from both the red and the blue box.
+# Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_1
+  name: ablation_task_7
   gui: true
 
   primitives:
@@ -11,15 +11,15 @@ env_kwargs:
 
   tasks:
     - action_skeleton:
+        - pick(blue_box, table)
+        - place(blue_box, table)
         - pick(red_box, table)
         - place(red_box, table)
-        - pick(cyan_box, table)
-        - place(cyan_box, table)
       evaluation_fns:
         - null
-        - PlaceNextToBlueBoxFn
+        - InFrontOfCyanBoxFn
         - null
-        - PlaceFarAwayFromRedAndBlueFn
+        - InFrontOfBlueBoxFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table
@@ -30,12 +30,12 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Make sure that the red box is placed close to the blue box and that the cyan box is placed far away from both the red and the blue box."
+      instruction: "Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box."
       custom_fns:
         - null
+        - InFrontOfCyanBoxFn_trial_35
         - null
-        - null
-        - PlaceFarFromRedAndBlueBoxFn_trial_27
+        - InFrontOfBlueBoxFn_trial_35
       
       
       

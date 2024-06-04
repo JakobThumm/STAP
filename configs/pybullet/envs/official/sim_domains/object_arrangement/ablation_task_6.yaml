@@ -1,4 +1,4 @@
-# Place the blue box and red box as far to the left of the table as possible.
+# Make sure that the cyan box, blue box and red box are oriented in the same direction.
 env: pybullet.HumanTableEnv
 env_kwargs:
   name: ablation_task_6
@@ -17,9 +17,9 @@ env_kwargs:
         - place(red_box, table)
       evaluation_fns:
         - null
-        - FarLeftOfTableFn
+        - SameOrientationAsCyanBoxFn
         - null
-        - FarLeftOfTableFn
+        - SameOrientationAsCyanBoxFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table
@@ -30,7 +30,7 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Place the blue box and red box as far to the left of the table as possible."
+      instruction: "Make sure that the cyan box, blue box and red box are oriented in the same direction."
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml
