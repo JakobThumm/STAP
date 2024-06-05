@@ -207,6 +207,7 @@ def evaluate_trajectory(
         Sequence[Optional[Callable[[torch.Tensor, torch.Tensor, torch.Tensor, Primitive], torch.Tensor]]]
     ] = None,
     action_skeleton: Optional[Sequence[Primitive]] = None,
+    use_additive_score: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     r"""Evaluates probability of success for the given trajectory.
 
@@ -227,6 +228,7 @@ def evaluate_trajectory(
                 primitive: primitive at time n
             ]
             Out: [batch_dims]: custom value of the state at time t \in [1, T+1]
+        use_additive_score: Whether to use the additive score or the multiplicative score.
 
     Returns:
         (Trajectory success probabilities [batch_size],
@@ -264,7 +266,10 @@ def evaluate_trajectory(
                 if clip_success:
                     p_successes[:, t] = torch.clip(p_successes[:, t], min=0, max=1)
                 custom_values = custom_fns[t](states[:, t], action, states[:, t + 1], action_skeleton[t])  # type: ignore
-                p_successes[:, t] = p_successes[:, t] * custom_values
+                if use_additive_score:
+                    p_successes[:, t] = p_successes[:, t] + custom_values
+                else:
+                    p_successes[:, t] = p_successes[:, t] * custom_values
     else:
         raise NotImplementedError
 
@@ -272,7 +277,10 @@ def evaluate_trajectory(
         p_successes = torch.clip(p_successes, min=0, max=1)
 
     # Combine probabilities.
-    p_success = torch.exp(torch.log(p_successes).sum(dim=-1))
+    if use_additive_score:
+        p_success = p_successes.sum(dim=-1)
+    else:
+        p_success = torch.exp(torch.log(p_successes).sum(dim=-1))
 
     return p_success, p_successes, p_successes_unc
 

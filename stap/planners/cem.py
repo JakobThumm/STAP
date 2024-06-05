@@ -32,6 +32,7 @@ class CEMPlanner(planners.Planner):
         keep_elites_fraction: float = 0.0,
         population_decay: float = 1.0,
         std_decay: float = 0.5,
+        use_additive_score: bool = False,
         device: str = "auto",
     ):
         """Constructs the iCEM planner.
@@ -49,6 +50,7 @@ class CEMPlanner(planners.Planner):
             keep_elites_fraction: Fraction of elites to keep between iterations.
             population_decay: Population decay applied after each iteration.
             std_decay: Decay of standard deviation over time. Std_{t+1} = std_t * (1 - std_decay)
+            use_additive_score: Whether to use the additive score or the multiplicative score.
             device: Torch device.
         """
         super().__init__(policies=policies, dynamics=dynamics, custom_fns=custom_fns, env=env, device=device)
@@ -61,6 +63,7 @@ class CEMPlanner(planners.Planner):
         self._num_elites_to_keep = int(keep_elites_fraction * self.num_elites + 0.5)
         self._population_decay = population_decay
         self._std_decay = std_decay
+        self._use_additive_score = use_additive_score
 
     @property
     def num_iterations(self) -> int:
@@ -96,6 +99,11 @@ class CEMPlanner(planners.Planner):
     def std_decay(self) -> float:
         """Decay of standard deviation over time."""
         return self._std_decay
+
+    @property
+    def use_additive_score(self) -> bool:
+        """Whether to use the additive score or the multiplicative score."""
+        return self._use_additive_score
 
     def _compute_initial_distribution(
         self, observation: torch.Tensor, action_skeleton: Sequence[envs.Primitive]
@@ -241,6 +249,7 @@ class CEMPlanner(planners.Planner):
                     actions=samples,
                     custom_fns=custom_fns,
                     action_skeleton=action_skeleton,
+                    use_additive_score=self.use_additive_score,
                 )
                 torch.nan_to_num_(p_success, nan=0.0)
                 # Select the top trajectories.
