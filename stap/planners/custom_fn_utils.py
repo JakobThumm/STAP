@@ -346,8 +346,8 @@ def probability_intersection(p_1: torch.Tensor, p_2: torch.Tensor) -> torch.Tens
 
 
 def probability_union(p_1: torch.Tensor, p_2: torch.Tensor) -> torch.Tensor:
-    """Calculate the union of two probabilities `p = max(p_1, p_2)`."""
-    return torch.max(p_1, p_2)
+    """Calculate the union of two probabilities `p = p_1 * p_2 + p_1 * (1 - p_2) + p_2 * (1 - p_1)`."""
+    return p_1 * p_2 + p_1 * (1 - p_2) + p_2 * (1 - p_1)
 
 
 ################ OLD FUNCTIONS #################

@@ -53,6 +53,12 @@ def read_in_files(
                 # Identify the trial name by parsing the directory path
                 trial_name = os.path.basename(os.path.dirname(root))  # or root.split(os.sep)[-1] for deeper nesting
 
+                # Debug
+                trial_id = int(trial_name.split("_")[-1])
+                # if trial_id % 13 == 4 or trial_id % 13 == 6 or trial_id % 13 == 12:
+                #     print(f"Skipping trial {trial_name}")
+                #     continue
+
                 # Load the npz file
                 file_path = os.path.join(root, file)
                 data = np.load(file_path)
@@ -212,8 +218,36 @@ def create_result_summary(
     #     print(f"Summary for trial {trial_name}: {summary}")
 
 
+def create_result_summary_by_trial(
+    eval_path: Union[str, pathlib.Path],
+) -> None:
+    n_experiments = 10
+    result_rows = [
+        {"ID": i, "oracle_0": -1, "ablation_0": -1, "generated_0": -1, "generated_1": -1, "generated_2": -1}
+        for i in range(n_experiments)
+    ]
+    keys = [
+        "observed_preference_values",
+    ]
+    raw_data = read_in_files(eval_path)
+    for trial_name, trial_results in raw_data.items():
+        trial_id = int(trial_name.split("_")[-1])
+        trial_type = trial_name.split("_")[0]
+        trial_number = trial_id % n_experiments
+        trial_version = trial_id // n_experiments
+        summary = summarize_trial(trial_results, keys)
+        result_rows[trial_number][f"{trial_type}_{trial_version}"] = summary[keys[0] + "_mean"]
+
+    # Convert the list of dictionaries to a DataFrame
+    df = pd.DataFrame(result_rows)
+
+    # Save the DataFrame as a CSV file
+    df.to_csv(f"{eval_path}/summary_observed_preference_values.csv", index=False, sep=",")
+
+
 def main(args: argparse.Namespace) -> None:
     create_result_summary(**vars(args))
+    create_result_summary_by_trial(**vars(args))
 
 
 if __name__ == "__main__":
