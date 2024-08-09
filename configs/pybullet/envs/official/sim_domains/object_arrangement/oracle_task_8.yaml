@@ -14,7 +14,7 @@ env_kwargs:
         - place(cyan_box, table)
       evaluation_fns:
         - null
-        - PlaceLeftOfRedBoxFn
+        - StraightLeftOfRedBoxFn
       initial_state:
         - free(screwdriver)
         - on(screwdriver, table
@@ -31,7 +31,7 @@ env_kwargs:
       instruction: "Place the cyan box in a straight line left of the red box."
       custom_fns:
         - null
-        - PlaceLeftOfRedBoxFn
+        - StraightLeftOfRedBoxFn
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

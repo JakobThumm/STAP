@@ -266,7 +266,7 @@ def HandoverVerticalOrientationFn(
     return total_probability
 
 
-def PlaceLeftOfRedBoxFn(
+def StraightLeftOfRedBoxFn(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
     r"""Evaluates if the object is placed in a straight line left of the red box.
@@ -291,18 +291,19 @@ def PlaceLeftOfRedBoxFn(
     direction_difference = position_diff_along_direction(next_object_pose, red_box_pose, left)
     lower_threshold = 0.0
     is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
-    # Evaluate if the object is placed in a straight line left of the red box.
-    straight_line_metric = position_metric_normal_to_direction(next_object_pose, red_box_pose, left)
+    # Evaluate the deviation to the front or back
+    normal_to_metric = position_metric_normal_to_direction(next_object_pose, red_box_pose, left)
     lower_threshold = 0.0
     upper_threshold = 0.05
-    straight_line_probability = linear_probability(
-        straight_line_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    normal_diff_probability = linear_probability(
+        normal_to_metric, lower_threshold, upper_threshold, is_smaller_then=True
     )
-    total_probability = probability_intersection(is_left_probability, straight_line_probability)
+    # The object should be left of the red box *and* not deviate too much to the front or back.
+    total_probability = probability_intersection(is_left_probability, normal_diff_probability)
     return total_probability
 
 
-def PlaceInFrontOfBlueBoxFn(
+def StraightInFrontOfBlueBoxFn(
     state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
 ) -> torch.Tensor:
     r"""Evaluates if the object is placed in a straight line in front of the blue box.
@@ -326,13 +327,53 @@ def PlaceInFrontOfBlueBoxFn(
     in_front_of = [1.0, 0.0, 0.0]
     direction_difference = position_diff_along_direction(next_object_pose, blue_box_pose, in_front_of)
     lower_threshold = 0.0
-    is_left_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
-    # Evaluate if the object is placed in a straight line in front of the blue box.
-    y_diff_metric = position_metric_normal_to_direction(next_object_pose, blue_box_pose, in_front_of)
+    is_in_front_of_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
+    # Evaluate the deviation to the left or right
+    normal_to_metric = position_metric_normal_to_direction(next_object_pose, blue_box_pose, in_front_of)
     lower_threshold = 0.0
     upper_threshold = 0.05
-    x_diff_probability = linear_probability(y_diff_metric, lower_threshold, upper_threshold, is_smaller_then=True)
-    total_probability = probability_intersection(is_left_probability, x_diff_probability)
+    normal_diff_probability = linear_probability(
+        normal_to_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    # The object should be in front of the blue box *and* not deviate too much to the left or right.
+    total_probability = probability_intersection(is_in_front_of_probability, normal_diff_probability)
+    return total_probability
+
+
+def StraightInFrontOfCyanBoxFn(
+    state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, primitive: Optional[Primitive] = None
+) -> torch.Tensor:
+    r"""Evaluates if the object is placed in a straight line in front of the cyan box.
+
+    Args:
+        state [batch_size, state_dim]: Current state.
+        action [batch_size, action_dim]: Action.
+        next_state [batch_size, state_dim]: Next state.
+        primitive: optional primitive to receive the object orientation from
+
+    Returns:
+        Evaluation of the performed handover [batch_size] \in [0, 1].
+    """
+    assert primitive is not None and isinstance(primitive, Primitive)
+    env = primitive.env
+    object_id = get_object_id_from_primitive(0, primitive)
+    cyan_box_id = get_object_id_from_name("cyan_box", env, primitive)
+    next_object_pose = get_pose(next_state, object_id, -1)
+    cyan_box_pose = get_pose(state, cyan_box_id, -1)
+    # Evaluate if the object is placed in front of the cyan box
+    in_front_of = [1.0, 0.0, 0.0]
+    direction_difference = position_diff_along_direction(next_object_pose, cyan_box_pose, in_front_of)
+    lower_threshold = 0.0
+    is_in_front_of_probability = threshold_probability(direction_difference, lower_threshold, is_smaller_then=False)
+    # Evaluate the deviation to the left or right
+    normal_to_metric = position_metric_normal_to_direction(next_object_pose, cyan_box_pose, in_front_of)
+    lower_threshold = 0.0
+    upper_threshold = 0.05
+    normal_diff_probability = linear_probability(
+        normal_to_metric, lower_threshold, upper_threshold, is_smaller_then=True
+    )
+    # The object should be in front of the cyan box *and* not deviate too much to the left or right.
+    total_probability = probability_intersection(is_in_front_of_probability, normal_diff_probability)
     return total_probability
 
 
@@ -2236,9 +2277,10 @@ CUSTOM_FNS = {
     "HandoverOrientationFn": HandoverOrientationFn,
     "HandoverOrientationAndPositionnFn": HandoverOrientationAndPositionnFn,
     "HandoverVerticalOrientationFn": HandoverVerticalOrientationFn,
-    "PlaceLeftOfRedBoxFn": PlaceLeftOfRedBoxFn,
-    "PlaceInFrontOfBlueBoxFn": PlaceInFrontOfBlueBoxFn,
+    "StraightLeftOfRedBoxFn": StraightLeftOfRedBoxFn,
     "PlaceLeftOfAndNextToRedBoxFn": PlaceLeftOfAndNextToRedBoxFn,
+    "StraightInFrontOfBlueBoxFn": StraightInFrontOfBlueBoxFn,
+    "StraightInFrontOfCyanBoxFn": StraightInFrontOfCyanBoxFn,
     "PlaceDistanceApartBlueBoxFn": PlaceDistanceApartBlueBoxFn,
     "PlaceInLineWithRedAndBlueBoxFn": PlaceInLineWithRedAndBlueBoxFn,
     "PlaceNextToBlueBoxFn": PlaceNextToBlueBoxFn,
