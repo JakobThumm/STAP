@@ -42,5 +42,4 @@ if [ "$cache" = "nocache" ]
 fi
 
 echo "Running docker command: ${command} ${options} -f ${dockerfile} -t ${image} ."
-DOCKER_BUILDKIT=1
-${command} ${options} -f ${dockerfile} -t ${image} .
+DOCKER_BUILDKIT=1 ${command} ${options} -f ${dockerfile} -t ${image} .
