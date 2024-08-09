@@ -1,7 +1,7 @@
-# Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box.
+# The blue box and the red box have to be oriented in the same direction as the cyan box or orthogonal to the cyan box.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_7
+  name: ablation_task_12
   gui: true
 
   primitives:
@@ -17,9 +17,9 @@ env_kwargs:
         - place(red_box, table)
       evaluation_fns:
         - null
-        - InFrontOfCyanBoxFn
+        - OrientedSameOrOrthogonalToCyanBoxFn
         - null
-        - InFrontOfBlueBoxFn
+        - OrientedSameOrOrthogonalToCyanBoxFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table
@@ -30,12 +30,12 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box."
+      instruction: "The blue box and the red box have to be oriented in the same direction as the cyan box or orthogonal to the cyan box."
       custom_fns:
         - null
-        - PlaceInFrontOfBlueBoxFn_trial_27
+        - OrientedSameOrOrthogonalToCyanBoxFn_trial_27
         - null
-        - PlaceInFrontOfCyanBoxFn_trial_27
+        - OrientedSameOrOrthogonalToCyanBoxFn_trial_27
       
       
       

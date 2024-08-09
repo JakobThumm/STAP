@@ -1,7 +1,7 @@
-# Make sure that the blue box and the cyan box are left of the red box.
+# The blue box should be oriented the same as the cyan box or the red box.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_3
+  name: ablation_task_13
   gui: true
 
   primitives:
@@ -13,13 +13,9 @@ env_kwargs:
     - action_skeleton:
         - pick(blue_box, table)
         - place(blue_box, table)
-        - pick(cyan_box, table)
-        - place(cyan_box, table)
       evaluation_fns:
         - null
-        - LeftOfRedBoxFn
-        - null
-        - LeftOfRedBoxFn
+        - OrientedSameAsCyanOrRedBoxFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table
@@ -30,12 +26,10 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Make sure that the blue box and the cyan box are left of the red box."
+      instruction: "The blue box should be oriented the same as the cyan box or the red box."
       custom_fns:
         - null
-        - LeftOfRedBoxFn_trial_13
-        - null
-        - LeftOfRedBoxFn_trial_13
+        - OrientLikeCyanOrRedBoxFn_trial_13
       
       
       

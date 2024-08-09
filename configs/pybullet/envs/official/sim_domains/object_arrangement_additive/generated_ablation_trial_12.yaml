@@ -1,7 +1,7 @@
-# Arrange the red box, blue box, and cyan box in a triangle of edge length 20 cm.
+# The blue box and the red box have to be oriented in the same direction as the cyan box or orthogonal to the cyan box.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_2
+  name: ablation_task_12
   gui: true
 
   primitives:
@@ -13,13 +13,13 @@ env_kwargs:
     - action_skeleton:
         - pick(blue_box, table)
         - place(blue_box, table)
-        - pick(cyan_box, table)
-        - place(cyan_box, table)
+        - pick(red_box, table)
+        - place(red_box, table)
       evaluation_fns:
         - null
-        - PlaceNextToRedBox20cmFn
+        - OrientedSameOrOrthogonalToCyanBoxFn
         - null
-        - PlaceNextToRedBoxAndBlueBox20cmFn
+        - OrientedSameOrOrthogonalToCyanBoxFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table
@@ -30,12 +30,12 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Arrange the red box, blue box, and cyan box in a triangle of edge length 20 cm."
+      instruction: "The blue box and the red box have to be oriented in the same direction as the cyan box or orthogonal to the cyan box."
       custom_fns:
         - null
-        - ArrangeInTriangleFn_trial_12
+        - OrientLikeOrOrthogonalToCyanBoxFn_trial_12
         - null
-        - null
+        - OrientLikeOrOrthogonalToCyanBoxFn_trial_12
       
       
       

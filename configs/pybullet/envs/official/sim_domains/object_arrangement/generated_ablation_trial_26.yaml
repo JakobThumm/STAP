@@ -1,7 +1,7 @@
-# Make sure that the cyan box, blue box and red box are oriented in the same direction.
+# Place the red box in a straight line right of or behind the blue box.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_6
+  name: ablation_task_11
   gui: true
 
   primitives:
@@ -11,15 +11,11 @@ env_kwargs:
 
   tasks:
     - action_skeleton:
-        - pick(blue_box, table)
-        - place(blue_box, table)
         - pick(red_box, table)
         - place(red_box, table)
       evaluation_fns:
         - null
-        - SameOrientationAsCyanBoxFn
-        - null
-        - SameOrientationAsCyanBoxFn
+        - StraightRightOfOrBehindBlueBoxFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table
@@ -30,12 +26,12 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Make sure that the cyan box, blue box and red box are oriented in the same direction."
+      instruction: "Place the red box in a straight line right of or behind the blue box."
       custom_fns:
         - null
-        - OrientSameAsCyanBoxFn_trial_26
-        - null
-        - OrientSameAsCyanBoxFn_trial_26
+        - PlaceRightOrBehindBlueBoxFn_trial_26
+      
+      
       
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml

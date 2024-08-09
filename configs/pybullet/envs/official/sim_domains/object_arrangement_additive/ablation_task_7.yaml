@@ -1,4 +1,4 @@
-# Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box.
+# Arrange the three boxes in a straight line. The blue box should be in front of the cyan box and the red box should be in front of the blue box.
 env: pybullet.HumanTableEnv
 env_kwargs:
   name: ablation_task_7
@@ -17,9 +17,9 @@ env_kwargs:
         - place(red_box, table)
       evaluation_fns:
         - null
-        - InFrontOfCyanBoxFn
+        - StraightInFrontOfCyanBoxFn
         - null
-        - InFrontOfBlueBoxFn
+        - StraightInFrontOfBlueBoxFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table
@@ -30,7 +30,7 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box."
+      instruction: "Arrange the three boxes in a straight line. The blue box should be in front of the cyan box and the red box should be in front of the blue box."
         
   robot_config: configs/pybullet/envs/robots/safe_fr3_sim.yaml
   human_config: configs/pybullet/envs/humans/average_male_TUM.yaml

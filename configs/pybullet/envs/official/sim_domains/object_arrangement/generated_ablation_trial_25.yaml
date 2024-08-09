@@ -1,7 +1,7 @@
-# Place the cyan box, blue box, and red box close to each other without them touching.
+# The cyan box should be close to the red box or close to the blue box.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_5
+  name: ablation_task_10
   gui: true
 
   primitives:
@@ -11,15 +11,11 @@ env_kwargs:
 
   tasks:
     - action_skeleton:
-        - pick(blue_box, table)
-        - place(blue_box, table)
-        - pick(red_box, table)
-        - place(red_box, table)
+        - pick(cyan_box, table)
+        - place(cyan_box, table)
       evaluation_fns:
         - null
-        - CloseToCyanBoxFn
-        - null
-        - CloseToCyanAndBlueBoxFn
+        - PlaceNextToRedOrBlueBoxFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table
@@ -30,12 +26,10 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Place the cyan box, blue box, and red box close to each other without them touching."
+      instruction: "The cyan box should be close to the red box or close to the blue box."
       custom_fns:
         - null
-        - PlaceCloseButNotTouchingFn_trial_25
-        - null
-        - PlaceCloseButNotTouchingFn_trial_25
+        - CloseToRedOrBlueBoxFn_trial_25
       
       
       

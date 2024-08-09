@@ -14,7 +14,7 @@ env_kwargs:
         - place(red_box, table)
       evaluation_fns:
         - null
-        - PlaceInFrontOfBlueBoxFn
+        - StraightInFrontOfBlueBoxFn
       initial_state:
         - free(screwdriver)
         - on(screwdriver, table
@@ -31,7 +31,7 @@ env_kwargs:
       instruction: "Place the red box in a straight line in front of the blue box."
       custom_fns:
         - null
-        - PlaceInFrontOfBlueBoxFn_trial_9
+        - StraightInFrontOfBlueBoxFn_trial_9
       
       
       

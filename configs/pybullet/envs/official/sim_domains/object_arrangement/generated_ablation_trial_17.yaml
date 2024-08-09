@@ -1,7 +1,7 @@
-# Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box.
+# Arrange the red box, blue box, and cyan box in a triangle of edge length 20 cm.
 env: pybullet.HumanTableEnv
 env_kwargs:
-  name: ablation_task_7
+  name: ablation_task_2
   gui: true
 
   primitives:
@@ -13,13 +13,13 @@ env_kwargs:
     - action_skeleton:
         - pick(blue_box, table)
         - place(blue_box, table)
-        - pick(red_box, table)
-        - place(red_box, table)
+        - pick(cyan_box, table)
+        - place(cyan_box, table)
       evaluation_fns:
         - null
-        - InFrontOfCyanBoxFn
+        - PlaceNextToRedBox20cmFn
         - null
-        - InFrontOfBlueBoxFn
+        - PlaceNextToRedBoxAndBlueBox20cmFn
       initial_state:
         - free(cyan_box)
         - on(cyan_box, table
@@ -30,12 +30,12 @@ env_kwargs:
         - free(blue_box)
         - on(blue_box, table
         - graspable(blue_box)
-      instruction: "Place the three boxes in a line so that the red box is in front of the blue box is in front of the cyan box."
+      instruction: "Arrange the red box, blue box, and cyan box in a triangle of edge length 20 cm."
       custom_fns:
         - null
-        - PlaceInFrontOfCyanBoxFn_trial_17
+        - TrianglePlacementBlueBoxFn_trial_17
         - null
-        - PlaceInFrontOfBlueBoxFn_trial_17
+        - TrianglePlacementCyanBoxFn_trial_17
       
       
       

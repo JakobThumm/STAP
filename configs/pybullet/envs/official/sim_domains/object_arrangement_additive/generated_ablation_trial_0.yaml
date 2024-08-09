@@ -29,7 +29,7 @@ env_kwargs:
       instruction: "Make sure that the red box, the blue box, and the cyan box are in a line on the table."
       custom_fns:
         - null
-        - AlignBoxesInLineFn_trial_0
+        - InLineWithRedAndBlueBoxFn_trial_0
       
       
       

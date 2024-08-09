@@ -14,7 +14,7 @@ env_kwargs:
         - place(cyan_box, table)
       evaluation_fns:
         - null
-        - PlaceLeftOfRedBoxFn
+        - StraightLeftOfRedBoxFn
       initial_state:
         - free(screwdriver)
         - on(screwdriver, table
