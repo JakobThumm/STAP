@@ -93,6 +93,10 @@ def summarize_trial(
         Dictionary containing the summarized results.
     """
     results = {}
+    if "p_success" in keys:
+        values = np.array([result["p_success"] for result in trial_results])
+        results["shooting_failed"] = np.sum(values == 0) / len(values)
+
     for key in keys:
         if key == "t_planner":
             values = np.array([np.sum(result[key]) for result in trial_results])
@@ -111,6 +115,7 @@ def summarize_trial(
 def simplified_summary_all_trials(
     trial_results: Dict[str, Sequence[Dict[str, Any]]],
     keys: Sequence[str] = [
+        "p_success",
         "values",
         "rewards",
         "predicted_preference_values",
@@ -136,6 +141,9 @@ def simplified_summary_all_trials(
             elif key == "rewards":
                 # We want to summarize if the the last action was successful or not.
                 values.extend([result[key][-1] for result in results])
+            elif key == "p_success":
+                # We want to summarize if the the last action was successful or not.
+                values.extend([result[key] for result in results])
             # elif key == "observed_preference_values":
             #     # Emulate a threshold prefenerence function instead of the normal cdf function.
             #     for result in results:
@@ -147,6 +155,11 @@ def simplified_summary_all_trials(
                 for result in results:
                     values.extend(result[key])
         values = np.array(values).flatten()
+        if key == "p_success":
+            summary["shooting_failed_percent_mean"] = np.sum(values == 0) / len(values)
+            summary["shooting_failed_percent_std"] = 0.0
+            summary["shooting_failed_percent_ci_025"] = 0.0
+            summary["shooting_failed_percent_ci_975"] = 0.0
         summary[key + "_mean"] = np.nanmean(values)
         summary[key + "_std"] = np.nanstd(values)
         ci = bootstrap(data=(values,), statistic=np.nanmean, axis=0, confidence_level=0.95).confidence_interval
@@ -200,6 +213,7 @@ def create_result_summary(
     experiment_paths = list_subdirs(eval_path)
     summary_list = []
     keys = [
+        "p_success",
         "values",
         "rewards",
         "predicted_preference_values",
@@ -212,6 +226,7 @@ def create_result_summary(
         summary = simplified_summary_all_trials(raw_data, keys)
         summary["experiment"] = experiment_path.split("/")[-1]
         summary_list.append(summary)
+    keys.append("shooting_failed_percent")
     dicts_to_csv(summary_list, f"{eval_path}/summary.csv", keys)
     # for trial_name, trial_results in raw_data.items():
     #     summary = summarize_trial(trial_results)
