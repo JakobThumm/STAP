@@ -1,18 +1,16 @@
 #!/bin/bash
 
-function download_zip {
-    gdown "${GDRIVE_LINK}" -O file.zip
-    unzip file.zip -d "${DESTINATION}"
-    rm file.zip
-}
+# Datasets
 
-# Download model checkpoints and IRL dataset to ./models.
-GDRIVE_LINK="https://drive.google.com/uc?id=1QeAUF73zZSKOA1vhMEFZ9KU4BrNv0eVI"
-DESTINATION="./"
-download_zip
 
-# Download environment configs associated with IRL dataset.
-# to ./configs/pybullet/envs/official/primitives/datasets.
-GDRIVE_LINK="https://drive.google.com/uc?id=1uxm4TZq0XSS2dk5mp8pIz3Q6AGkSLK8C"
-DESTINATION="./configs/pybullet/envs/official/primitives/"
-download_zip
+# Q-value functions
+wget https://nextcloud.in.tum.de/index.php/s/8RyNzX79aBrjWzT/download/value_fns_initial_submission.zip
+unzip value_fns_initial_submission.zip
+
+# Policies
+wget https://nextcloud.in.tum.de/index.php/s/xXtATYPWnyG5awE/download/policy_irl_initial_submission.zip
+unzip policy_irl_initial_submission.zip
+
+# Dynamics
+wget https://nextcloud.in.tum.de/index.php/s/gqQbd4KPwK9ogjR/download/dynamics_irl_initial_submission.zip
+unzip dynamics_irl_initial_submission.zip
