@@ -6,7 +6,7 @@ For a brief overview of our work, please refer to our [project page](https://sit
 
 Further details can be found in our paper available on [arXiv](https://arxiv.org/abs/2408.06105v1).
 
-<img src="readme/user_instruction.png" alt="Text2Interaction Preview"/>
+<img src="readme/user_instruction.png" alt="Text2Interaction Preview" height="55pt"/>
 <p align="center">
   <table>
     <tr>
@@ -160,7 +160,7 @@ Run the following commands to download the model checkpoints to the default `mod
 
 ## Training Skills
 
-<img src="readme/offline_rl.png" alt="Offline RL overview"/>
+<img src="readme/offline_rl.png" alt="Offline RL overview" width="500pt"/>
 
 Skills in STAP are trained independently in custom environments.
 We provide an inverse RL pipeline for training skills, which can be executed using the [docker image](#docker-installation). Running 
@@ -219,7 +219,7 @@ We evaluated this behavior on a real-world Frank Research 3 robot. The code for 
 
 ### Ablation study
 
-<img src="readme/ablation_results.png" alt="Ablation study results"/>
+<img src="readme/ablation_results.png" alt="Ablation study results" width="400pt"/>
 
 We evaluate four models in our ablation study:
  - Oracle: hand scripted preference functions run with the default Text2Interaction formulation.
