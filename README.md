@@ -99,7 +99,7 @@ conda env create -f environment.yml
 or pip
 ```
 # Install torch with the correct CUDA version of your GPU.
-pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 networkx==3.0 --index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 networkx==3.0 --index-url https://download.pytorch.org/whl/cu118 swig
 pip install --upgrade pip && pip install -r requirements.txt
 ```
 
@@ -119,7 +119,9 @@ source ~/.bashrc
 
 Then install `sara-shield`
 ```
-python third_party/sara-shield/setup.py install
+cd third_party/sara-shield
+python setup.py install
+cd ../..
 ```
 
 #### STAP installation
