@@ -6,6 +6,7 @@ dependencies:
   - python=3.8.10
   - setuptools==65.5.0
   - wheel=0.38.4  # Fix for Issue #160: https://github.com/openai/gym/issues/3202#issuecomment-1513593788
+  - swig
   - pip:
     # works for regular pip packages
     - matplotlib
