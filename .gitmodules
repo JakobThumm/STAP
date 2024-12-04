@@ -6,4 +6,4 @@
 	url = https://github.com/JakobThumm/human-robot-animations.git
 [submodule "third_party/sara-shield"]
 	path = third_party/sara-shield
-	url = git@gitlab.lrz.de:cps-robotics/sara-shield.git
+	url = git@github.com:JakobThumm/sara-shield.git
